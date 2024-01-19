@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -22,36 +24,23 @@ use Composer\Package\PackageInterface;
 abstract class AbstractSolveEvent extends Event
 {
     /**
-     * @var string
-     */
-    private $assetDir;
-
-    /**
-     * @var PackageInterface[] The composer packages
-     */
-    private $packages;
-
-    /**
      * Constructor.
      *
-     * @param string             $name     The event name
-     * @param string             $assetDir The directory of mock assets
-     * @param PackageInterface[] $packages All installed Composer packages
+     * @param string $name The event name.
+     * @param string $assetDir The directory of mock assets.
+     * @param array $packages All installed Composer packages.
+     * 
+     * @psalm-param PackageInterface[] $packages All installed Composer packages.
      */
-    public function __construct($name, $assetDir, array $packages)
+    public function __construct(string $name, private string $assetDir, private array $packages = [])
     {
-        parent::__construct($name, array(), array());
-
-        $this->assetDir = $assetDir;
-        $this->packages = $packages;
+        parent::__construct($name, [], []);
     }
 
     /**
      * Get the directory of mock assets.
-     *
-     * @return string
      */
-    public function getAssetDir()
+    public function getAssetDir(): string
     {
         return $this->assetDir;
     }
@@ -59,9 +48,9 @@ abstract class AbstractSolveEvent extends Event
     /**
      * Get the installed Composer packages.
      *
-     * @return PackageInterface[]
+     * @psalm-return PackageInterface[] All installed Composer packages.
      */
-    public function getPackages()
+    public function getPackages(): array
     {
         return $this->packages;
     }
