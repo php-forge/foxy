@@ -1,0 +1,34 @@
+on:
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+      - 'CHANGELOG.md'
+      - '.gitignore'
+      - '.gitattributes'
+      - 'infection.json.dist'
+      - 'phpunit.xml.dist'
+
+  push:
+    branches: ['main']
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+      - 'CHANGELOG.md'
+      - '.gitignore'
+      - '.gitattributes'
+      - 'infection.json.dist'
+      - 'phpunit.xml.dist'
+
+name: ecs
+
+jobs:
+  easy-coding-standard:
+    uses: php-forge/actions/.github/workflows/ecs.yml@main
+    secrets:
+      AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+    with:
+      os: >-
+        ['ubuntu-latest']
+      php: >-
+        ['8.1']
