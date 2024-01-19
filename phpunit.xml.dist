@@ -1,30 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<phpunit backupGlobals="false"
-         backupStaticAttributes="false"
-         colors="true"
-         convertErrorsToExceptions="true"
-         convertNoticesToExceptions="true"
-         convertWarningsToExceptions="true"
-         processIsolation="false"
-         stopOnFailure="false"
-         bootstrap="tests/bootstrap.php"
+<phpunit
+  backupGlobals="false"
+  backupStaticAttributes="false"
+  colors="true"
+  convertErrorsToExceptions="true"
+  convertNoticesToExceptions="true"
+  convertWarningsToExceptions="true"
+  processIsolation="false"
+  stopOnFailure="false"
+  bootstrap="tests/bootstrap.php"
 >
-    <coverage>
-        <include>
-            <directory>./</directory>
-        </include>
+  <coverage>
+    <include>
+      <directory>./src</directory>
+    </include>
 
-        <exclude>
-            <file>.php-cs-fixer.dist.php</file>
-            <directory>./Tests</directory>
-            <directory>./Resources</directory>
-            <directory>./vendor</directory>
-        </exclude>
-    </coverage>
+    <exclude>
+      <file>.php-cs-fixer.dist.php</file>
+      <directory>./tests</directory>
+      <directory>./resources</directory>
+      <directory>./vendor</directory>
+    </exclude>
+  </coverage>
 
   <testsuites>
-        <testsuite name="Foxy Test Suite">
-            <directory>./Tests/</directory>
-        </testsuite>
-    </testsuites>
+    <testsuite name="Foxy">
+      <directory>./tests/</directory>
+    </testsuite>
+  </testsuites>
 </phpunit>
