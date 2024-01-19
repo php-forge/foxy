@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -19,33 +21,26 @@ use Foxy\FoxyEvents;
  *
  * @author François Pluchino <francois.pluchino@gmail.com>
  */
-class PostSolveEvent extends AbstractSolveEvent
+final class PostSolveEvent extends AbstractSolveEvent
 {
-    /**
-     * @var int
-     */
-    private $runResult;
-
     /**
      * Constructor.
      *
-     * @param string             $assetDir  The directory of mock assets
-     * @param PackageInterface[] $packages  All installed Composer packages
-     * @param int                $runResult The process result of asset manager execution
+     * @param string $assetDir The directory of mock assets.
+     * @param array $packages  All installed Composer packages.
+     * @param int $runResult The process result of asset manager execution.
+     * 
+     * @psalm-param PackageInterface[] $packages All installed Composer packages.
      */
-    public function __construct($assetDir, array $packages, $runResult)
+    public function __construct($assetDir, array $packages, private int $runResult)
     {
         parent::__construct(FoxyEvents::POST_SOLVE, $assetDir, $packages);
-
-        $this->runResult = $runResult;
     }
 
     /**
      * Get the process result of asset manager execution.
-     *
-     * @return int
      */
-    public function getRunResult()
+    public function getRunResult(): int
     {
         return $this->runResult;
     }

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -19,15 +21,17 @@ use Foxy\FoxyEvents;
  *
  * @author François Pluchino <francois.pluchino@gmail.com>
  */
-class PreSolveEvent extends AbstractSolveEvent
+final class PreSolveEvent extends AbstractSolveEvent
 {
     /**
      * Constructor.
      *
-     * @param string             $assetDir The directory of mock assets
-     * @param PackageInterface[] $packages All installed Composer packages
+     * @param string $assetDir The directory of mock assets.
+     * @param array $packages All installed Composer packages.
+     * 
+     * @psalm-param PackageInterface[] $packages All installed Composer packages.
      */
-    public function __construct($assetDir, array $packages)
+    public function __construct(string $assetDir, array $packages = [])
     {
         parent::__construct(FoxyEvents::PRE_SOLVE, $assetDir, $packages);
     }

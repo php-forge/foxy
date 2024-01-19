@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -19,21 +21,18 @@ use Foxy\FoxyEvents;
  *
  * @author François Pluchino <francois.pluchino@gmail.com>
  */
-class GetAssetsEvent extends AbstractSolveEvent
+final class GetAssetsEvent extends AbstractSolveEvent
 {
-    /**
-     * @var array
-     */
-    private $assets;
-
     /**
      * Constructor.
      *
-     * @param string             $assetDir The directory of mock assets
-     * @param PackageInterface[] $packages All installed Composer packages
-     * @param array              $assets   The map of asset package name and the asset package path
+     * @param string $assetDir The directory of mock assets.
+     * @param array $packages All installed Composer packages.
+     * @param array $assets The map of asset package name and the asset package path.
+     * 
+     * @psalm-param PackageInterface[] $packages All installed Composer packages.
      */
-    public function __construct($assetDir, array $packages, array $assets)
+    public function __construct(string $assetDir, array $packages, private array $assets = [])
     {
         parent::__construct(FoxyEvents::GET_ASSETS, $assetDir, $packages);
 
@@ -44,10 +43,8 @@ class GetAssetsEvent extends AbstractSolveEvent
      * Check if the asset package is present.
      *
      * @param string $name The asset package name
-     *
-     * @return bool
      */
-    public function hasAsset($name)
+    public function hasAsset(string $name): bool
     {
         return isset($this->assets[$name]);
     }
@@ -55,20 +52,16 @@ class GetAssetsEvent extends AbstractSolveEvent
     /**
      * Add the asset package.
      *
-     * @param string $name The asset package name
-     * @param string $path The asset package path (relative path form root project
-     *                     and started with `file:`)
+     * @param string $name The asset package name.
+     * @param string $path The asset package path (relative path form root project and started with `file:`).
      *
      * Example:
      *
      * For the Composer package `foo/bar`.
      *
-     * $event->addAsset('@composer-asset/foo--bar',
-     *                  'file:./vendor/foxy/composer-asset/foo/bar');
-     *
-     * @return self
+     * $event->addAsset('@composer-asset/foo--bar', 'file:./vendor/foxy/composer-asset/foo/bar');
      */
-    public function addAsset($name, $path)
+    public function addAsset(string $name, string $path): self
     {
         $this->assets[$name] = $path;
 
@@ -77,10 +70,8 @@ class GetAssetsEvent extends AbstractSolveEvent
 
     /**
      * Get the map of asset package name and the asset package path.
-     *
-     * @return array
      */
-    public function getAssets()
+    public function getAssets(): array
     {
         return $this->assets;
     }
