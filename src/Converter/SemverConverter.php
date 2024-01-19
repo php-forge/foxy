@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -16,9 +18,9 @@ namespace Foxy\Converter;
  *
  * @author François Pluchino <francois.pluchino@gmail.com>
  */
-class SemverConverter implements VersionConverterInterface
+final class SemverConverter implements VersionConverterInterface
 {
-    public function convertVersion($version)
+    public function convertVersion(string $version = null): string
     {
         if (\in_array($version, array(null, '', 'latest'), true)) {
             return ('latest' === $version ? 'default || ' : '').'*';

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -23,11 +25,9 @@ abstract class SemverUtil
     /**
      * Converts the date or datetime version.
      *
-     * @param string $version The version
-     *
-     * @return string
+     * @param string $version The version.
      */
-    public static function convertDateVersion($version)
+    public static function convertDateVersion(string $version): string
     {
         if (preg_match('/^\d{7,}\./', $version)) {
             $pos = strpos($version, '.');
@@ -41,10 +41,8 @@ abstract class SemverUtil
      * Converts the version metadata.
      *
      * @param string $version
-     *
-     * @return string
      */
-    public static function convertVersionMetadata($version)
+    public static function convertVersionMetadata(string $version): string
     {
         if (preg_match_all(
             self::createPattern('([a-zA-Z]+|(\-|\+)[a-zA-Z]+|(\-|\+)[0-9]+)'),
@@ -70,11 +68,11 @@ abstract class SemverUtil
     /**
      * Creates a pattern with the version prefix pattern.
      *
-     * @param string $pattern The pattern without '/'
+     * @param string $pattern The pattern without '/'.
      *
-     * @return string The full pattern with '/'
+     * @return string The full pattern with '/'.
      */
-    public static function createPattern($pattern)
+    public static function createPattern(string $pattern): string
     {
         $numVer = '([0-9]+|x|\*)';
         $numVer2 = '('.$numVer.'\.'.$numVer.')';
@@ -86,11 +84,11 @@ abstract class SemverUtil
     /**
      * Clean the wildcard in version.
      *
-     * @param string $version The version
+     * @param string $version The version.
      *
-     * @return string The cleaned version
+     * @return string The cleaned version.
      */
-    private static function cleanWildcard($version)
+    private static function cleanWildcard(string $version): string
     {
         while (false !== strpos($version, '.x.x')) {
             $version = str_replace('.x.x', '.x', $version);
@@ -102,12 +100,12 @@ abstract class SemverUtil
     /**
      * Clean the raw version.
      *
-     * @param string $version The version
-     * @param array  $matches The match of pattern asset version
+     * @param string $version The version.
+     * @param array $matches The match of pattern asset version.
      *
-     * @return array The list of $type, $version and $end
+     * @return array The list of $type, $version and $end.
      */
-    private static function cleanVersion($version, array $matches)
+    private static function cleanVersion(string $version, array $matches): array
     {
         $end = substr($version, \strlen($matches[1][0][0]));
         $version = $matches[1][0][0].'-';
@@ -128,12 +126,12 @@ abstract class SemverUtil
     /**
      * Match the version.
      *
-     * @param string $version
-     * @param string $type
+     * @param string $version The version.
+     * @param string $type The type of version.
      *
-     * @return array The list of $version and $patchVersion
+     * @return array The list of $version and $patchVersion.
      */
-    private static function matchVersion($version, $type)
+    private static function matchVersion(string $version, string $type): array
     {
         $patchVersion = true;
 
@@ -172,11 +170,9 @@ abstract class SemverUtil
     /**
      * Convert the minor version of date.
      *
-     * @param string $minor The minor version
-     *
-     * @return string
+     * @param string $minor The minor version.
      */
-    private static function convertDateMinorVersion($minor)
+    private static function convertDateMinorVersion(string $minor): string
     {
         $split = explode('.', $minor);
         $minor = (int) $split[0];
