@@ -1,24 +1,30 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<phpunit
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/10.2/phpunit.xsd"
-    bootstrap="vendor/autoload.php"
-    cacheDirectory=".phpunit.cache"
-    colors="true"
-    executionOrder="depends,defects"
-    failOnRisky="true"
-    failOnWarning="true"
-    stopOnFailure="false"
+<phpunit backupGlobals="false"
+         backupStaticAttributes="false"
+         colors="true"
+         convertErrorsToExceptions="true"
+         convertNoticesToExceptions="true"
+         convertWarningsToExceptions="true"
+         processIsolation="false"
+         stopOnFailure="false"
+         bootstrap="Tests/bootstrap.php"
 >
-    <testsuites>
-        <testsuite name="Template">
-            <directory>tests</directory>
+    <coverage>
+        <include>
+            <directory>./</directory>
+        </include>
+
+        <exclude>
+            <file>.php-cs-fixer.dist.php</file>
+            <directory>./Tests</directory>
+            <directory>./Resources</directory>
+            <directory>./vendor</directory>
+        </exclude>
+    </coverage>
+
+  <testsuites>
+        <testsuite name="Foxy Test Suite">
+            <directory>./Tests/</directory>
         </testsuite>
     </testsuites>
-
-    <source>
-        <include>
-            <directory suffix=".php">./src</directory>
-        </include>
-    </source>
 </phpunit>

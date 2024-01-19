@@ -1,67 +1,119 @@
-<p align="center">
-    <a href="https://github.com/yii-tools/template" target="_blank">
-        <img src="https://avatars.githubusercontent.com/u/121752654?s=200&v=4" height="100px">
-    </a>
-    <h1 align="center">Template.</h1>
-    <br>
-</p>
+<p align="center"><a href="https://foxypkg.com" target="_blank">
+    <img src="https://foxypkg.com/assets/img/logo.svg" width="260" alt="Foxy">
+</a></p>
 
-<p align="center">
-    <a href="https://github.com/yii-tools/template/actions/workflows/build.yml" target="_blank">
-        <img src="https://github.com/yii-tools/template/actions/workflows/build.yml/badge.svg" alt="PHPUnit">
-    </a>
-    <a href="https://codecov.io/gh/yii-tools/template" target="_blank">
-        <img src="https://codecov.io/gh/yii-tools/template/branch/main/graph/badge.svg?token=MF0XUGVLYC" alt="Codecov">
-    </a>
-    <a href="https://dashboard.stryker-mutator.io/reports/github.com/yii-tools/template/main" target="_blank">
-        <img src="https://img.shields.io/endpoint?style=flat&url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fyii2-extensions%2Fasset-bootstrap5%2Fmain" alt="Infection">
-    </a>
-    <a href="https://github.com/yii-tools/template/actions/workflows/static.yml" target="_blank">
-        <img src="https://github.com/yii-tools/template/actions/workflows/static.yml/badge.svg" alt="Psalm">
-    </a>
-    <a href="https://shepherd.dev/github/yii-tools/template" target="_blank">
-        <img src="https://shepherd.dev/github/yii-tools/template/coverage.svg" alt="Psalm Coverage">
-    </a>
-    <a href="https://github.styleci.io/repos/494495136?branch=main" target="_blank">
-        <img src="https://github.styleci.io/repos/494495136/shield?branch=main" alt="Style ci">
-    </a>           
-</p>
+[![Latest Version](https://img.shields.io/packagist/v/foxy/foxy.svg)](https://packagist.org/packages/foxy/foxy)
+[![Build Status](https://img.shields.io/travis/com/fxpio/foxy.svg)](https://travis-ci.com/github/fxpio/foxy)
+[![Coverage Status](https://img.shields.io/coveralls/github/fxpio/foxy.svg)](https://coveralls.io/r/fxpio/foxy)
+[![Packagist Downloads](https://img.shields.io/packagist/dt/foxy/foxy.svg)](https://packagist.org/packages/foxy/foxy/stats)
 
-## Installation
+Foxy is a Composer plugin to automate the validation, installation, updating and removing of PHP libraries
+asset dependencies (javaScript, stylesheets, etc.) defined in the NPM `package.json` file of the project and
+PHP libraries during the execution of Composer. It handles restoring the project state in case
+[NPM](https://www.npmjs.com) or [Yarn](https://yarnpkg.com) or [pnpm](https://pnpm.io) terminates with an error. All features and tools
+are available: [Npmrc](https://docs.npmjs.com/files/npmrc), [Yarnrc](https://yarnpkg.com/en/docs/yarnrc),
+[Webpack](https://webpack.js.org), [Gulp](https://gulpjs.com), [Grunt](https://gruntjs.com),
+[Babel](https://babeljs.io), [TypeScript](https://www.typescriptlang.org), [Scss/Sass](http://sass-lang.com),
+[Less](http://lesscss.org), etc.
 
-The preferred way to install this extension is through [composer](https://getcomposer.org/download/).
+It is certain that each language has its own dependency management system, and that it is highly recommended to use
+each package manager. NPM, Yarn or pnpm works very well when the asset dependencies are managed only in the PHP project,
+but when you create PHP libraries that using assets, there is no way to automatically add asset dependencies,
+and most importantly, no validation of versions can be done automatically. You must tell the developers
+the list of asset dependencies that using by your PHP library, and you must ask him to add manually the asset
+dependencies to its asset manager of his project.
 
-Either run
+However, another solution exist - what many projects propose - you must add the assets in the folder of the
+PHP library (like `/assets`, `/Resources/public`). Of course, with this method, the code is duplicated, it
+pollutes the source code of the PHP library, no version management/validation is possible, and it is even
+less possible, to use all tools such as Babel, Scss, Less, etc ...
 
-```shell
-composer require --prefer-dist package
-```
+Foxy focuses solely on automation of the validation, addition, updating and deleting of the dependencies in
+the definition file of the asset package, while restoring the project state, as well as PHP dependencies if
+NPM, Yarn or pnpm terminates with an error.
 
-or add
+#### It is Fast
 
-```json
-"package": "version"
-```
+Foxy retrieves the list of all Composer dependencies to inject the asset dependencies in the file `package.json`,
+and leaves the execution of the analysis, validation and downloading of the libraries to NPM, Yarn or pnpm. Therefore,
+no VCS Repository of Composer is used for analyzing the asset dependencies, and you keep the performance
+of native package manager used.
 
-to the require-dev section of your `composer.json` file. 
+#### It is Reliable
 
-## Usage
+Foxy creates mock packages of the PHP libraries containing only the asset dependencies definition file
+in a local directory, and associates these packages in the asset dependencies definition file of the
+project. Given that Foxy does not manipulate any asset dependencies, and let alone the version constraints,
+this allows NPM, Yarn or pnpm to solve the asset dependencies without any intermediary. Moreover, the entire
+validation with the lock file and installation process is left to NPM, Yarn or pnpm.
 
-[Check the documentation docs](/docs/README.md) to learn about usage.
+#### It is Secure
 
-## Support versions
+Foxy restores the Composer lock file with all its PHP dependencies, as well as the asset dependencies
+definition file, in the previous state if NPM, Yarn or pnpm ends with an error.
 
-[![PHP81](https://img.shields.io/badge/PHP-%3E%3D8.1-787CB5)](https://www.php.net/releases/8.1/en.php)
-[![Yii30](https://img.shields.io/badge/Yii%20version-3.0-blue)](https://yiiframework.com)
+Features
+--------
 
-## Testing
+- Compatible with [Symfony Webpack Encore](http://symfony.com/doc/current/frontend.html)
+  and [Laravel Mix](https://laravel.com/docs/master/mix)
+- Works with Node.js and NPM, Yarn or pnpm
+- Works with the asset dependencies defined in the `package.json` file for projects and PHP libraries
+- Works with the installation in the dependencies of the project or libraries (not in global mode)
+- Works with public or private repositories
+- Works with all features of Composer, NPM, Yarn and pnpm
+- Retains the native performance of Composer, NPM, Yarn and pnpm
+- Restores previous versions of PHP dependencies and the lock file if NPM, Yarn or pnpm terminates with an error
+- Validates the NPM, Yarn or pnpm version with a version range
+- Configuration of the plugin per project, globally or with the environment variables:
+  - Enable/disable the plugin
+  - Choose the asset manager: NPM, Yarn or pnpm (`npm` is used by default)
+  - Lock the version of the asset manager with the Composer version range
+  - Define the custom path of binary of the asset manager
+  - Enable/disable the fallback for the asset package file of the project
+  - Enable/disable the fallback for the Composer lock file and its dependencies
+  - Enable/disable the running of asset manager to keep only the manipulation of the asset package file
+  - Override the install command options for the asset manager
+  - Override the update command options for the asset manager
+  - Define the custom path of the mock package of PHP library
+  - Enable/disable manually the asset packages for the PHP libraries
+- Works with the Composer commands:
+  - `install`
+  - `update`
+  - `require`
+  - `remove`
 
-[Check the documentation testing](/docs/testing.md) to learn about testing.
+Documentation
+-------------
 
-## Our social networks
+- [Guide](Resources/doc/index.md)
+- [FAQs](Resources/doc/faqs.md)
+- [Release Notes](https://github.com/fxpio/foxy/releases)
 
-[![Twitter](https://img.shields.io/badge/twitter-follow-1DA1F2?logo=twitter&logoColor=1DA1F2&labelColor=555555?style=flat)](https://twitter.com/Terabytesoftw)
+Installation
+------------
 
-## License
+Installation instructions are located in [the guide](Resources/doc/index.md).
 
-The MIT License. Please see [License File](LICENSE.md) for more information.
+License
+-------
+
+Foxy is released under the MIT license. See the complete license in:
+
+[LICENSE](LICENSE)
+
+About
+-----
+
+Foxy is a [François Pluchino](https://github.com/francoispluchino) initiative.
+See also the list of [contributors](https://github.com/fxpio/foxy/contributors).
+
+Reporting an issue or a feature request
+---------------------------------------
+
+Issues and feature requests are tracked in the [Github issue tracker](https://github.com/fxpio/foxy/issues).
+
+Acknowledgments
+---------------
+
+Thanks to [Tobias Munk](https://github.com/schmunk42) to have suggesting this name
