@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -21,9 +23,9 @@ interface VersionConverterInterface
     /**
      * Converts the asset version to composer version.
      *
-     * @param string $version The asset version
+     * @param string|null $version The asset version
      *
      * @return string The composer version
      */
-    public function convertVersion($version);
+    public function convertVersion(string $version = null): string;
 }
