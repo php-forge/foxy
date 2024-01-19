@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -20,28 +22,15 @@ use Foxy\Exception\RuntimeException;
  */
 final class Config
 {
-    /**
-     * @var array
-     */
-    private $config;
-
-    /**
-     * @var array
-     */
-    private $defaults;
-
-    /**
-     * @var array
-     */
-    private $cacheEnv = array();
+    private array $cacheEnv = [];
 
     /**
      * Constructor.
      *
-     * @param array $config   The config
-     * @param array $defaults The default values
+     * @param array $config The config.
+     * @param array $defaults The default values.
      */
-    public function __construct(array $config, array $defaults = array())
+    public function __construct(private array $config, private array $defaults = [])
     {
         $this->config = $config;
         $this->defaults = $defaults;
@@ -50,27 +39,23 @@ final class Config
     /**
      * Get the array config value.
      *
-     * @param string $key     The config key
-     * @param array  $default The default value
-     *
-     * @return array
+     * @param string $key The config key.
+     * @param array $default The default value.
      */
-    public function getArray($key, array $default = array())
+    public function getArray(string $key, array $default = []): array
     {
         $value = $this->get($key, null);
 
-        return null !== $value ? (array) $value : (array) $default;
+        return $value ?? $default;
     }
 
     /**
      * Get the config value.
      *
-     * @param string     $key     The config key
-     * @param null|mixed $default The default value
-     *
-     * @return null|mixed
+     * @param string $key The config key.
+     * @param mixed $default The default value.
      */
-    public function get($key, $default = null)
+    public function get(string $key, mixed $default = null): mixed
     {
         if (\array_key_exists($key, $this->cacheEnv)) {
             return $this->cacheEnv[$key];
@@ -93,11 +78,9 @@ final class Config
     /**
      * Convert the config key into environment variable.
      *
-     * @param string $key The config key
-     *
-     * @return string
+     * @param string $key The config key.
      */
-    private function convertEnvKey($key)
+    private function convertEnvKey(string $key): string
     {
         return 'FOXY__'.strtoupper(str_replace('-', '_', $key));
     }
@@ -105,12 +88,10 @@ final class Config
     /**
      * Convert the value of environment variable into php variable.
      *
-     * @param string $value               The value of environment variable
-     * @param string $environmentVariable The environment variable name
-     *
-     * @return array|bool|int|string
+     * @param string $value The value of environment variable.
+     * @param string $environmentVariable The environment variable name.
      */
-    private function convertEnvValue($value, $environmentVariable)
+    private function convertEnvValue(string $value, string $environmentVariable): array|bool|int|string
     {
         $value = trim(trim(trim($value, '\''), '"'));
 
@@ -128,11 +109,9 @@ final class Config
     /**
      * Check if the value of environment variable is a boolean.
      *
-     * @param string $value The value of environment variable
-     *
-     * @return bool
+     * @param string $value The value of environment variable.
      */
-    private function isBoolean($value)
+    private function isBoolean(string $value): bool
     {
         $value = strtolower($value);
 
@@ -142,11 +121,9 @@ final class Config
     /**
      * Convert the value of environment variable into a boolean.
      *
-     * @param string $value The value of environment variable
-     *
-     * @return bool
+     * @param string $value The value of environment variable.
      */
-    private function convertBoolean($value)
+    private function convertBoolean(string $value): bool
     {
         return \in_array($value, array('true', '1', 'yes', 'y'), true);
     }
@@ -154,11 +131,9 @@ final class Config
     /**
      * Check if the value of environment variable is a integer.
      *
-     * @param string $value The value of environment variable
-     *
-     * @return bool
+     * @param string $value The value of environment variable.
      */
-    private function isInteger($value)
+    private function isInteger(string $value): bool
     {
         return ctype_digit(trim($value, '-'));
     }
@@ -166,11 +141,9 @@ final class Config
     /**
      * Convert the value of environment variable into a integer.
      *
-     * @param string $value The value of environment variable
-     *
-     * @return bool
+     * @param string $value The value of environment variable.
      */
-    private function convertInteger($value)
+    private function convertInteger(string $value): int
     {
         return (int) $value;
     }
@@ -178,11 +151,9 @@ final class Config
     /**
      * Check if the value of environment variable is a string JSON.
      *
-     * @param string $value The value of environment variable
-     *
-     * @return bool
+     * @param string $value The value of environment variable.
      */
-    private function isJson($value)
+    private function isJson(string $value): bool
     {
         return 0 === strpos($value, '{') || 0 === strpos($value, '[');
     }
@@ -190,17 +161,17 @@ final class Config
     /**
      * Convert the value of environment variable into a json array.
      *
-     * @param string $value               The value of environment variable
-     * @param string $environmentVariable The environment variable name
-     *
-     * @return array
+     * @param string $value The value of environment variable.
+     * @param string $environmentVariable The environment variable name.
      */
-    private function convertJson($value, $environmentVariable)
+    private function convertJson(string $value, string $environmentVariable): array
     {
         $value = json_decode($value, true);
 
         if (json_last_error()) {
-            throw new RuntimeException(sprintf('The "%s" environment variable isn\'t a valid JSON', $environmentVariable));
+            throw new RuntimeException(
+                sprintf('The "%s" environment variable isn\'t a valid JSON', $environmentVariable)
+            );
         }
 
         return $value;
@@ -209,12 +180,10 @@ final class Config
     /**
      * Get the configured default value or custom default value.
      *
-     * @param string     $key     The config key
-     * @param null|mixed $default The default value
-     *
-     * @return null|mixed
+     * @param string $key The config key.
+     * @param mixed $default The default value.
      */
-    private function getDefaultValue($key, $default = null)
+    private function getDefaultValue(string $key, mixed $default = null): mixed
     {
         $value = null === $default && \array_key_exists($key, $this->defaults)
             ? $this->defaults[$key]
@@ -226,13 +195,11 @@ final class Config
     /**
      * Get the value defined by the manager name in the key.
      *
-     * @param string      $key     The config key
-     * @param array|mixed $value   The value
-     * @param null|mixed  $default The default value
-     *
-     * @return null|mixed
+     * @param string $key The config key.
+     * @param mixed $value The value.
+     * @param mixed  $default The default value.
      */
-    private function getByManager($key, $value, $default = null)
+    private function getByManager(string $key, mixed $value, mixed $default = null): mixed
     {
         if (0 === strpos($key, 'manager-') && \is_array($value)) {
             $manager = $manager = $this->get('manager', '');
