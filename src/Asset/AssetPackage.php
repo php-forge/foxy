@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -19,29 +21,20 @@ use Composer\Package\RootPackageInterface;
  *
  * @author François Pluchino <francois.pluchino@gmail.com>
  */
-class AssetPackage implements AssetPackageInterface
+final class AssetPackage implements AssetPackageInterface
 {
-    const SECTION_DEPENDENCIES = 'dependencies';
-    const SECTION_DEV_DEPENDENCIES = 'devDependencies';
-    const COMPOSER_PREFIX = '@composer-asset/';
-
-    /**
-     * @var JsonFile
-     */
-    protected $jsonFile;
-
-    /**
-     * @var array
-     */
-    protected $package = array();
+    public const SECTION_DEPENDENCIES = 'dependencies';
+    public const SECTION_DEV_DEPENDENCIES = 'devDependencies';
+    public const COMPOSER_PREFIX = '@composer-asset/';
+    protected array $package = [];
 
     /**
      * Constructor.
      *
      * @param RootPackageInterface $rootPackage The composer root package
-     * @param JsonFile             $jsonFile    The json file
+     * @param JsonFile $jsonFile    The json file
      */
-    public function __construct(RootPackageInterface $rootPackage, JsonFile $jsonFile)
+    public function __construct(RootPackageInterface $rootPackage, protected JsonFile $jsonFile)
     {
         $this->jsonFile = $jsonFile;
 
@@ -52,38 +45,26 @@ class AssetPackage implements AssetPackageInterface
         $this->injectRequiredKeys($rootPackage);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function write()
+    public function write(): self
     {
         $this->jsonFile->write($this->package);
 
         return $this;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function setPackage(array $package)
+    public function setPackage(array $package): self
     {
         $this->package = $package;
 
         return $this;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getPackage()
+    public function getPackage(): array
     {
         return $this->package;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getInstalledDependencies()
+    public function getInstalledDependencies(): array
     {
         $installedAssets = array();
 
@@ -98,10 +79,7 @@ class AssetPackage implements AssetPackageInterface
         return $installedAssets;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function addNewDependencies(array $dependencies)
+    public function addNewDependencies(array $dependencies): array
     {
         $installedAssets = $this->getInstalledDependencies();
         $existingPackages = array();
@@ -120,10 +98,7 @@ class AssetPackage implements AssetPackageInterface
         return $existingPackages;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function removeUnusedDependencies(array $dependencies)
+    public function removeUnusedDependencies(array $dependencies): self
     {
         $installedAssets = $this->getInstalledDependencies();
         $removeDependencies = array_diff_key($installedAssets, $dependencies);
@@ -140,7 +115,7 @@ class AssetPackage implements AssetPackageInterface
      *
      * @param RootPackageInterface $rootPackage The composer root package
      */
-    protected function injectRequiredKeys(RootPackageInterface $rootPackage)
+    protected function injectRequiredKeys(RootPackageInterface $rootPackage): void
     {
         if (!isset($this->package['license']) && \count($rootPackage->getLicense()) > 0) {
             $license = current($rootPackage->getLicense());
@@ -160,7 +135,7 @@ class AssetPackage implements AssetPackageInterface
      *
      * @param string $section The package section
      */
-    protected function orderPackages($section)
+    protected function orderPackages(string $section): void
     {
         if (isset($this->package[$section]) && \is_array($this->package[$section])) {
             ksort($this->package[$section], SORT_STRING);

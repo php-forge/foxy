@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -24,77 +26,57 @@ interface AssetManagerInterface
 {
     /**
      * Get the name of asset manager.
-     *
-     * @return string
      */
-    public function getName();
+    public function getName(): string;
 
     /**
      * Check if the asset manager is available.
-     *
-     * @return bool
      */
-    public function isAvailable();
+    public function isAvailable(): bool;
 
     /**
      * Get the filename of the asset package.
-     *
-     * @return string
      */
-    public function getPackageName();
+    public function getPackageName(): string;
 
     /**
      * Check if the lock file is present or not.
-     *
-     * @return bool
      */
-    public function hasLockFile();
+    public function hasLockFile(): bool;
 
     /**
      * Check if the asset dependencies are installed or not.
-     *
-     * @return bool
      */
-    public function isInstalled();
+    public function isInstalled(): bool;
 
     /**
      * Set the fallback.
      *
      * @param FallbackInterface $fallback The fallback
-     *
-     * @return self
      */
-    public function setFallback(FallbackInterface $fallback);
+    public function setFallback(FallbackInterface $fallback): self;
 
     /**
      * Define if the asset manager can be use the update command.
      *
      * @param bool $updatable The value
-     *
-     * @return self
      */
-    public function setUpdatable($updatable);
+    public function setUpdatable(bool $updatable): self;
 
     /**
      * Check if the asset manager can be use the update command or not.
-     *
-     * @return bool
      */
-    public function isUpdatable();
+    public function isUpdatable(): bool;
 
     /**
      * Check if the asset package is valid for the update.
-     *
-     * @return bool
      */
-    public function isValidForUpdate();
+    public function isValidForUpdate(): bool;
 
     /**
      * Get the filename of the lock file.
-     *
-     * @return string
      */
-    public function getLockPackageName();
+    public function getLockPackageName(): string;
 
     /**
      * Validate the version of asset manager.
@@ -102,22 +84,20 @@ interface AssetManagerInterface
      * @throws RuntimeException When the binary isn't installed
      * @throws RuntimeException When the version doesn't match
      */
-    public function validate();
+    public function validate(): void;
 
     /**
      * Add the asset dependencies in asset package file.
      *
      * @param RootPackageInterface $rootPackage  The composer root package
-     * @param array                $dependencies The asset local dependencies
+     * @param array $dependencies The asset local dependencies
      *
      * @return AssetPackageInterface
      */
-    public function addDependencies(RootPackageInterface $rootPackage, array $dependencies);
+    public function addDependencies(RootPackageInterface $rootPackage, array $dependencies): AssetPackageInterface;
 
     /**
      * Run the asset manager to install/update the asset dependencies.
-     *
-     * @return int
      */
-    public function run();
+    public function run(): int;
 }

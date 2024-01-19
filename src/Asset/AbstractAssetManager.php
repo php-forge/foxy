@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -31,146 +33,67 @@ use Foxy\Json\JsonFile;
  */
 abstract class AbstractAssetManager implements AssetManagerInterface
 {
-    const NODE_MODULES_PATH = './node_modules';
+    public const NODE_MODULES_PATH = './node_modules';
+    protected bool $updatable = true;
+    protected VersionConverterInterface|null $versionConverter;
+    private null|string $version = '';
 
-    /**
-     * @var IOInterface
-     */
-    protected $io;
-
-    /**
-     * @var Config
-     */
-    protected $config;
-
-    /**
-     * @var ProcessExecutor
-     */
-    protected $executor;
-
-    /**
-     * @var Filesystem
-     */
-    protected $fs;
-
-    /**
-     * @var VersionConverterInterface
-     */
-    protected $versionConverter;
-
-    /**
-     * @var null|FallbackInterface
-     */
-    protected $fallback;
-
-    /**
-     * @var bool
-     */
-    protected $updatable = true;
-
-    /**
-     * @var null|string
-     */
-    private $version = '';
-
-    /**
-     * Constructor.
-     *
-     * @param IOInterface                    $io               The IO
-     * @param Config                         $config           The config
-     * @param ProcessExecutor                $executor         The process
-     * @param Filesystem                     $fs               The filesystem
-     * @param null|FallbackInterface         $fallback         The asset fallback
-     * @param null|VersionConverterInterface $versionConverter The version converter
-     */
     public function __construct(
-        IOInterface $io,
-        Config $config,
-        ProcessExecutor $executor,
-        Filesystem $fs,
-        FallbackInterface $fallback = null,
-        VersionConverterInterface $versionConverter = null
+        protected IOInterface $io,
+        protected Config $config,
+        protected ProcessExecutor $executor,
+        protected Filesystem $fs,
+        protected FallbackInterface|null $fallback = null,
+        VersionConverterInterface|null $versionConverter = null
     ) {
-        $this->io = $io;
-        $this->config = $config;
-        $this->executor = $executor;
-        $this->fs = $fs;
-        $this->fallback = $fallback;
-        $this->versionConverter = null !== $versionConverter ? $versionConverter : new SemverConverter();
+        $this->versionConverter = $versionConverter ?? new SemverConverter();
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function isAvailable()
+    public function isAvailable(): bool
     {
         return null !== $this->getVersion();
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getPackageName()
+    public function getPackageName(): string
     {
         return 'package.json';
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function hasLockFile()
+    public function hasLockFile(): bool
     {
         return file_exists($this->getLockPackageName());
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function isInstalled()
+    public function isInstalled(): bool
     {
         return is_dir(self::NODE_MODULES_PATH) && file_exists($this->getPackageName());
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function setFallback(FallbackInterface $fallback)
+    public function setFallback(FallbackInterface $fallback): static
     {
         $this->fallback = $fallback;
 
         return $this;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function setUpdatable($updatable)
+    public function setUpdatable($updatable): static
     {
         $this->updatable = $updatable;
 
         return $this;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function isUpdatable()
+    public function isUpdatable(): bool
     {
         return $this->updatable && $this->isInstalled() && $this->isValidForUpdate();
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function isValidForUpdate()
+    public function isValidForUpdate(): bool
     {
         return true;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function validate()
+    public function validate(): void
     {
         $version = $this->getVersion();
         $constraintVersion = $this->config->get('manager-version');
@@ -189,10 +112,7 @@ abstract class AbstractAssetManager implements AssetManagerInterface
         }
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function addDependencies(RootPackageInterface $rootPackage, array $dependencies)
+    public function addDependencies(RootPackageInterface $rootPackage, array $dependencies): AssetPackageInterface
     {
         $assetPackage = new AssetPackage($rootPackage, new JsonFile($this->getPackageName(), null, $this->io));
         $assetPackage->removeUnusedDependencies($dependencies);
@@ -204,10 +124,7 @@ abstract class AbstractAssetManager implements AssetManagerInterface
         return $assetPackage->write();
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function run()
+    public function run(): int
     {
         if (true !== $this->config->get('run-asset-manager')) {
             return 0;
@@ -233,9 +150,11 @@ abstract class AbstractAssetManager implements AssetManagerInterface
     /**
      * Action when the composer dependencies are already installed.
      *
-     * @param string[] $names the asset package name of composer dependencies
+     * @param array $names the asset package name of composer dependencies.
+     * 
+     * @psalm-param list<string> $names
      */
-    protected function actionWhenComposerDependenciesAreAlreadyInstalled($names)
+    protected function actionWhenComposerDependenciesAreAlreadyInstalled(array $names): void
     {
         // do nothing by default
     }
@@ -243,13 +162,13 @@ abstract class AbstractAssetManager implements AssetManagerInterface
     /**
      * Build the command with binary and command options.
      *
-     * @param string          $defaultBin The default binary of command if option isn't defined
-     * @param string          $action     The command action to retrieve the options in config
-     * @param string|string[] $command    The command
+     * @param string $defaultBin The default binary of command if option isn't defined.
+     * @param string $action The command action to retrieve the options in config.
+     * @param array|string $command The command.
      *
-     * @return string
+     * @psalm-param string|string[] $command
      */
-    protected function buildCommand($defaultBin, $action, $command)
+    protected function buildCommand(string $defaultBin, string $action, array|string $command): string
     {
         $bin = $this->config->get('manager-bin', $defaultBin);
         $bin = Platform::isWindows() ? str_replace('/', '\\', $bin) : $bin;
@@ -261,10 +180,7 @@ abstract class AbstractAssetManager implements AssetManagerInterface
             .(empty($options) ? '' : ' '.$options);
     }
 
-    /**
-     * @return null|string
-     */
-    protected function getVersion()
+    protected function getVersion(): string|null
     {
         if ('' === $this->version) {
             $this->executor->execute($this->getVersionCommand(), $version);
@@ -276,22 +192,16 @@ abstract class AbstractAssetManager implements AssetManagerInterface
 
     /**
      * Get the command to retrieve the version.
-     *
-     * @return string
      */
-    abstract protected function getVersionCommand();
+    abstract protected function getVersionCommand(): string;
 
     /**
      * Get the command to install the asset dependencies.
-     *
-     * @return string
      */
-    abstract protected function getInstallCommand();
+    abstract protected function getInstallCommand(): string;
 
     /**
      * Get the command to update the asset dependencies.
-     *
-     * @return string
      */
-    abstract protected function getUpdateCommand();
+    abstract protected function getUpdateCommand(): string;
 }

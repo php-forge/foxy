@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -16,52 +18,34 @@ namespace Foxy\Asset;
  *
  * @author Steffen Dietz <steffo.dietz@gmail.com>
  */
-class PnpmManager extends AbstractAssetManager
+final class PnpmManager extends AbstractAssetManager
 {
-    /**
-     * {@inheritdoc}
-     */
-    public function getName()
+    public function getName(): string
     {
         return 'pnpm';
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getLockPackageName()
+    public function getLockPackageName(): string
     {
         return 'pnpm-lock.yaml';
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function isInstalled()
+    public function isInstalled(): bool
     {
         return parent::isInstalled() && file_exists($this->getLockPackageName());
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    protected function getVersionCommand()
+    protected function getVersionCommand(): string
     {
         return $this->buildCommand('pnpm', 'version', '--version');
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    protected function getInstallCommand()
+    protected function getInstallCommand(): string
     {
         return $this->buildCommand('pnpm', 'install', 'install');
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    protected function getUpdateCommand()
+    protected function getUpdateCommand(): string
     {
         return $this->buildCommand('pnpm', 'update', 'update');
     }

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -20,33 +22,27 @@ interface AssetPackageInterface
 {
     /**
      * Write the asset package in file.
-     *
-     * @return self
      */
-    public function write();
+    public function write(): self;
 
     /**
      * Set the asset package.
      *
      * @param array $package The asset package
-     *
-     * @return self
      */
-    public function setPackage(array $package);
+    public function setPackage(array $package): self;
 
     /**
      * Get the asset package.
-     *
-     * @return array
      */
-    public function getPackage();
+    public function getPackage(): array;
 
     /**
      * Get the installed asset dependencies.
      *
      * @return array The installed asset dependencies
      */
-    public function getInstalledDependencies();
+    public function getInstalledDependencies(): array;
 
     /**
      * Add the new asset dependencies and return the names of already installed asset dependencies.
@@ -55,14 +51,12 @@ interface AssetPackageInterface
      *
      * @return array The asset package name of the already asset dependencies
      */
-    public function addNewDependencies(array $dependencies);
+    public function addNewDependencies(array $dependencies): array;
 
     /**
      * Remove the unused asset dependencies.
      *
      * @param array $dependencies All asset dependencies
-     *
-     * @return self
      */
-    public function removeUnusedDependencies(array $dependencies);
+    public function removeUnusedDependencies(array $dependencies): self;
 }

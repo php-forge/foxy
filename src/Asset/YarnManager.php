@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -18,36 +20,24 @@ use Composer\Semver\VersionParser;
  *
  * @author François Pluchino <francois.pluchino@gmail.com>
  */
-class YarnManager extends AbstractAssetManager
+final class YarnManager extends AbstractAssetManager
 {
-    /**
-     * {@inheritdoc}
-     */
-    public function getName()
+    public function getName(): string
     {
         return 'yarn';
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getLockPackageName()
+    public function getLockPackageName(): string
     {
         return 'yarn.lock';
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function isInstalled()
+    public function isInstalled(): bool
     {
         return parent::isInstalled() && file_exists($this->getLockPackageName());
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function isValidForUpdate()
+    public function isValidForUpdate(): bool
     {
         if ($this->isYarnNext()) {
             return true;
@@ -58,36 +48,24 @@ class YarnManager extends AbstractAssetManager
         return 0 === $this->executor->execute($cmd);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    protected function getVersionCommand()
+    protected function getVersionCommand(): string
     {
         return $this->buildCommand('yarn', 'version', '--version');
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    protected function getInstallCommand()
+    protected function getInstallCommand(): string
     {
         return $this->buildCommand('yarn', 'install', $this->mergeInteractiveCommand(array('install')));
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    protected function getUpdateCommand()
+    protected function getUpdateCommand(): string
     {
         $commandName = $this->isYarnNext() ? 'up' : 'upgrade';
 
         return $this->buildCommand('yarn', 'update', $this->mergeInteractiveCommand(array($commandName)));
     }
 
-    /**
-     * @return bool
-     */
-    private function isYarnNext()
+    private function isYarnNext(): bool
     {
         $version = $this->getVersion();
         $parser = new VersionParser();
@@ -96,7 +74,7 @@ class YarnManager extends AbstractAssetManager
         return $constraint->matches($parser->parseConstraints($version));
     }
 
-    private function mergeInteractiveCommand(array $command)
+    private function mergeInteractiveCommand(array $command): array
     {
         if (!$this->isYarnNext()) {
             $command[] = '--non-interactive';

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -16,55 +18,37 @@ namespace Foxy\Asset;
  *
  * @author François Pluchino <francois.pluchino@gmail.com>
  */
-class NpmManager extends AbstractAssetManager
+final class NpmManager extends AbstractAssetManager
 {
-    /**
-     * {@inheritdoc}
-     */
-    public function getName()
+    public function getName(): string
     {
         return 'npm';
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getLockPackageName()
+    public function getLockPackageName(): string
     {
         return 'package-lock.json';
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    protected function getVersionCommand()
+    protected function getVersionCommand(): string
     {
         return $this->buildCommand('npm', 'version', '--version');
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    protected function getInstallCommand()
+    protected function getInstallCommand(): string
     {
         return $this->buildCommand('npm', 'install', 'install');
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    protected function getUpdateCommand()
+    protected function getUpdateCommand(): string
     {
         return $this->buildCommand('npm', 'update', 'update');
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    protected function actionWhenComposerDependenciesAreAlreadyInstalled($names)
+    protected function actionWhenComposerDependenciesAreAlreadyInstalled(array $names): void
     {
         foreach ($names as $name) {
-            $this->fs->remove(self::NODE_MODULES_PATH.'/'.$name);
+            $this->fs->remove(self::NODE_MODULES_PATH . '/' . $name);
         }
     }
 }

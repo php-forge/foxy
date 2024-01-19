@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -18,17 +20,17 @@ use Foxy\Exception\RuntimeException;
  *
  * @author François Pluchino <francois.pluchino@gmail.com>
  */
-class AssetManagerFinder
+final class AssetManagerFinder
 {
     /**
-     * @var AssetManagerInterface[]
+     * @psalm-var AssetManagerInterface[]
      */
-    private $managers;
+    private array $managers = [];
 
     /**
      * Constructor.
      *
-     * @param AssetManagerInterface[] $managers The asset managers
+     * @psalm-param AssetManagerInterface[] $managers The asset managers
      */
     public function __construct(array $managers = array())
     {
@@ -39,7 +41,7 @@ class AssetManagerFinder
         }
     }
 
-    public function addManager(AssetManagerInterface $manager)
+    public function addManager(AssetManagerInterface $manager): void
     {
         $this->managers[$manager->getName()] = $manager;
     }
@@ -54,7 +56,7 @@ class AssetManagerFinder
      * @throws RuntimeException When the asset manager does not exist
      * @throws RuntimeException When the asset manager is not found
      */
-    public function findManager($manager = null)
+    public function findManager(string $manager = null): AssetManagerInterface
     {
         if (null !== $manager) {
             if (isset($this->managers[$manager])) {
@@ -74,7 +76,7 @@ class AssetManagerFinder
      *
      * @throws RuntimeException When no asset manager is found
      */
-    private function findAvailableManager()
+    private function findAvailableManager(): AssetManagerInterface
     {
         // find asset manager by lockfile
         foreach ($this->managers as $manager) {
