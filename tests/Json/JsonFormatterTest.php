@@ -51,8 +51,8 @@ JSON;
     }
 
     public function testFormat()
-    {
-        $expected = <<<'JSON'
+{
+    $expected = <<<'JSON'
 {
   "name": "test",
   "contributors": [],
@@ -62,16 +62,16 @@ JSON;
   "devDependencies": {}
 }
 JSON;
-        $data = array(
-            'name' => 'test',
-            'contributors' => array(),
-            'dependencies' => array(
-                '@foo/bar' => '^1.0.0',
-            ),
-            'devDependencies' => array(),
-        );
-        $content = json_encode($data);
+    $data = array(
+        'name' => 'test',
+        'contributors' => array(),
+        'dependencies' => array(
+            '@foo/bar' => '^1.0.0',
+        ),
+        'devDependencies' => array(),
+    );
+    $content = json_encode($data);
 
-        static::assertSame($expected, JsonFormatter::format($content, array('contributors'), 2));
-    }
+    static::assertSame($expected, JsonFormatter::format($content, array('contributors'), 2));
+}
 }
