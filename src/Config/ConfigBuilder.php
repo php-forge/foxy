@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -25,13 +27,11 @@ abstract class ConfigBuilder
     /**
      * Build the config of plugin.
      *
-     * @param Composer         $composer The composer
-     * @param array            $defaults The default values
-     * @param null|IOInterface $io       The composer input/output
-     *
-     * @return Config
+     * @param Composer $composer The composer.
+     * @param array $defaults The default values.
+     * @param null|IOInterface $io The composer input/output.
      */
-    public static function build(Composer $composer, array $defaults = array(), $io = null)
+    public static function build(Composer $composer, array $defaults = [], IOInterface $io = null): Config
     {
         $config = self::getConfigBase($composer, $io);
 
@@ -41,12 +41,10 @@ abstract class ConfigBuilder
     /**
      * Get the base of data.
      *
-     * @param Composer         $composer The composer
-     * @param null|IOInterface $io       The composer input/output
-     *
-     * @return array
+     * @param Composer $composer The composer.
+     * @param null|IOInterface $io The composer input/output.
      */
-    private static function getConfigBase(Composer $composer, $io = null)
+    private static function getConfigBase(Composer $composer, IOInterface $io = null): array
     {
         $globalPackageConfig = self::getGlobalConfig($composer, 'composer', $io);
         $globalConfig = self::getGlobalConfig($composer, 'config', $io);
@@ -61,13 +59,11 @@ abstract class ConfigBuilder
     /**
      * Get the data of the global config.
      *
-     * @param Composer         $composer The composer
-     * @param string           $filename The filename
-     * @param null|IOInterface $io       The composer input/output
-     *
-     * @return array
+     * @param Composer $composer The composer.
+     * @param string $filename The filename.
+     * @param null|IOInterface $io The composer input/output.
      */
-    private static function getGlobalConfig(Composer $composer, $filename, $io = null)
+    private static function getGlobalConfig(Composer $composer, string $filename, IOInterface $io = null): array
     {
         $home = self::getComposerHome($composer);
         $file = new JsonFile($home.'/'.$filename.'.json');
@@ -92,10 +88,8 @@ abstract class ConfigBuilder
      * Get the home directory of composer.
      *
      * @param Composer $composer The composer
-     *
-     * @return string
      */
-    private static function getComposerHome(Composer $composer)
+    private static function getComposerHome(Composer $composer): string
     {
         return null !== $composer->getConfig() && $composer->getConfig()->has('home')
             ? $composer->getConfig()->get('home')
