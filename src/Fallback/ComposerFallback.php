@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -28,73 +30,33 @@ use Symfony\Component\Console\Input\InputInterface;
  *
  * @author François Pluchino <francois.pluchino@gmail.com>
  */
-class ComposerFallback implements FallbackInterface
+final class ComposerFallback implements FallbackInterface
 {
-    /**
-     * @var Composer
-     */
-    protected $composer;
-
-    /**
-     * @var IOInterface
-     */
-    protected $io;
-
-    /**
-     * @var Config
-     */
-    protected $config;
-
-    /**
-     * @var InputInterface
-     */
-    protected $input;
-
-    /**
-     * @var Filesystem
-     */
-    protected $fs;
-
-    /**
-     * @var null|Installer
-     */
-    protected $installer;
-
-    /**
-     * @var array
-     */
-    protected $lock = array();
+    protected Filesystem $fs;
+    protected array $lock = [];
 
     /**
      * Constructor.
      *
-     * @param Composer        $composer  The composer
-     * @param IOInterface     $io        The IO
-     * @param Config          $config    The config
-     * @param InputInterface  $input     The input
-     * @param null|Filesystem $fs        The composer filesystem
-     * @param null|Installer  $installer The installer
+     * @param Composer $composer The composer.
+     * @param IOInterface $io The IO.
+     * @param Config $config The config.
+     * @param InputInterface $input The input.
+     * @param null|Filesystem $fs The composer filesystem.
+     * @param null|Installer $installer The installer.
      */
     public function __construct(
-        Composer $composer,
-        IOInterface $io,
-        Config $config,
-        InputInterface $input,
+        protected Composer $composer,
+        protected IOInterface $io,
+        protected Config $config,
+        protected InputInterface $input,
         Filesystem $fs = null,
-        Installer $installer = null
+        protected Installer|null $installer = null
     ) {
-        $this->composer = $composer;
-        $this->io = $io;
-        $this->config = $config;
-        $this->input = $input;
         $this->fs = $fs ?: new Filesystem();
-        $this->installer = $installer;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function save()
+    public function save(): self
     {
         $rm = $this->composer->getRepositoryManager();
         $im = $this->composer->getInstallationManager();
@@ -111,10 +73,7 @@ class ComposerFallback implements FallbackInterface
         return $this;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function restore()
+    public function restore(): void
     {
         if (!$this->config->get('fallback-composer')) {
             return;
@@ -132,10 +91,8 @@ class ComposerFallback implements FallbackInterface
 
     /**
      * Restore the data of lock file.
-     *
-     * @return bool
      */
-    protected function restoreLockData()
+    protected function restoreLockData(): bool
     {
         $this->composer->getLocker()->setLockData(
             $this->getLockValue('packages', array()),
@@ -160,7 +117,7 @@ class ComposerFallback implements FallbackInterface
     /**
      * Restore the PHP dependencies with the previous lock file.
      */
-    protected function restorePreviousLockFile()
+    protected function restorePreviousLockFile(): void
     {
         $config = $this->composer->getConfig();
         list($preferSource, $preferDist) = ConsoleUtil::getPreferredInstallOptions($config, $this->input);
@@ -186,10 +143,7 @@ class ComposerFallback implements FallbackInterface
             $installer->setPlatformRequirementFilter(PlatformRequirementFilterFactory::fromBoolOrList($ignorePlatformReqs));
             $dispatcher->setRunScripts(false);
         } else {
-            $installer
-                ->setRunScripts(false)
-                ->setIgnorePlatformRequirements($this->input->getOption('ignore-platform-reqs'))
-            ;
+            $installer->setPlatformRequirementFilter($this->input->getOption('ignore-platform-reqs'));
         }
 
         if (method_exists($installer, 'setSkipSuggest')) {
@@ -209,22 +163,18 @@ class ComposerFallback implements FallbackInterface
     /**
      * Get the lock value.
      *
-     * @param string     $key     The key
-     * @param null|mixed $default The default value
-     *
-     * @return null|mixed
+     * @param string $key The key.
+     * @param mixed $default The default value.
      */
-    private function getLockValue($key, $default = null)
+    private function getLockValue(string $key, mixed $default = null): mixed
     {
         return isset($this->lock[$key]) ? $this->lock[$key] : $default;
     }
 
     /**
      * Get the installer.
-     *
-     * @return Installer
      */
-    private function getInstaller()
+    private function getInstaller(): Installer
     {
         return null !== $this->installer ? $this->installer : Installer::create($this->io, $this->composer);
     }

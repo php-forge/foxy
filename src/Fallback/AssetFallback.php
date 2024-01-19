@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -14,51 +16,28 @@ namespace Foxy\Fallback;
 use Composer\IO\IOInterface;
 use Composer\Util\Filesystem;
 use Foxy\Config\Config;
+use PHPUnit\TextUI\XmlConfiguration\File;
 
 /**
  * Asset fallback.
  *
  * @author François Pluchino <francois.pluchino@gmail.com>
  */
-class AssetFallback implements FallbackInterface
+final class AssetFallback implements FallbackInterface
 {
-    /**
-     * @var IOInterface
-     */
-    protected $io;
+    protected Filesystem $fs;
+    protected string|null $originalContent = null;
 
-    /**
-     * @var Config
-     */
-    protected $config;
-
-    /**
-     * @var string
-     */
-    protected $path;
-
-    /**
-     * @var Filesystem
-     */
-    protected $fs;
-
-    /**
-     * @var null|string
-     */
-    protected $originalContent;
-
-    public function __construct(IOInterface $io, Config $config, $path, Filesystem $fs = null)
-    {
-        $this->io = $io;
-        $this->config = $config;
-        $this->path = $path;
+    public function __construct(
+        protected IOInterface $io,
+        protected Config $config,
+        protected string $path,
+        Filesystem $fs = null
+    ) {
         $this->fs = $fs ?: new Filesystem();
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function save()
+    public function save(): self
     {
         if (file_exists($this->path) && is_file($this->path)) {
             $this->originalContent = file_get_contents($this->path);
@@ -67,10 +46,7 @@ class AssetFallback implements FallbackInterface
         return $this;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function restore()
+    public function restore(): void
     {
         if (!$this->config->get('fallback-asset')) {
             return;

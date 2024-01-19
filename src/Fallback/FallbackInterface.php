@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -20,13 +22,11 @@ interface FallbackInterface
 {
     /**
      * Save the state.
-     *
-     * @return self
      */
-    public function save();
+    public function save(): self;
 
     /**
      * Restore the state.
      */
-    public function restore();
+    public function restore(): void;
 }
