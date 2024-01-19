@@ -1,52 +1,44 @@
 {
-    "name": "yii-tools/template",
-    "type": "library",
-    "description": "template",
-    "keywords": [
-        "template"
+    "name": "php-forge/foxy",
+    "description": "Fast, reliable, and secure NPM/Yarn/pnpm bridge for Composer",
+    "keywords": ["npm", "yarn", "composer", "bridge", "dependency manager", "package", "asset", "nodejs"],
+    "homepage": "https://github.com/fxpio/foxy",
+    "type": "composer-plugin",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "François Pluchino",
+            "email": "francois.pluchino@gmail.com"
+        }
     ],
-    "license": "mit",
-    "minimum-stability": "dev",
-    "prefer-stable": true,
     "require": {
-        "php": "^8.1"
+        "php": "^8.1",
+        "composer-plugin-api": "^2.0"
     },
     "require-dev": {
-        "maglnet/composer-require-checker": "^4.7",
-        "phpunit/phpunit": "^10.5",
-        "roave/infection-static-analysis-plugin": "^1.34",
-        "symplify/easy-coding-standard": "^12.1",
-        "vimeo/psalm": "^5.19"
+        "composer/composer": "^2.0.0",
+        "phpunit/phpunit": "^9.6.1"
+    },
+    "config": {
+        "preferred-install": {
+            "*": "dist"
+        },
+        "sort-packages": true
     },
     "autoload": {
         "psr-4": {
-            "Template\\": "src"
+            "Foxy\\": "src"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Template\\Tests\\": "tests"
+            "Foxy\\Tests\\": "tests"
         }
     },
     "extra": {
+        "class": "Foxy\\Foxy",
         "branch-alias": {
-            "dev-main": "1.0.x-dev"
+            "dev-main": "1.2-dev"
         }
-    },
-    "config": {
-        "sort-packages": true,
-        "allow-plugins": {
-            "infection/extension-installer": true
-        }
-    },
-    "scripts": {
-        "check-dependencies": "composer-require-checker",
-        "easy-coding-standard": "ecs check",
-        "mutation": [
-            "Composer\\Config::disableProcessTimeout",
-            "roave-infection-static-analysis-plugin"
-        ],
-        "psalm": "psalm",
-        "test": "phpunit"
     }
 }
