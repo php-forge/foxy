@@ -65,7 +65,7 @@ final class ConsoleUtil
                 $preferSource = true;
 
                 break;
-                
+
             case 'dist':
                 $preferDist = true;
 

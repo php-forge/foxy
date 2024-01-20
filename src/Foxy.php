@@ -79,9 +79,9 @@ final class Foxy implements PluginInterface, EventSubscriberInterface
      * The list of the classes of asset managers.
      */
     private static $assetManagers = [
-        \Foxy\Asset\NpmManager::class,
-        \Foxy\Asset\PnpmManager::class,
-        \Foxy\Asset\YarnManager::class,
+        Asset\NpmManager::class,
+        Asset\PnpmManager::class,
+        Asset\YarnManager::class,
     ];
 
     /**
@@ -119,7 +119,7 @@ final class Foxy implements PluginInterface, EventSubscriberInterface
 
     public function activate(Composer $composer, IOInterface $io): void
     {
-        ComposerUtil::validateVersion(static::REQUIRED_COMPOSER_VERSION, Composer::VERSION);
+        ComposerUtil::validateVersion(self::REQUIRED_COMPOSER_VERSION, Composer::VERSION);
 
         $input = ConsoleUtil::getInput($io);
         $executor = new ProcessExecutor($io);

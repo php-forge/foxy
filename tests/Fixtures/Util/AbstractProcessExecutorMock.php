@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -64,7 +66,7 @@ abstract class AbstractProcessExecutorMock extends ProcessExecutor
      *
      * @param int $position The position of executed command
      *
-     * @return null|string
+     * @return string|null
      */
     public function getExecutedCommand($position)
     {
@@ -76,7 +78,7 @@ abstract class AbstractProcessExecutorMock extends ProcessExecutor
      *
      * @param int $position The position of executed command
      *
-     * @return null|int
+     * @return int|null
      */
     public function getExecutedReturnedCode($position)
     {
@@ -88,7 +90,7 @@ abstract class AbstractProcessExecutorMock extends ProcessExecutor
      *
      * @param int $position The position of executed command
      *
-     * @return null|string
+     * @return string|null
      */
     public function getExecutedOutput($position)
     {
@@ -98,7 +100,7 @@ abstract class AbstractProcessExecutorMock extends ProcessExecutor
     /**
      * Get the last executed command.
      *
-     * @return null|string
+     * @return string|null
      */
     public function getLastCommand()
     {
@@ -108,7 +110,7 @@ abstract class AbstractProcessExecutorMock extends ProcessExecutor
     /**
      * Get the last executed returned code.
      *
-     * @return null|int
+     * @return int|null
      */
     public function getLastReturnedCode()
     {
@@ -118,7 +120,7 @@ abstract class AbstractProcessExecutorMock extends ProcessExecutor
     /**
      * Get the last executed output.
      *
-     * @return null|string
+     * @return string|null
      */
     public function getLastOutput()
     {
@@ -131,7 +133,7 @@ abstract class AbstractProcessExecutorMock extends ProcessExecutor
      * @param int $position The position
      * @param int $index    The index of value
      *
-     * @return null|int|string
+     * @return int|string|null
      */
     private function getExecutedValue($position, int $index)
     {

@@ -41,7 +41,7 @@ final class JsonFormatterTest extends \PHPUnit\Framework\TestCase
         $data = [
             'name' => 'test',
             'contributors' => [],
-            'dependencies' => ['@foo/bar' => '^1.0.0'], 'devDependencies' => []
+            'dependencies' => ['@foo/bar' => '^1.0.0'], 'devDependencies' => [],
         ];
         $content = json_encode($data);
 

@@ -161,7 +161,7 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
         $expectedPackage = [
             'dependencies' => [
                 '@composer-asset/foo--bar' => 'file:./path/foo/bar',
-                '@composer-asset/new--dependency' => 'file:./path/new/dependency'
+                '@composer-asset/new--dependency' => 'file:./path/new/dependency',
             ],
         ];
         $allDependencies = [
@@ -191,7 +191,7 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
         $expectedPackage = [
             'dependencies' => [
                 '@composer-asset/foo--bar' => 'file:./path/foo/bar',
-                '@composer-asset/new--dependency' => 'file:./path/new/dependency'
+                '@composer-asset/new--dependency' => 'file:./path/new/dependency',
             ],
         ];
         $package = [
@@ -291,10 +291,15 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
     }
 
     abstract protected function getManager(): AssetManagerInterface;
+
     abstract protected function getValidName(): string;
+
     abstract protected function getValidLockPackageName(): string;
+
     abstract protected function getValidVersionCommand(): string;
+
     abstract protected function getValidInstallCommand(): string;
+
     abstract protected function getValidUpdateCommand(): string;
 
     protected function actionForTestAddDependenciesForUpdateCommand(): void

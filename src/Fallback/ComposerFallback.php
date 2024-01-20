@@ -42,8 +42,8 @@ final class ComposerFallback implements FallbackInterface
      * @param IOInterface $io The IO.
      * @param Config $config The config.
      * @param InputInterface $input The input.
-     * @param null|Filesystem $fs The composer filesystem.
-     * @param null|Installer $installer The installer.
+     * @param Filesystem|null $fs The composer filesystem.
+     * @param Installer|null $installer The installer.
      */
     public function __construct(
         protected Composer $composer,

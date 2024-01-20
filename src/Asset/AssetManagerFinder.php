@@ -49,7 +49,7 @@ final class AssetManagerFinder
     /**
      * Find the asset manager.
      *
-     * @param null|string $manager The name of the asset manager
+     * @param string|null $manager The name of the asset manager
      *
      * @throws RuntimeException When the asset manager does not exist
      * @throws RuntimeException When the asset manager is not found

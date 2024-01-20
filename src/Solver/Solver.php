@@ -39,7 +39,7 @@ final class Solver implements SolverInterface
      *
      * @param AssetManagerInterface $assetManager The asset manager instance.
      * @param Config $config The config instance.
-     * @param null|FallbackInterface $composerFallback The composer fallback instance.
+     * @param FallbackInterface|null $composerFallback The composer fallback instance.
      */
     public function __construct(
         protected AssetManagerInterface $assetManager,
@@ -89,6 +89,7 @@ final class Solver implements SolverInterface
      * @param array $packages The package dependencies.
      *
      * @psalm-param PackageInterface[] $packages The package dependencies.
+     *
      * @psalm-return array[] The package name and the relative package path from the current directory.
      */
     protected function getAssets(Composer $composer, string $assetDir, array $packages): array
