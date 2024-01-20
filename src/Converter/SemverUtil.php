@@ -107,6 +107,7 @@ abstract class SemverUtil
      *
      * @psalm-suppress MixedArrayAccess
      * @psalm-suppress MixedOperand
+     *
      * @psalm-return array{0: string, 1: string, 2: string}
      */
     private static function cleanVersion(string $version, array $matches): array
