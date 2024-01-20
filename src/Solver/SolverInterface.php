@@ -24,17 +24,15 @@ interface SolverInterface
     /**
      * Define if the update action can be used.
      *
-     * @param bool $updatable The value
-     *
-     * @return self
+     * @param bool $updatable The value of updatable.
      */
-    public function setUpdatable($updatable);
+    public function setUpdatable(bool $updatable): self;
 
     /**
      * Solve the asset dependencies.
      *
-     * @param Composer    $composer The composer
-     * @param IOInterface $io       The IO
+     * @param Composer $composer The composer instance.
+     * @param IOInterface $io The IO instance.
      */
-    public function solve(Composer $composer, IOInterface $io);
+    public function solve(Composer $composer, IOInterface $io): void;
 }
