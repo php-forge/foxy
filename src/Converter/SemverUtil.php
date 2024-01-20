@@ -31,7 +31,10 @@ abstract class SemverUtil
     {
         if (preg_match('/^\d{7,}\./', $version)) {
             $pos = strpos($version, '.');
-            $version = substr($version, 0, $pos) . self::convertDateMinorVersion(substr($version, $pos + 1));
+
+            if ($pos !== false) {
+                $version = substr($version, 0, $pos) . self::convertDateMinorVersion(substr($version, $pos + 1));
+            }
         }
 
         return $version;
@@ -42,12 +45,13 @@ abstract class SemverUtil
      */
     public static function convertVersionMetadata(string $version): string
     {
-        if (preg_match_all(
-            self::createPattern('([a-zA-Z]+|(\-|\+)[a-zA-Z]+|(\-|\+)[0-9]+)'),
-            $version,
-            $matches,
-            PREG_OFFSET_CAPTURE
-        )) {
+        $pattern = self::createPattern('([a-zA-Z]+|(\-|\+)[a-zA-Z]+|(\-|\+)[0-9]+)');
+
+        if ($pattern === '') {
+            return $version;
+        }
+
+        if (preg_match_all($pattern, $version, $matches, PREG_OFFSET_CAPTURE)) {
             [$type, $version, $end] = self::cleanVersion(strtolower($version), $matches);
             [$version, $patchVersion] = self::matchVersion($version, $type);
 

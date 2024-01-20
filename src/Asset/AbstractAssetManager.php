@@ -35,7 +35,6 @@ abstract class AbstractAssetManager implements AssetManagerInterface
 {
     final public const NODE_MODULES_PATH = './node_modules';
     protected bool $updatable = true;
-    protected VersionConverterInterface|null $versionConverter;
     private null|string $version = '';
 
     public function __construct(
@@ -44,9 +43,9 @@ abstract class AbstractAssetManager implements AssetManagerInterface
         protected ProcessExecutor $executor,
         protected Filesystem $fs,
         protected FallbackInterface|null $fallback = null,
-        VersionConverterInterface|null $versionConverter = null
+        protected VersionConverterInterface|null $versionConverter = null
     ) {
-        $this->versionConverter = $versionConverter ?? new SemverConverter();
+        $this->versionConverter ??= new SemverConverter();
     }
 
     public function isAvailable(): bool
@@ -107,7 +106,14 @@ abstract class AbstractAssetManager implements AssetManagerInterface
             $constraint = $parser->parseConstraints($constraintVersion);
 
             if (!$constraint->matches($parser->parseConstraints($version))) {
-                throw new RuntimeException(sprintf('The installed %s version "%s" doesn\'t match with the constraint version "%s"', $this->getName(), $version, $constraintVersion));
+                throw new RuntimeException(
+                    sprintf(
+                        'The installed %s version "%s" doesn\'t match with the constraint version "%s"',
+                        $this->getName(),
+                        $version,
+                        $constraintVersion
+                    )
+                );
             }
         }
     }
@@ -182,7 +188,7 @@ abstract class AbstractAssetManager implements AssetManagerInterface
 
     protected function getVersion(): string|null
     {
-        if ('' === $this->version) {
+        if ($this->version === '' && $this->versionConverter !== null) {
             $this->executor->execute($this->getVersionCommand(), $version);
             $this->version = '' !== trim((string) $version) ? $this->versionConverter->convertVersion(trim((string) $version)) : null;
         }

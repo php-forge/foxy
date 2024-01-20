@@ -79,6 +79,15 @@ final class AssetPackage implements AssetPackageInterface
         return $installedAssets;
     }
 
+    /**
+     * Add new dependencies.
+     *
+     * @param array $dependencies The dependencies
+     *
+     * @return array The existing packages.
+     *
+     * @psalm-return list<string> The existing packages.
+     */
     public function addNewDependencies(array $dependencies): array
     {
         $installedAssets = $this->getInstalledDependencies();
