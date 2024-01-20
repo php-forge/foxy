@@ -16,7 +16,6 @@ namespace Foxy\Fallback;
 use Composer\IO\IOInterface;
 use Composer\Util\Filesystem;
 use Foxy\Config\Config;
-use PHPUnit\TextUI\XmlConfiguration\File;
 
 /**
  * Asset fallback.

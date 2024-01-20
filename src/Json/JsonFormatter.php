@@ -62,8 +62,6 @@ final class JsonFormatter
      * @param array $arrayKeys The list of keys to be retained with an array representation if they are empty.
      * @param int $indent The space count for indent.
      * @param bool $formatJson Check if the json must be formatted.
-     *
-     * @return string
      */
     public static function format(
         string $json,
@@ -125,8 +123,6 @@ final class JsonFormatter
      * @param array $arrayKeys The list of keys to be retained with an array representation if they are empty.
      *
      * @psalm-param string[] $arrayKeys The list of keys to be retained with an array representation if they are empty.
-     *
-     * @return string
      */
     private static function replaceArrayByMap(string $json, array $arrayKeys): string
     {

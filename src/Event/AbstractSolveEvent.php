@@ -29,7 +29,7 @@ abstract class AbstractSolveEvent extends Event
      * @param string $name The event name.
      * @param string $assetDir The directory of mock assets.
      * @param array $packages All installed Composer packages.
-     * 
+     *
      * @psalm-param PackageInterface[] $packages All installed Composer packages.
      */
     public function __construct(string $name, private string $assetDir, private array $packages = [])

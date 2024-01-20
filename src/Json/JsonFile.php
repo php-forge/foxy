@@ -75,9 +75,7 @@ final class JsonFile extends \Composer\Json\JsonFile
         self::$encodeIndent = 4;
     }
 
-    /**
-     * {@inheritdoc}
-     */
+    
     public static function encode(mixed $data, int $options = 448, string $indent = self::INDENT_DEFAULT): string
     {
         $result = parent::encode($data, $options, $indent);

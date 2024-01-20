@@ -29,7 +29,7 @@ final class GetAssetsEvent extends AbstractSolveEvent
      * @param string $assetDir The directory of mock assets.
      * @param array $packages All installed Composer packages.
      * @param array $assets The map of asset package name and the asset package path.
-     * 
+     *
      * @psalm-param PackageInterface[] $packages All installed Composer packages.
      */
     public function __construct(string $assetDir, array $packages, private array $assets = [])

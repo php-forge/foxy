@@ -31,7 +31,7 @@ final class AssetUtil
      *
      * @param PackageInterface $package The package instance.
      */
-    public static function getName(PackageInterface $package): string 
+    public static function getName(PackageInterface $package): string
     {
         return AssetPackage::COMPOSER_PREFIX . \str_replace(array('/'), '--', $package->getName());
     }
@@ -45,16 +45,16 @@ final class AssetUtil
      * @param array $configPackages The packages defined in config.
      */
     public static function getPath(
-        InstallationManager $installationManager, 
-        AssetManagerInterface $assetManager, 
-        PackageInterface $package, 
+        InstallationManager $installationManager,
+        AssetManagerInterface $assetManager,
+        PackageInterface $package,
         array $configPackages = []
     ): string|null {
         $path = null;
 
         if (static::isAsset($package, $configPackages)) {
             $installPath = $installationManager->getInstallPath($package);
-            $filename = $installPath.'/'.$assetManager->getPackageName();
+            $filename = $installPath . '/' . $assetManager->getPackageName();
             $path = \file_exists($filename) ? \str_replace('\\', '/', \realpath($filename)) : null;
         }
 

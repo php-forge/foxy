@@ -173,11 +173,11 @@ abstract class AbstractAssetManager implements AssetManagerInterface
         $bin = $this->config->get('manager-bin', $defaultBin);
         $bin = Platform::isWindows() ? str_replace('/', '\\', $bin) : $bin;
         $gOptions = trim($this->config->get('manager-options', ''));
-        $options = trim($this->config->get('manager-'.$action.'-options', ''));
+        $options = trim($this->config->get('manager-' . $action . '-options', ''));
 
-        return $bin.' '.implode(' ', (array) $command)
-            .(empty($gOptions) ? '' : ' '.$gOptions)
-            .(empty($options) ? '' : ' '.$options);
+        return $bin . ' ' . implode(' ', (array) $command)
+            . (empty($gOptions) ? '' : ' ' . $gOptions)
+            . (empty($options) ? '' : ' ' . $options);
     }
 
     protected function getVersion(): string|null
