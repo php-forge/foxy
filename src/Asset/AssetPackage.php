@@ -91,6 +91,8 @@ final class AssetPackage implements AssetPackageInterface
      * @return array The existing packages.
      *
      * @psalm-return list<string> The existing packages.
+     *
+     * @psalm-suppress MixedArrayAssignment
      */
     public function addNewDependencies(array $dependencies): array
     {
@@ -115,6 +117,9 @@ final class AssetPackage implements AssetPackageInterface
         return $existingPackages;
     }
 
+    /**
+     * @psalm-suppress MixedArrayAccess
+     */
     public function removeUnusedDependencies(array $dependencies): self
     {
         $installedAssets = $this->getInstalledDependencies();

@@ -97,6 +97,7 @@ final class ComposerFallback implements FallbackInterface
      */
     protected function restoreLockData(): bool
     {
+        /** @psalm-suppress MixedArgument */
         $this->composer->getLocker()->setLockData(
             $this->getLockValue('packages', []),
             $this->getLockValue('packages-dev'),
