@@ -42,8 +42,8 @@ final class ComposerFallback implements FallbackInterface
      * @param IOInterface $io The IO.
      * @param Config $config The config.
      * @param InputInterface $input The input.
-     * @param null|Filesystem $fs The composer filesystem.
-     * @param null|Installer $installer The installer.
+     * @param Filesystem|null $fs The composer filesystem.
+     * @param Installer|null $installer The installer.
      */
     public function __construct(
         protected Composer $composer,
@@ -67,7 +67,7 @@ final class ComposerFallback implements FallbackInterface
             $lock = $locker->getLockData();
             $this->lock = PackageUtil::loadLockPackages($lock);
         } catch (\LogicException $e) {
-            $this->lock = array();
+            $this->lock = [];
         }
 
         return $this;
@@ -95,16 +95,16 @@ final class ComposerFallback implements FallbackInterface
     protected function restoreLockData(): bool
     {
         $this->composer->getLocker()->setLockData(
-            $this->getLockValue('packages', array()),
+            $this->getLockValue('packages', []),
             $this->getLockValue('packages-dev'),
-            $this->getLockValue('platform', array()),
-            $this->getLockValue('platform-dev', array()),
-            $this->getLockValue('aliases', array()),
+            $this->getLockValue('platform', []),
+            $this->getLockValue('platform-dev', []),
+            $this->getLockValue('aliases', []),
             $this->getLockValue('minimum-stability', ''),
-            $this->getLockValue('stability-flags', array()),
+            $this->getLockValue('stability-flags', []),
             $this->getLockValue('prefer-stable', false),
             $this->getLockValue('prefer-lowest', false),
-            $this->getLockValue('platform-overrides', array())
+            $this->getLockValue('platform-overrides', [])
         );
 
         $isLocked = $this->composer->getLocker()->isLocked();
@@ -120,7 +120,7 @@ final class ComposerFallback implements FallbackInterface
     protected function restorePreviousLockFile(): void
     {
         $config = $this->composer->getConfig();
-        list($preferSource, $preferDist) = ConsoleUtil::getPreferredInstallOptions($config, $this->input);
+        [$preferSource, $preferDist] = ConsoleUtil::getPreferredInstallOptions($config, $this->input);
         $optimize = $this->input->getOption('optimize-autoloader') || $config->get('optimize-autoloader');
         $authoritative = $this->input->getOption('classmap-authoritative') || $config->get('classmap-authoritative');
         $apcu = $this->input->getOption('apcu-autoloader') || $config->get('apcu-autoloader');
@@ -168,7 +168,7 @@ final class ComposerFallback implements FallbackInterface
      */
     private function getLockValue(string $key, mixed $default = null): mixed
     {
-        return isset($this->lock[$key]) ? $this->lock[$key] : $default;
+        return $this->lock[$key] ?? $default;
     }
 
     /**

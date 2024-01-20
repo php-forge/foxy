@@ -22,7 +22,7 @@ final class SemverConverter implements VersionConverterInterface
 {
     public function convertVersion(string $version = null): string
     {
-        if (\in_array($version, array(null, '', 'latest'), true)) {
+        if (\in_array($version, [null, '', 'latest'], true)) {
             return ('latest' === $version ? 'default || ' : '') . '*';
         }
 

@@ -39,7 +39,7 @@ final class Solver implements SolverInterface
      *
      * @param AssetManagerInterface $assetManager The asset manager instance.
      * @param Config $config The config instance.
-     * @param null|FallbackInterface $composerFallback The composer fallback instance.
+     * @param FallbackInterface|null $composerFallback The composer fallback instance.
      */
     public function __construct(
         protected AssetManagerInterface $assetManager,
@@ -89,19 +89,20 @@ final class Solver implements SolverInterface
      * @param array $packages The package dependencies.
      *
      * @psalm-param PackageInterface[] $packages The package dependencies.
+     *
      * @psalm-return array[] The package name and the relative package path from the current directory.
      */
     protected function getAssets(Composer $composer, string $assetDir, array $packages): array
     {
         $installationManager = $composer->getInstallationManager();
         $configPackages = $this->config->getArray('enable-packages');
-        $assets = array();
+        $assets = [];
 
         foreach ($packages as $package) {
             $filename = AssetUtil::getPath($installationManager, $this->assetManager, $package, $configPackages);
 
             if (null !== $filename) {
-                list($packageName, $packagePath) = $this->getMockPackagePath($package, $assetDir, $filename);
+                [$packageName, $packagePath] = $this->getMockPackagePath($package, $assetDir, $filename);
                 $assets[$packageName] = $packagePath;
             }
         }
@@ -135,6 +136,6 @@ final class Solver implements SolverInterface
 
         $jsonFile->write($packageValue);
 
-        return array($packageName, $this->fs->findShortestPath(getcwd(), $newFilename));
+        return [$packageName, $this->fs->findShortestPath(getcwd(), $newFilename)];
     }
 }

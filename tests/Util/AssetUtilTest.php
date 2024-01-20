@@ -68,7 +68,7 @@ final class AssetUtilTest extends \PHPUnit\Framework\TestCase
 
         $assetManager = $this->createMock(AbstractAssetManager::class);
 
-        /** @var PackageInterface|MockObject $package */
+        /** @var MockObject|PackageInterface $package */
         $package = $this->createMock(PackageInterface::class);
 
         $package->expects($this->once())->method('getRequires')->willReturn([]);
@@ -205,7 +205,7 @@ final class AssetUtilTest extends \PHPUnit\Framework\TestCase
                 [
                     new Link('root/package', 'foo/bar', new Constraint('=', '1.0.0')),
                     new Link('root/package', 'foxy/foxy', new Constraint('=', '1.0.0')),
-                    new Link('root/package', 'bar/foo', new Constraint('=', '1.0.0'))
+                    new Link('root/package', 'bar/foo', new Constraint('=', '1.0.0')),
                 ],
             )
         );
@@ -239,7 +239,7 @@ final class AssetUtilTest extends \PHPUnit\Framework\TestCase
             'full-disable/qualified' => false,
         ];
 
-        /** @var PackageInterface|MockObject $package */
+        /** @var MockObject|PackageInterface $package */
         $package = $this->createMock(PackageInterface::class);
 
         $package->expects($this->once())->method('getName')->willReturn($packageName);
@@ -274,7 +274,7 @@ final class AssetUtilTest extends \PHPUnit\Framework\TestCase
             '*' => true,
         ];
 
-        /** @var PackageInterface|MockObject $package */
+        /** @var MockObject|PackageInterface $package */
         $package = $this->createMock(PackageInterface::class);
 
         $package->expects($this->once())->method('getName')->willReturn($packageName);
@@ -313,7 +313,7 @@ final class AssetUtilTest extends \PHPUnit\Framework\TestCase
     ): void {
         $packageName = '@composer-asset/foo--bar';
 
-        /** @var PackageInterface|MockObject $package */
+        /** @var MockObject|PackageInterface $package */
         $package = $this->createMock(PackageInterface::class);
 
         $assetPackage = [];

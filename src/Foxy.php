@@ -78,23 +78,23 @@ final class Foxy implements PluginInterface, EventSubscriberInterface
     /**
      * The list of the classes of asset managers.
      */
-    private static $assetManagers = array(
+    private static $assetManagers = [
         'Foxy\Asset\NpmManager',
         'Foxy\Asset\PnpmManager',
         'Foxy\Asset\YarnManager',
-    );
+    ];
 
     /**
      * The default values of config.
      */
-    private static $defaultConfig = array(
+    private static $defaultConfig = [
         'enabled' => true,
         'manager' => null,
-        'manager-version' => array(
+        'manager-version' => [
             'npm' => '>=5.0.0',
             'pnpm' => '>=7.0.0',
             'yarn' => '>=1.0.0',
-        ),
+        ],
         'manager-bin' => null,
         'manager-options' => null,
         'manager-install-options' => null,
@@ -104,30 +104,30 @@ final class Foxy implements PluginInterface, EventSubscriberInterface
         'run-asset-manager' => true,
         'fallback-asset' => true,
         'fallback-composer' => true,
-        'enable-packages' => array(),
-    );
+        'enable-packages' => [],
+    ];
 
     public static function getSubscribedEvents(): array
     {
-        return array(
-            ComposerUtil::getInitEventName() => array(
-                array('init', 100),
-            ),
-            PackageEvents::POST_PACKAGE_INSTALL => array(
-                array('initOnInstall', 100),
-            ),
-            ScriptEvents::POST_INSTALL_CMD => array(
-                array('solveAssets', 100),
-            ),
-            ScriptEvents::POST_UPDATE_CMD => array(
-                array('solveAssets', 100),
-            ),
-        );
+        return [
+            ComposerUtil::getInitEventName() => [
+                ['init', 100],
+            ],
+            PackageEvents::POST_PACKAGE_INSTALL => [
+                ['initOnInstall', 100],
+            ],
+            ScriptEvents::POST_INSTALL_CMD => [
+                ['solveAssets', 100],
+            ],
+            ScriptEvents::POST_UPDATE_CMD => [
+                ['solveAssets', 100],
+            ],
+        ];
     }
 
     public function activate(Composer $composer, IOInterface $io): void
     {
-        ComposerUtil::validateVersion(static::REQUIRED_COMPOSER_VERSION, Composer::VERSION);
+        ComposerUtil::validateVersion(self::REQUIRED_COMPOSER_VERSION, Composer::VERSION);
 
         $input = ConsoleUtil::getInput($io);
         $executor = new ProcessExecutor($io);

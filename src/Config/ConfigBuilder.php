@@ -29,7 +29,7 @@ abstract class ConfigBuilder
      *
      * @param Composer $composer The composer.
      * @param array $defaults The default values.
-     * @param null|IOInterface $io The composer input/output.
+     * @param IOInterface|null $io The composer input/output.
      */
     public static function build(Composer $composer, array $defaults = [], IOInterface $io = null): Config
     {
@@ -42,7 +42,7 @@ abstract class ConfigBuilder
      * Get the base of data.
      *
      * @param Composer $composer The composer.
-     * @param null|IOInterface $io The composer input/output.
+     * @param IOInterface|null $io The composer input/output.
      */
     private static function getConfigBase(Composer $composer, IOInterface $io = null): array
     {
@@ -51,7 +51,7 @@ abstract class ConfigBuilder
         $packageConfig = $composer->getPackage()->getConfig();
         $packageConfig = isset($packageConfig['foxy']) && \is_array($packageConfig['foxy'])
             ? $packageConfig['foxy']
-            : array();
+            : [];
 
         return array_merge($globalPackageConfig, $globalConfig, $packageConfig);
     }
@@ -61,13 +61,13 @@ abstract class ConfigBuilder
      *
      * @param Composer $composer The composer.
      * @param string $filename The filename.
-     * @param null|IOInterface $io The composer input/output.
+     * @param IOInterface|null $io The composer input/output.
      */
     private static function getGlobalConfig(Composer $composer, string $filename, IOInterface $io = null): array
     {
         $home = self::getComposerHome($composer);
         $file = new JsonFile($home . '/' . $filename . '.json');
-        $config = array();
+        $config = [];
 
         if ($file->exists()) {
             $data = $file->read();

@@ -74,7 +74,7 @@ final class ConfigTest extends \PHPUnit\Framework\TestCase
      * @param string $key The key.
      * @param mixed $expected The expected value.
      * @param mixed $default The default value.
-     * @param null|string $env The env variable.
+     * @param string|null $env The env variable.
      * @param array $defaults The configured default values.
      */
     public function testGetConfig(
@@ -109,10 +109,10 @@ final class ConfigTest extends \PHPUnit\Framework\TestCase
                         'manager' => 'quill',
                         'manager-bar' => [
                             'peter' => 42,
-                            'quill' => 23
+                            'quill' => 23,
                         ],
                         'manager-baz' => [
-                            'peter' => 42
+                            'peter' => 42,
                         ],
                     ],
                 ],

@@ -33,11 +33,9 @@ final class PackageUtil
     public static function loadLockPackages(array $lockData): array
     {
         $loader = new ArrayLoader();
-        $lockData = static::loadLockPackage($loader, $lockData);
-        $lockData = static::loadLockPackage($loader, $lockData, true);
-        $lockData = static::convertLockAlias($lockData);
-
-        return $lockData;
+        $lockData = self::loadLockPackage($loader, $lockData);
+        $lockData = self::loadLockPackage($loader, $lockData, true);
+        return self::convertLockAlias($lockData);
     }
 
     /**
@@ -73,13 +71,13 @@ final class PackageUtil
     public static function convertLockAlias(array $lockData): array
     {
         if (isset($lockData['aliases'])) {
-            $aliases = array();
+            $aliases = [];
 
             foreach ($lockData['aliases'] as $i => $config) {
-                $aliases[$config['package']][$config['version']] = array(
+                $aliases[$config['package']][$config['version']] = [
                     'alias' => $config['alias'],
                     'alias_normalized' => $config['alias_normalized'],
-                );
+                ];
             }
 
             $lockData['aliases'] = $aliases;

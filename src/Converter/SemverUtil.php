@@ -48,10 +48,10 @@ abstract class SemverUtil
             $matches,
             PREG_OFFSET_CAPTURE
         )) {
-            list($type, $version, $end) = self::cleanVersion(strtolower($version), $matches);
-            list($version, $patchVersion) = self::matchVersion($version, $type);
+            [$type, $version, $end] = self::cleanVersion(strtolower($version), $matches);
+            [$version, $patchVersion] = self::matchVersion($version, $type);
 
-            $matches = array();
+            $matches = [];
             $hasPatchNumber = preg_match('/[0-9]+\.[0-9]+|[0-9]+|\.[0-9]+$/', $end, $matches);
             $end = $hasPatchNumber ? $matches[0] : '1';
 
@@ -108,17 +108,17 @@ abstract class SemverUtil
         $end = substr($version, \strlen($matches[1][0][0]));
         $version = $matches[1][0][0] . '-';
 
-        $matches = array();
+        $matches = [];
         if (preg_match('/^([-+])/', $end, $matches)) {
             $end = substr($end, 1);
         }
 
-        $matches = array();
+        $matches = [];
         preg_match('/^[a-z]+/', $end, $matches);
         $type = isset($matches[0]) ? VersionParser::normalizeStability($matches[0]) : '';
         $end = substr($end, \strlen($type));
 
-        return array($type, $version, $end);
+        return [$type, $version, $end];
     }
 
     /**
@@ -153,7 +153,7 @@ abstract class SemverUtil
                 break;
 
             default:
-                if (!\in_array($type, array('alpha', 'beta', 'RC'), true)) {
+                if (!\in_array($type, ['alpha', 'beta', 'RC'], true)) {
                     $type = 'patch';
                 }
 
@@ -162,7 +162,7 @@ abstract class SemverUtil
 
         $version .= $type;
 
-        return array($version, $patchVersion);
+        return [$version, $patchVersion];
     }
 
     /**

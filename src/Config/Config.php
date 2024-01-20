@@ -115,7 +115,7 @@ class Config
     {
         $value = strtolower($value);
 
-        return \in_array($value, array('true', 'false', '1', '0', 'yes', 'no', 'y', 'n'), true);
+        return \in_array($value, ['true', 'false', '1', '0', 'yes', 'no', 'y', 'n'], true);
     }
 
     /**
@@ -125,7 +125,7 @@ class Config
      */
     private function convertBoolean(string $value): bool
     {
-        return \in_array($value, array('true', '1', 'yes', 'y'), true);
+        return \in_array($value, ['true', '1', 'yes', 'y'], true);
     }
 
     /**
