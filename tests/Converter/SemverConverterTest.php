@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace Foxy\Tests\Converter;
 
 use Foxy\Converter\SemverConverter;
-use Foxy\Converter\SemverUtil;
 use Foxy\Converter\VersionConverterInterface;
 use PHPUnit\Framework\TestCase;
 
