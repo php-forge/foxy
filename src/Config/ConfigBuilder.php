@@ -91,6 +91,8 @@ abstract class ConfigBuilder
      */
     private static function getComposerHome(Composer $composer): string
     {
-        return $composer->getConfig()->has('home') ? $composer->getConfig()->get('home') : '';
+        $composerHome = $composer->getConfig()->get('home');
+
+        return is_string($composerHome) ? $composerHome : '';
     }
 }

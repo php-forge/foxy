@@ -46,7 +46,7 @@ class Config
     {
         $value = $this->get($key, null);
 
-        return $value ?? $default;
+        return is_array($value) ? $value : $default;
     }
 
     /**
@@ -174,7 +174,7 @@ class Config
             );
         }
 
-        return $value;
+        return is_array($value) ? $value : [];
     }
 
     /**
