@@ -2,10 +2,23 @@
     <img src="https://foxypkg.com/assets/img/logo.svg" width="260" alt="Foxy">
 </a></p>
 
-[![Latest Version](https://img.shields.io/packagist/v/foxy/foxy.svg)](https://packagist.org/packages/foxy/foxy)
-[![Build Status](https://img.shields.io/travis/com/fxpio/foxy.svg)](https://travis-ci.com/github/fxpio/foxy)
-[![Coverage Status](https://img.shields.io/coveralls/github/fxpio/foxy.svg)](https://coveralls.io/r/fxpio/foxy)
-[![Packagist Downloads](https://img.shields.io/packagist/dt/foxy/foxy.svg)](https://packagist.org/packages/foxy/foxy/stats)
+<p align="center">
+    <a href="https://www.php.net/releases/8.1/en.php" target="_blank">
+        <img src="https://img.shields.io/badge/PHP-%3E%3D8.1-787CB5" alt="php-version">
+    </a>
+    <a href="https://github.com/php-forge/foxy/actions/workflows/build.yml" target="_blank">
+        <img src="https://github.com/php-forge/foxy/actions/workflows/build.yml/badge.svg" alt="PHPUnit">
+    </a> 
+    <a href="https://codecov.io/gh/php-forge/foxy" target="_blank">
+        <img src="https://codecov.io/gh/php-forge/foxy/branch/main/graph/badge.svg?token=MF0XUGVLYC" alt="Codecov">
+    </a>
+    <a href="https://github.com/yii2-extensions/asset-bootstrap5/actions/workflows/static.yml" target="_blank">
+        <img src="https://github.com/yii2-extensions/asset-bootstrap5/actions/workflows/static.yml/badge.svg" alt="PSalm">
+    </a>      
+    <a href="https://github.styleci.io/repos/745652761?branch=main" target="_blank">
+        <img src="https://github.styleci.io/repos/745652761/shield?branch=main" alt="StyleCI">
+    </a>  
+</p>
 
 Foxy is a Composer plugin to automate the validation, installation, updating and removing of PHP libraries
 asset dependencies (javaScript, stylesheets, etc.) defined in the NPM `package.json` file of the project and
