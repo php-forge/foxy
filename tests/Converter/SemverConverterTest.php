@@ -107,6 +107,6 @@ final class SemverConverterTest extends TestCase
         $version = '1.0.0';
         $expected = '1.0.0';
 
-        static::assertSame($expected, SemverUtil::convertVersionMetadata($version));
+        self::assertSame($expected, SemverUtil::convertVersionMetadata($version));
     }
 }
