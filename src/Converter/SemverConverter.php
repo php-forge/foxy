@@ -22,12 +22,12 @@ final class SemverConverter implements VersionConverterInterface
 {
     public function convertVersion(string $version = null): string
     {
-        if (\in_array($version, array(null, '', 'latest'), true)) {
+        if (\in_array($version, [null, '', 'latest'], true)) {
             return ('latest' === $version ? 'default || ' : '') . '*';
         }
 
         $version = str_replace('–', '-', $version);
-        $prefix = preg_match('/^[a-z]/', $version) && 0 !== strpos($version, 'dev-') ? substr($version, 0, 1) : '';
+        $prefix = preg_match('/^[a-z]/', $version) && !str_starts_with($version, 'dev-') ? substr($version, 0, 1) : '';
         $version = substr($version, \strlen($prefix));
         $version = SemverUtil::convertVersionMetadata($version);
         $version = SemverUtil::convertDateVersion($version);

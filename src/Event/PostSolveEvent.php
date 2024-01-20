@@ -32,7 +32,7 @@ final class PostSolveEvent extends AbstractSolveEvent
      *
      * @psalm-param PackageInterface[] $packages All installed Composer packages.
      */
-    public function __construct($assetDir, array $packages, private int $runResult)
+    public function __construct($assetDir, array $packages, private readonly int $runResult)
     {
         parent::__construct(FoxyEvents::POST_SOLVE, $assetDir, $packages);
     }

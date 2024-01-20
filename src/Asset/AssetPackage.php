@@ -66,11 +66,11 @@ final class AssetPackage implements AssetPackageInterface
 
     public function getInstalledDependencies(): array
     {
-        $installedAssets = array();
+        $installedAssets = [];
 
         if (isset($this->package[self::SECTION_DEPENDENCIES]) && \is_array($this->package[self::SECTION_DEPENDENCIES])) {
             foreach ($this->package[self::SECTION_DEPENDENCIES] as $dependency => $version) {
-                if (0 === strpos($dependency, self::COMPOSER_PREFIX)) {
+                if (str_starts_with($dependency, self::COMPOSER_PREFIX)) {
                     $installedAssets[$dependency] = $version;
                 }
             }
@@ -82,13 +82,13 @@ final class AssetPackage implements AssetPackageInterface
     public function addNewDependencies(array $dependencies): array
     {
         $installedAssets = $this->getInstalledDependencies();
-        $existingPackages = array();
+        $existingPackages = [];
 
         foreach ($dependencies as $name => $path) {
             if (isset($installedAssets[$name])) {
                 $existingPackages[] = $name;
             } else {
-                $this->package[self::SECTION_DEPENDENCIES][$name] = 'file:./' . \dirname($path);
+                $this->package[self::SECTION_DEPENDENCIES][$name] = 'file:./' . \dirname((string) $path);
             }
         }
 

@@ -81,6 +81,6 @@ final class ConsoleUtil
             $preferDist = $input->getOption('prefer-dist');
         }
 
-        return array($preferSource, $preferDist);
+        return [$preferSource, $preferDist];
     }
 }

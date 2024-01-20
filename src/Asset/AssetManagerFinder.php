@@ -32,7 +32,7 @@ final class AssetManagerFinder
      *
      * @psalm-param AssetManagerInterface[] $managers The asset managers
      */
-    public function __construct(array $managers = array())
+    public function __construct(array $managers = [])
     {
         foreach ($managers as $manager) {
             if ($manager instanceof AssetManagerInterface) {

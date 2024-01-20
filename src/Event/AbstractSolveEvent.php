@@ -32,7 +32,7 @@ abstract class AbstractSolveEvent extends Event
      *
      * @psalm-param PackageInterface[] $packages All installed Composer packages.
      */
-    public function __construct(string $name, private string $assetDir, private array $packages = [])
+    public function __construct(string $name, private readonly string $assetDir, private readonly array $packages = [])
     {
         parent::__construct($name, [], []);
     }

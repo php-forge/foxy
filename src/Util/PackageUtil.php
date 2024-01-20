@@ -73,13 +73,10 @@ final class PackageUtil
     public static function convertLockAlias(array $lockData): array
     {
         if (isset($lockData['aliases'])) {
-            $aliases = array();
+            $aliases = [];
 
             foreach ($lockData['aliases'] as $i => $config) {
-                $aliases[$config['package']][$config['version']] = array(
-                    'alias' => $config['alias'],
-                    'alias_normalized' => $config['alias_normalized'],
-                );
+                $aliases[$config['package']][$config['version']] = ['alias' => $config['alias'], 'alias_normalized' => $config['alias_normalized']];
             }
 
             $lockData['aliases'] = $aliases;

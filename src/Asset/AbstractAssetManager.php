@@ -33,7 +33,7 @@ use Foxy\Json\JsonFile;
  */
 abstract class AbstractAssetManager implements AssetManagerInterface
 {
-    public const NODE_MODULES_PATH = './node_modules';
+    final public const NODE_MODULES_PATH = './node_modules';
     protected bool $updatable = true;
     protected VersionConverterInterface|null $versionConverter;
     private null|string $version = '';
@@ -171,9 +171,9 @@ abstract class AbstractAssetManager implements AssetManagerInterface
     protected function buildCommand(string $defaultBin, string $action, array|string $command): string
     {
         $bin = $this->config->get('manager-bin', $defaultBin);
-        $bin = Platform::isWindows() ? str_replace('/', '\\', $bin) : $bin;
-        $gOptions = trim($this->config->get('manager-options', ''));
-        $options = trim($this->config->get('manager-' . $action . '-options', ''));
+        $bin = Platform::isWindows() ? str_replace('/', '\\', (string) $bin) : $bin;
+        $gOptions = trim((string) $this->config->get('manager-options', ''));
+        $options = trim((string) $this->config->get('manager-' . $action . '-options', ''));
 
         return $bin . ' ' . implode(' ', (array) $command)
             . (empty($gOptions) ? '' : ' ' . $gOptions)
