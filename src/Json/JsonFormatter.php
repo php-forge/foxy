@@ -74,11 +74,11 @@ final class JsonFormatter
         if ($formatJson) {
             $json = self::formatInternal($json, true, true);
         }
-    
+
         if (4 !== $indent) {
             $json = \str_replace('    ', \str_repeat(' ', $indent), $json);
         }
-    
+
         return self::replaceArrayByMap($json, $arrayKeys);
     }
 
@@ -91,17 +91,22 @@ final class JsonFormatter
     private static function formatInternal(string $json, bool $unescapeUnicode, bool $unescapeSlashes): string
     {
         $array = \json_decode($json, true);
-    
+
         if ($unescapeUnicode) {
             \array_walk_recursive($array, function (&$item) {
                 if (\is_string($item)) {
-                    $item = \preg_replace_callback('/\\\\u([0-9a-fA-F]{4})/', function ($match) {
-                        return \mb_convert_encoding(\pack('H*', $match[1]), 'UTF-8', 'UCS-2BE');
-                    }, $item);
+                    $item = \preg_replace_callback(
+                        '/\\\\u([0-9a-fA-F]{4})/',
+                        static function (mixed $match) {
+                            $result = \mb_convert_encoding(\pack('H*', $match[1]), 'UTF-8', 'UCS-2BE');
+                            return $result !== false ? $result : '';
+                        },
+                        $item,
+                    );
                 }
             });
         }
-    
+
         if ($unescapeSlashes) {
             \array_walk_recursive($array, function (&$item) {
                 if (\is_string($item)) {
@@ -109,7 +114,7 @@ final class JsonFormatter
                 }
             });
         }
-    
+
         return \json_encode($array, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     }
 
@@ -118,7 +123,7 @@ final class JsonFormatter
      *
      * @param string $json The original JSON.
      * @param array $arrayKeys The list of keys to be retained with an array representation if they are empty.
-     * 
+     *
      * @psalm-param string[] $arrayKeys The list of keys to be retained with an array representation if they are empty.
      *
      * @return string
