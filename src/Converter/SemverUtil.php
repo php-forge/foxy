@@ -52,7 +52,7 @@ abstract class SemverUtil
             [$version, $patchVersion] = self::matchVersion($version, $type);
 
             $matches = [];
-            $hasPatchNumber = preg_match('/[0-9]+\.[0-9]+|[0-9]+|\.[0-9]+$/', (string) $end, $matches);
+            $hasPatchNumber = preg_match('/[0-9]+\.[0-9]+|[0-9]+|\.[0-9]+$/', $end, $matches);
             $end = $hasPatchNumber ? $matches[0] : '1';
 
             if ($patchVersion) {
@@ -104,6 +104,8 @@ abstract class SemverUtil
      * @param array $matches The match of pattern asset version.
      *
      * @return array The list of $type, $version and $end.
+     *
+     * @psalm-return array{0: string, 1: string, 2: string}
      */
     private static function cleanVersion(string $version, array $matches): array
     {
@@ -130,6 +132,8 @@ abstract class SemverUtil
      * @param string $type The type of version.
      *
      * @return array The list of $version and $patchVersion.
+     *
+     * @psalm-return array{0: string, 1: bool}
      */
     private static function matchVersion(string $version, string $type): array
     {

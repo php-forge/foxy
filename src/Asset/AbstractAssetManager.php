@@ -95,6 +95,7 @@ abstract class AbstractAssetManager implements AssetManagerInterface
     public function validate(): void
     {
         $version = $this->getVersion();
+        /** @var string $constraintVersion */
         $constraintVersion = $this->config->get('manager-version');
 
         if (null === $version) {
@@ -141,9 +142,14 @@ abstract class AbstractAssetManager implements AssetManagerInterface
         $this->io->write($info);
 
         $timeout = ProcessExecutor::getTimeout();
-        ProcessExecutor::setTimeout($this->config->get('manager-timeout', PHP_INT_MAX));
+
+        /** @var int $managerTimeout */
+        $managerTimeout = $this->config->get('manager-timeout', PHP_INT_MAX);
+        ProcessExecutor::setTimeout($managerTimeout);
+
         $cmd = $updatable ? $this->getUpdateCommand() : $this->getInstallCommand();
         $res = $this->executor->execute($cmd);
+
         ProcessExecutor::setTimeout($timeout);
 
         if ($res > 0 && null !== $this->fallback) {
@@ -171,8 +177,6 @@ abstract class AbstractAssetManager implements AssetManagerInterface
      * @param string $defaultBin The default binary of command if option isn't defined.
      * @param string $action The command action to retrieve the options in config.
      * @param array|string $command The command.
-     *
-     * @psalm-param string|string[] $command
      */
     protected function buildCommand(string $defaultBin, string $action, array|string $command): string
     {
@@ -181,7 +185,8 @@ abstract class AbstractAssetManager implements AssetManagerInterface
         $gOptions = trim((string) $this->config->get('manager-options', ''));
         $options = trim((string) $this->config->get('manager-' . $action . '-options', ''));
 
-        return $bin . ' ' . implode(' ', (array) $command)
+        /** @psalm-var string|string[] $command */
+        return (string) $bin . ' ' . implode(' ', (array) $command)
             . (empty($gOptions) ? '' : ' ' . $gOptions)
             . (empty($options) ? '' : ' ' . $options);
     }

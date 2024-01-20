@@ -85,7 +85,10 @@ final class ComposerFallback implements FallbackInterface
         if ($hasLock) {
             $this->restorePreviousLockFile();
         } else {
-            $this->fs->remove($this->composer->getConfig()->get('vendor-dir'));
+            /** @var string $vendorDir */
+            $vendorDir = $this->composer->getConfig()->get('vendor-dir');
+
+            $this->fs->remove($vendorDir);
         }
     }
 
