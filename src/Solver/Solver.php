@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -30,28 +32,8 @@ use Foxy\Util\AssetUtil;
  *
  * @author François Pluchino <francois.pluchino@gmail.com>
  */
-class Solver implements SolverInterface
+final class Solver implements SolverInterface
 {
-    /**
-     * @var Config
-     */
-    protected $config;
-
-    /**
-     * @var Filesystem
-     */
-    protected $fs;
-
-    /**
-     * @var AssetManagerInterface
-     */
-    protected $assetManager;
-
-    /**
-     * @var null|FallbackInterface
-     */
-    protected $composerFallback;
-
     /**
      * Constructor.
      *
@@ -61,31 +43,21 @@ class Solver implements SolverInterface
      * @param null|FallbackInterface $composerFallback The composer fallback
      */
     public function __construct(
-        AssetManagerInterface $assetManager,
-        Config $config,
-        Filesystem $filesystem,
-        FallbackInterface $composerFallback = null
+        protected AssetManagerInterface $assetManager,
+        protected Config $config,
+        protected Filesystem $fs,
+        protected FallbackInterface|null $composerFallback = null
     ) {
-        $this->config = $config;
-        $this->fs = $filesystem;
-        $this->assetManager = $assetManager;
-        $this->composerFallback = $composerFallback;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function setUpdatable($updatable)
+    public function setUpdatable($updatable): self
     {
         $this->assetManager->setUpdatable($updatable);
 
         return $this;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function solve(Composer $composer, IOInterface $io)
+    public function solve(Composer $composer, IOInterface $io): void
     {
         if (!$this->config->get('enabled')) {
             return;
@@ -113,13 +85,14 @@ class Solver implements SolverInterface
     /**
      * Get the package of asset dependencies.
      *
-     * @param Composer           $composer The composer
-     * @param string             $assetDir The asset directory
-     * @param PackageInterface[] $packages The package dependencies
+     * @param Composer  $composer The composer instance.
+     * @param string $assetDir The asset directory.
+     * @param array $packages The package dependencies.
      *
-     * @return array[]
+     * @psalm-param PackageInterface[] $packages The package dependencies.
+     * @psalm-return array[] The package name and the relative package path from the current directory.
      */
-    protected function getAssets(Composer $composer, $assetDir, array $packages)
+    protected function getAssets(Composer $composer, string $assetDir, array $packages): array
     {
         $installationManager = $composer->getInstallationManager();
         $configPackages = $this->config->getArray('enable-packages');
@@ -143,19 +116,20 @@ class Solver implements SolverInterface
     /**
      * Get the path of the mock package.
      *
-     * @param PackageInterface $package  The package dependency
-     * @param string           $assetDir The asset directory
-     * @param string           $filename The filename of asset package
+     * @param PackageInterface $package The package dependency,
+     * @param string $assetDir The asset directory.
+     * @param string $filename The filename of asset package.
      *
-     * @return string[] The package name and the relative package path from the current directory
+     * @psalm-return string[] The package name and the relative package path from the current directory
      */
-    protected function getMockPackagePath(PackageInterface $package, $assetDir, $filename)
+    protected function getMockPackagePath(PackageInterface $package, string $assetDir, string $filename): array
     {
         $packageName = AssetUtil::getName($package);
-        $packagePath = rtrim($assetDir, '/').'/'.$package->getName();
-        $newFilename = $packagePath.'/'.basename($filename);
-        mkdir($packagePath, 0777, true);
-        copy($filename, $newFilename);
+        $packagePath = \rtrim($assetDir, '/').'/'.$package->getName();
+        $newFilename = $packagePath.'/'. \basename($filename);
+
+        \mkdir($packagePath, 0777, true);
+        \copy($filename, $newFilename);
 
         $jsonFile = new JsonFile($newFilename);
         $packageValue = AssetUtil::formatPackage($package, $packageName, (array) $jsonFile->read());
