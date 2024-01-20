@@ -62,6 +62,8 @@ final class JsonFormatter
      * @param array $arrayKeys The list of keys to be retained with an array representation if they are empty.
      * @param int $indent The space count for indent.
      * @param bool $formatJson Check if the json must be formatted.
+     *
+     * @psalm-param string[] $arrayKeys The list of keys to be retained with an array representation if they are empty.
      */
     public static function format(
         string $json,
@@ -89,6 +91,10 @@ final class JsonFormatter
     private static function formatInternal(string $json, bool $unescapeUnicode, bool $unescapeSlashes): string
     {
         $array = \json_decode($json, true);
+
+        if (!is_array($array)) {
+            return $json;
+        }
 
         if ($unescapeUnicode) {
             \array_walk_recursive($array, function (mixed &$item): void {

@@ -54,8 +54,11 @@ final class AssetUtil
 
         if (self::isAsset($package, $configPackages)) {
             $installPath = $installationManager->getInstallPath($package);
-            $filename = $installPath . '/' . $assetManager->getPackageName();
-            $path = \file_exists($filename) ? \str_replace('\\', '/', \realpath($filename)) : null;
+
+            if ($installPath !== null) {
+                $filename = $installPath . '/' . $assetManager->getPackageName();
+                $path = \file_exists($filename) ? \str_replace('\\', '/', \realpath($filename)) : null;
+            }
         }
 
         return $path;
@@ -180,19 +183,25 @@ final class AssetUtil
         $name = $package->getName();
         $value = null;
 
+        /**
+         * @var array<string|int, bool|string> $configPackages
+         */
         foreach ($configPackages as $pattern => $activation) {
             if (\is_int($pattern) && \is_string($activation)) {
                 $pattern = $activation;
                 $activation = true;
             }
 
-            if ((str_starts_with($pattern, '/') && \preg_match($pattern, $name)) || \fnmatch($pattern, $name)) {
+            if (
+                \is_string($pattern) &&
+                ((str_starts_with($pattern, '/') && \preg_match($pattern, $name)) || \fnmatch($pattern, $name))
+            ) {
                 $value = $activation;
 
                 break;
             }
         }
 
-        return $value;
+        return is_bool($value) ? $value : null;
     }
 }

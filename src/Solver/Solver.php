@@ -64,11 +64,12 @@ final class Solver implements SolverInterface
 
         $dispatcher = $composer->getEventDispatcher();
         $packages = $composer->getRepositoryManager()->getLocalRepository()->getCanonicalPackages();
+        /** @var string $vendorDir */
         $vendorDir = $composer->getConfig()->get('vendor-dir');
+        /** @var string $assetDir */
         $assetDir = $this->config->get('composer-asset-dir', $vendorDir . '/foxy/composer-asset/');
         $dispatcher->dispatch(FoxyEvents::PRE_SOLVE, new PreSolveEvent($assetDir, $packages));
         $this->fs->remove($assetDir);
-
         $assets = $this->getAssets($composer, $assetDir, $packages);
         $this->assetManager->addDependencies($composer->getPackage(), $assets);
         $res = $this->assetManager->run();
@@ -89,8 +90,6 @@ final class Solver implements SolverInterface
      * @param array $packages The package dependencies.
      *
      * @psalm-param PackageInterface[] $packages The package dependencies.
-     *
-     * @psalm-return array[] The package name and the relative package path from the current directory.
      */
     protected function getAssets(Composer $composer, string $assetDir, array $packages): array
     {

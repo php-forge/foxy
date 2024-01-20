@@ -60,10 +60,11 @@ final class JsonFile extends \Composer\Json\JsonFile
     public function read(): array
     {
         $data = parent::read();
+
         $this->getArrayKeys();
         $this->getIndent();
 
-        return $data;
+        return is_array($data) ? $data : [];
     }
 
     public function write(array $hash, int $options = 448): void
