@@ -22,56 +22,86 @@ use Foxy\Json\JsonFormatter;
  */
 final class JsonFormatterTest extends \PHPUnit\Framework\TestCase
 {
-    public function testGetArrayKeys()
+    public function testFormat(): void
     {
-        $content = <<<'JSON'
-{
-  "name": "test",
-  "contributors": [],
-  "dependencies": {}
-}
-JSON;
-        $expected = array(
-            'contributors',
+        $expected = <<<'JSON'
+        {
+          "name": "test",
+          "contributors": [],
+          "dependencies": {
+            "@foo/bar": "^1.0.0"
+          },
+          "devDependencies": {}
+        }
+        JSON;
+        $data = array(
+            'name' => 'test',
+            'contributors' => array(),
+            'dependencies' => array(
+                '@foo/bar' => '^1.0.0',
+            ),
+            'devDependencies' => array(),
         );
+        $content = json_encode($data);
+
+        static::assertSame($expected, JsonFormatter::format($content, array('contributors'), 2));
+    }
+
+    public function testGetArrayKeys(): void
+    {
+        $content = <<<JSON
+        {
+          "name": "test",
+          "contributors": [],
+          "dependencies": {}
+        }
+        JSON;
+        $expected = array('contributors');
 
         static::assertSame($expected, JsonFormatter::getArrayKeys($content));
     }
 
-    public function testGetIndent()
+    public function testGetIndent(): void
     {
-        $content = <<<'JSON'
-{
-  "name": "test",
-  "dependencies": {}
-}
-JSON;
+        $content = <<<JSON
+        {
+          "name": "test",
+          "dependencies": {}
+        }
+        JSON;
 
         static::assertSame(2, JsonFormatter::getIndent($content));
     }
 
-    public function testFormat()
-{
-    $expected = <<<'JSON'
-{
-  "name": "test",
-  "contributors": [],
-  "dependencies": {
-    "@foo/bar": "^1.0.0"
-  },
-  "devDependencies": {}
-}
-JSON;
-    $data = array(
-        'name' => 'test',
-        'contributors' => array(),
-        'dependencies' => array(
-            '@foo/bar' => '^1.0.0',
-        ),
-        'devDependencies' => array(),
-    );
-    $content = json_encode($data);
+    public function testUnescapeUnicode(): void
+    {
+        $data = array(
+            'name' => '\u0048\u0065\u006c\u006c\u006f', // Hello en unicode
+        );
+        $content = json_encode($data);
 
-    static::assertSame($expected, JsonFormatter::format($content, array('contributors'), 2));
-}
+        $expected = <<<JSON
+        {
+          "name": "Hello"
+        }
+        JSON;
+
+        static::assertSame($expected, JsonFormatter::format($content, array(), 2, true));
+    }
+
+    public function testUnescapeSlashes(): void
+    {
+        $data = array(
+            'url' => 'https:\/\/example.com', // URL con barras diagonales escapadas
+        );
+        $content = json_encode($data);
+
+        $expected = <<<'JSON'
+        {
+            "url": "https://example.com"
+        }
+        JSON;
+
+        static::assertSame($expected, JsonFormatter::format($content, array(), 4, true));
+    }
 }
