@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -25,7 +27,7 @@ final class JsonFormatterTest extends \PHPUnit\Framework\TestCase
 {
     public function testFormat(): void
     {
-        $expected = <<<'JSON'
+        $expected = <<<JSON
         {
           "name": "test",
           "contributors": {},
@@ -35,17 +37,15 @@ final class JsonFormatterTest extends \PHPUnit\Framework\TestCase
           "devDependencies": {}
         }
         JSON;
-        $data = array(
+
+        $data = [
             'name' => 'test',
-            'contributors' => array(),
-            'dependencies' => array(
-                '@foo/bar' => '^1.0.0',
-            ),
-            'devDependencies' => array(),
-        );
+            'contributors' => [],
+            'dependencies' => ['@foo/bar' => '^1.0.0'], 'devDependencies' => []
+        ];
         $content = json_encode($data);
 
-        Assert::equalsWithoutLE($expected, JsonFormatter::format($content, array(), 2));
+        Assert::equalsWithoutLE($expected, JsonFormatter::format($content, [], 2));
     }
 
     public function testGetArrayKeys(): void
@@ -57,9 +57,9 @@ final class JsonFormatterTest extends \PHPUnit\Framework\TestCase
           "dependencies": {}
         }
         JSON;
-        $expected = array('contributors');
+        $expected = ['contributors'];
 
-        static::assertSame($expected, JsonFormatter::getArrayKeys($content));
+        $this->assertSame($expected, JsonFormatter::getArrayKeys($content));
     }
 
     public function testGetIndent(): void
@@ -76,9 +76,7 @@ final class JsonFormatterTest extends \PHPUnit\Framework\TestCase
 
     public function testUnescapeUnicode(): void
     {
-        $data = array(
-            'name' => '\u0048\u0065\u006c\u006c\u006f', // Hello en unicode
-        );
+        $data = ['name' => '\u0048\u0065\u006c\u006c\u006f'];
         $content = json_encode($data);
 
         $expected = <<<JSON
@@ -87,22 +85,20 @@ final class JsonFormatterTest extends \PHPUnit\Framework\TestCase
         }
         JSON;
 
-        Assert::equalsWithoutLE($expected, JsonFormatter::format($content, array(), 2, true));
+        Assert::equalsWithoutLE($expected, JsonFormatter::format($content, [], 2, true));
     }
 
     public function testUnescapeSlashes(): void
     {
-        $data = array(
-            'url' => 'https:\/\/example.com', // URL con barras diagonales escapadas
-        );
+        $data = ['url' => 'https:\/\/example.com'];
         $content = json_encode($data);
 
-        $expected = <<<'JSON'
+        $expected = <<<JSON
         {
             "url": "https://example.com"
         }
         JSON;
 
-        Assert::equalsWithoutLE($expected, JsonFormatter::format($content, array(), 4, true));
+        Assert::equalsWithoutLE($expected, JsonFormatter::format($content, [], 4, true));
     }
 }

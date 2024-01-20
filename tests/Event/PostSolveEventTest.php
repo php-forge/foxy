@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -22,17 +24,15 @@ use Foxy\Event\PostSolveEvent;
  */
 final class PostSolveEventTest extends SolveEvent
 {
-    /**
-     * @return PostSolveEvent
-     */
-    public function getEvent()
+    public function getEvent(): PostSolveEvent
     {
         return new PostSolveEvent($this->assetDir, $this->packages, 42);
     }
 
-    public function testGetRunResult()
+    public function testGetRunResult(): void
     {
         $event = $this->getEvent();
-        static::assertSame(42, $event->getRunResult());
+
+        $this->assertSame(42, $event->getRunResult());
     }
 }

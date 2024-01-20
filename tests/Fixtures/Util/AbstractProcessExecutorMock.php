@@ -23,12 +23,12 @@ abstract class AbstractProcessExecutorMock extends ProcessExecutor
     /**
      * @var array
      */
-    private $expectedValues = array();
+    private $expectedValues = [];
 
     /**
      * @var array
      */
-    private $executedCommands = array();
+    private $executedCommands = [];
 
     /**
      * @var int
@@ -37,12 +37,10 @@ abstract class AbstractProcessExecutorMock extends ProcessExecutor
 
     public function doExecute($command, &$output = null, ?string $cwd = null): int
     {
-        $expected = isset($this->expectedValues[$this->position])
-            ? $this->expectedValues[$this->position]
-            : array(0, $output);
+        $expected = $this->expectedValues[$this->position] ?? [0, $output];
 
-        list($returnedCode, $output) = $expected;
-        $this->executedCommands[] = array($command, $returnedCode, $output);
+        [$returnedCode, $output] = $expected;
+        $this->executedCommands[] = [$command, $returnedCode, $output];
         ++$this->position;
 
         return $returnedCode;
@@ -56,7 +54,7 @@ abstract class AbstractProcessExecutorMock extends ProcessExecutor
      */
     public function addExpectedValues($returnedCode = 0, $output = null)
     {
-        $this->expectedValues[] = array($returnedCode, $output);
+        $this->expectedValues[] = [$returnedCode, $output];
 
         return $this;
     }
@@ -135,7 +133,7 @@ abstract class AbstractProcessExecutorMock extends ProcessExecutor
      *
      * @return null|int|string
      */
-    private function getExecutedValue($position, $index)
+    private function getExecutedValue($position, int $index)
     {
         return isset($this->executedCommands[$position])
             ? $this->executedCommands[$position][$index]

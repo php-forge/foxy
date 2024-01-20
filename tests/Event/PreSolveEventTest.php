@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -22,10 +24,7 @@ use Foxy\Event\PreSolveEvent;
  */
 final class PreSolveEventTest extends SolveEvent
 {
-    /**
-     * @return PreSolveEvent
-     */
-    public function getEvent()
+    public function getEvent(): PreSolveEvent
     {
         return new PreSolveEvent($this->assetDir, $this->packages);
     }

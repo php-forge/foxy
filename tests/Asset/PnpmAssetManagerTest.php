@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -22,37 +24,32 @@ use Foxy\Asset\PnpmManager;
  */
 final class PnpmAssetManagerTest extends AssetManager
 {
-    protected function getManager()
+    protected function getManager(): PnpmManager
     {
         return new PnpmManager($this->io, $this->config, $this->executor, $this->fs, $this->fallback);
     }
 
-    
-    protected function getValidName()
+    protected function getValidName(): string
     {
         return 'pnpm';
     }
 
-    
-    protected function getValidLockPackageName()
+    protected function getValidLockPackageName(): string
     {
         return 'pnpm-lock.yaml';
     }
 
-    
-    protected function getValidVersionCommand()
+    protected function getValidVersionCommand(): string
     {
         return 'pnpm --version';
     }
 
-    
-    protected function getValidInstallCommand()
+    protected function getValidInstallCommand(): string
     {
         return 'pnpm install';
     }
 
-    
-    protected function getValidUpdateCommand()
+    protected function getValidUpdateCommand(): string
     {
         return 'pnpm update';
     }

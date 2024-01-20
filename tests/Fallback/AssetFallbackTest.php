@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -15,6 +17,7 @@ use Composer\IO\IOInterface;
 use Composer\Util\Filesystem;
 use Foxy\Config\Config;
 use Foxy\Fallback\AssetFallback;
+use PHPUnit\Framework\MockObject\MockObject;
 
 /**
  * Tests for composer fallback.
@@ -25,35 +28,12 @@ use Foxy\Fallback\AssetFallback;
  */
 final class AssetFallbackTest extends \PHPUnit\Framework\TestCase
 {
-    /**
-     * @var Config
-     */
-    protected $config;
-
-    /**
-     * @var IOInterface|\PHPUnit_Framework_MockObject_MockObject
-     */
-    protected $io;
-
-    /**
-     * @var Filesystem|\PHPUnit_Framework_MockObject_MockObject
-     */
-    protected $fs;
-
-    /**
-     * @var \Symfony\Component\Filesystem\Filesystem
-     */
-    protected $sfs;
-
-    /**
-     * @var string
-     */
-    protected $oldCwd;
-
-    /**
-     * @var string
-     */
-    protected $cwd;
+    private Config|null $config = null;
+    private IOInterface|MockObject|null $io = null;
+    private Filesystem|MockObject|null $fs = null;
+    private \Symfony\Component\Filesystem\Filesystem|null $sfs = null;
+    private string|null $oldCwd = '';
+    private string|null $cwd = '';
 
     /**
      * @var AssetFallback
@@ -66,17 +46,13 @@ final class AssetFallbackTest extends \PHPUnit\Framework\TestCase
 
         $this->oldCwd = getcwd();
         $this->cwd = sys_get_temp_dir() . \DIRECTORY_SEPARATOR . uniqid('foxy_asset_fallback_test_', true);
-        $this->config = new Config(array(
-            'fallback-asset' => true,
-        ));
-        $this->io = $this->getMockBuilder('Composer\IO\IOInterface')->getMock();
-        $this->fs = $this->getMockBuilder('Composer\Util\Filesystem')
-            ->disableOriginalConstructor()
-            ->onlyMethods(array('remove'))
-            ->getMock();
+        $this->config = new Config(['fallback-asset' => true]);
+        $this->io = $this->createMock(IOInterface::class);
+        $this->fs = $this->createMock(Filesystem::class);
         $this->sfs = new \Symfony\Component\Filesystem\Filesystem();
         $this->sfs->mkdir($this->cwd);
-        chdir($this->cwd);
+
+        \chdir($this->cwd);
 
         $this->assetFallback = new AssetFallback($this->io, $this->config, 'package.json', $this->fs);
     }
@@ -85,7 +61,8 @@ final class AssetFallbackTest extends \PHPUnit\Framework\TestCase
     {
         parent::tearDown();
 
-        chdir($this->oldCwd);
+        \chdir($this->oldCwd);
+
         $this->sfs->remove($this->cwd);
         $this->config = null;
         $this->io = null;
@@ -98,58 +75,42 @@ final class AssetFallbackTest extends \PHPUnit\Framework\TestCase
 
     public static function getSaveData(): array
     {
-        return array(
-            array(true),
-            array(false),
-        );
+        return [[true], [false]];
     }
 
     /**
      * @dataProvider getSaveData
-     *
-     * @param bool $withPackageFile
      */
-    public function testSave($withPackageFile)
+    public function testSave(bool $withPackageFile): void
     {
         if ($withPackageFile) {
-            file_put_contents($this->cwd . '/package.json', '{}');
+            \file_put_contents($this->cwd . '/package.json', '{}');
         }
 
-        static::assertInstanceOf('Foxy\Fallback\AssetFallback', $this->assetFallback->save());
+        $this->assertInstanceOf(AssetFallback::class, $this->assetFallback->save());
     }
 
-    public function testRestoreWithDisableOption()
+    public function testRestoreWithDisableOption(): void
     {
-        $config = new Config(array(
-            'fallback-asset' => false,
-        ));
+        $config = new Config(['fallback-asset' => false]);
         $assetFallback = new AssetFallback($this->io, $config, 'package.json', $this->fs);
 
-        $this->io->expects(static::never())
-            ->method('write')
-        ;
+        $this->io->expects($this->never())->method('write');
 
-        $this->fs->expects(static::never())
-            ->method('remove')
-        ;
+        $this->fs->expects($this->never())->method('remove');
 
         $assetFallback->restore();
     }
 
     public static function getRestoreData(): array
     {
-        return array(
-            array(true),
-            array(false),
-        );
+        return [[true], [false]];
     }
 
     /**
      * @dataProvider getRestoreData
-     *
-     * @param bool $withPackageFile
      */
-    public function testRestore($withPackageFile)
+    public function testRestore(bool $withPackageFile): void
     {
         $content = '{}';
         $path = $this->cwd . '/package.json';
@@ -158,23 +119,18 @@ final class AssetFallbackTest extends \PHPUnit\Framework\TestCase
             file_put_contents($path, $content);
         }
 
-        $this->io->expects(static::once())
-            ->method('write')
-        ;
+        $this->io->expects($this->once())->method('write');
 
-        $this->fs->expects(static::once())
-            ->method('remove')
-            ->with('package.json')
-        ;
+        $this->fs->expects($this->once())->method('remove')->with('package.json');
 
         $this->assetFallback->save();
         $this->assetFallback->restore();
 
         if ($withPackageFile) {
-            static::assertFileExists($path);
-            static::assertSame($content, file_get_contents($path));
+            $this->assertFileExists($path);
+            $this->assertSame($content, file_get_contents($path));
         } else {
-            static::assertFileDoesNotExist($path);
+            $this->assertFileDoesNotExist($path);
         }
     }
 }

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -22,37 +24,32 @@ use Foxy\Asset\NpmManager;
  */
 final class NpmAssetManagerTest extends AssetManager
 {
-    protected function getManager()
+    protected function getManager(): NpmManager
     {
         return new NpmManager($this->io, $this->config, $this->executor, $this->fs, $this->fallback);
     }
 
-    
-    protected function getValidName()
+    protected function getValidName(): string
     {
         return 'npm';
     }
 
-    
-    protected function getValidLockPackageName()
+    protected function getValidLockPackageName(): string
     {
         return 'package-lock.json';
     }
 
-    
-    protected function getValidVersionCommand()
+    protected function getValidVersionCommand(): string
     {
         return 'npm --version';
     }
 
-    
-    protected function getValidInstallCommand()
+    protected function getValidInstallCommand(): string
     {
         return 'npm install';
     }
 
-    
-    protected function getValidUpdateCommand()
+    protected function getValidUpdateCommand(): string
     {
         return 'npm update';
     }

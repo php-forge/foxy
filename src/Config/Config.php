@@ -20,7 +20,7 @@ use Foxy\Exception\RuntimeException;
  *
  * @author François Pluchino <francois.pluchino@gmail.com>
  */
-final class Config
+class Config
 {
     private array $cacheEnv = [];
 

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -22,7 +24,7 @@ use Foxy\Asset\YarnManager;
  */
 final class YarnNextAssetManagerTest extends AssetManager
 {
-    public function actionForTestRunForInstallCommand($action)
+    public function actionForTestRunForInstallCommand($action): void
     {
         $this->executor->addExpectedValues(0, '2.0.0');
 
@@ -31,44 +33,37 @@ final class YarnNextAssetManagerTest extends AssetManager
         }
     }
 
-    
-    protected function getManager()
+    protected function getManager(): YarnManager
     {
         return new YarnManager($this->io, $this->config, $this->executor, $this->fs, $this->fallback);
     }
 
-    
-    protected function getValidName()
+    protected function getValidName(): string
     {
         return 'yarn';
     }
 
-    
-    protected function getValidLockPackageName()
+    protected function getValidLockPackageName(): string
     {
         return 'yarn.lock';
     }
 
-    
-    protected function getValidVersionCommand()
+    protected function getValidVersionCommand(): string
     {
         return 'yarn --version';
     }
 
-    
-    protected function getValidInstallCommand()
+    protected function getValidInstallCommand(): string
     {
         return 'yarn install';
     }
 
-    
-    protected function getValidUpdateCommand()
+    protected function getValidUpdateCommand(): string
     {
         return 'yarn up';
     }
 
-    
-    protected function actionForTestAddDependenciesForUpdateCommand()
+    protected function actionForTestAddDependenciesForUpdateCommand(): void
     {
         $this->executor->addExpectedValues(0, '2.0.0');
         $this->executor->addExpectedValues(0, 'CHECK OUTPUT');

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -23,22 +25,16 @@ use Foxy\Util\PackageUtil;
  */
 final class PackageUtilTest extends \PHPUnit\Framework\TestCase
 {
-    public function testLoadLockPackages()
+    public function testLoadLockPackages(): void
     {
-        $lockData = array(
-            'packages' => array(
-                array(
-                    'name' => 'foo/bar',
-                    'version' => '1.0.0.0',
-                ),
-            ),
-            'packages-dev' => array(
-                array(
-                    'name' => 'bar/foo',
-                    'version' => '1.0.0.0',
-                ),
-            ),
-        );
+        $lockData = [
+            'packages' => [
+                ['name' => 'foo/bar', 'version' => '1.0.0.0']
+            ],
+            'packages-dev' => [
+                ['name' => 'bar/foo', 'version' => '1.0.0.0']
+            ],
+        ];
 
         $package = new CompletePackage('foo/bar', '1.0.0.0', '1.0.0.0');
         $package->setType('library');
@@ -46,62 +42,60 @@ final class PackageUtilTest extends \PHPUnit\Framework\TestCase
         $packageDev = new CompletePackage('bar/foo', '1.0.0.0', '1.0.0.0');
         $packageDev->setType('library');
 
-        $expectedPackages = array(
-            $package,
-        );
-        $expectedDevPackages = array(
-            $packageDev,
-        );
+        $expectedPackages = [$package];
+        $expectedDevPackages = [$packageDev];
 
         $lockDataLoaded = PackageUtil::loadLockPackages($lockData);
 
-        static::assertArrayHasKey('packages', $lockDataLoaded);
-        static::assertArrayHasKey('packages-dev', $lockDataLoaded);
-        static::assertEquals($lockDataLoaded['packages'], $expectedPackages);
-        static::assertEquals($lockDataLoaded['packages-dev'], $expectedDevPackages);
+        $this->assertArrayHasKey('packages', $lockDataLoaded);
+        $this->assertArrayHasKey('packages-dev', $lockDataLoaded);
+        $this->assertEquals($lockDataLoaded['packages'], $expectedPackages);
+        $this->assertEquals($lockDataLoaded['packages-dev'], $expectedDevPackages);
     }
 
-    public function testLoadLockPackagesWithoutPackages()
+    public function testLoadLockPackagesWithoutPackages(): void
     {
-        static::assertSame(array(), PackageUtil::loadLockPackages(array()));
+        $this->assertSame([], PackageUtil::loadLockPackages([]));
     }
 
-    public function testConvertLockAlias()
+    public function testConvertLockAlias(): void
     {
-        $lockData = array(
-            'aliases' => array(
-                array(
+        $lockData = [
+            'aliases' => [
+                [
                     'alias' => '1.0.0',
-                    'alias_normalized' => '1.0.0.0',
+                    'alias_normalized' =>
+                    '1.0.0.0',
                     'version' => 'dev-feature/1.0-test',
                     'package' => 'foo/bar',
-                ),
-                array(
+                ],
+                [
                     'alias' => '2.2.0',
                     'alias_normalized' => '2.2.0.0',
                     'version' => 'dev-feature/2.2-test',
                     'package' => 'foo/baz',
-                ),
-            ),
-        );
-        $expectedAliases = array(
-            'foo/bar' => array(
-                'dev-feature/1.0-test' => array(
+                ],
+            ],
+        ];
+
+        $expectedAliases = [
+            'foo/bar' => [
+                'dev-feature/1.0-test' => [
                     'alias' => '1.0.0',
-                    'alias_normalized' => '1.0.0.0',
-                ),
-            ),
-            'foo/baz' => array(
-                'dev-feature/2.2-test' => array(
+                    'alias_normalized' => '1.0.0.0'
+                ]
+            ],
+            'foo/baz' => [
+                'dev-feature/2.2-test' => [
                     'alias' => '2.2.0',
                     'alias_normalized' => '2.2.0.0',
-                ),
-            ),
-        );
+                ],
+            ],
+        ];
 
         $convertedAliases = PackageUtil::convertLockAlias($lockData);
 
-        static::assertArrayHasKey('aliases', $convertedAliases);
-        static::assertEquals($convertedAliases['aliases'], $expectedAliases);
+        $this->assertArrayHasKey('aliases', $convertedAliases);
+        $this->assertEquals($convertedAliases['aliases'], $expectedAliases);
     }
 }
