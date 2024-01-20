@@ -197,6 +197,9 @@ final class Foxy implements PluginInterface, EventSubscriberInterface
             $amf->addManager(new $class($io, $config, $executor, $fs));
         }
 
-        return $amf->findManager($config->get('manager'));
+        /** @var string|null $manager */
+        $manager = $config->get('manager');
+
+        return $amf->findManager($manager);
     }
 }

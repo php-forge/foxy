@@ -125,39 +125,26 @@ final class ComposerFallback implements FallbackInterface
         $authoritative = $this->input->getOption('classmap-authoritative') || $config->get('classmap-authoritative');
         $apcu = $this->input->getOption('apcu-autoloader') || $config->get('apcu-autoloader');
         $dispatcher = $this->composer->getEventDispatcher();
+        /** @var bool $verbose */
+        $verbose = $this->input->getOption('verbose');
 
         $installer = $this->getInstaller()
-            ->setVerbose($this->input->getOption('verbose'))
+            ->setVerbose($verbose)
             ->setPreferSource($preferSource)
             ->setPreferDist($preferDist)
             ->setDevMode(!$this->input->getOption('no-dev'))
             ->setDumpAutoloader(!$this->input->getOption('no-autoloader'))
             ->setOptimizeAutoloader($optimize)
             ->setClassMapAuthoritative($authoritative)
-            ->setApcuAutoloader($apcu)
-        ;
+            ->setApcuAutoloader($apcu);
 
-        // @codeCoverageIgnoreStart
-        if (\defined('Composer\Composer::RUNTIME_API_VERSION') && version_compare(Composer::RUNTIME_API_VERSION, '2.2.0', '>=')) {
-            $ignorePlatformReqs = $this->input->getOption('ignore-platform-reqs') ?: ($this->input->getOption('ignore-platform-req') ?: false);
-            $installer->setPlatformRequirementFilter(PlatformRequirementFilterFactory::fromBoolOrList($ignorePlatformReqs));
-            $dispatcher->setRunScripts(false);
-        } else {
-            $installer->setPlatformRequirementFilter($this->input->getOption('ignore-platform-reqs'));
-        }
-
-        if (method_exists($installer, 'setSkipSuggest')) {
-            $installer->setSkipSuggest(true);
-        }
-        // @codeCoverageIgnoreEnd
+        $ignorePlatformReqs = $this->input->getOption('ignore-platform-reqs') ?: ($this->input->getOption('ignore-platform-req') ?: false);
+        $installer->setPlatformRequirementFilter(PlatformRequirementFilterFactory::fromBoolOrList($ignorePlatformReqs));
+        $dispatcher->setRunScripts(false);
 
         $installer->run();
 
-        // @codeCoverageIgnoreStart
-        if (\defined('Composer\Composer::RUNTIME_API_VERSION') && version_compare(Composer::RUNTIME_API_VERSION, '2.2.0', '>=')) {
-            $dispatcher->setRunScripts(!$this->input->getOption('no-scripts'));
-        }
-        // @codeCoverageIgnoreEnd
+        $dispatcher->setRunScripts(!$this->input->getOption('no-scripts'));
     }
 
     /**

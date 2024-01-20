@@ -53,7 +53,7 @@ final class ConsoleUtil
      * @param Config $config The composer config.
      * @param InputInterface $input The console input
      *
-     * @psalm-return bool[] An array composed of the preferSource and preferDist values
+     * @psalm-return list{bool, bool} An array composed of the preferSource and preferDist values
      */
     public static function getPreferredInstallOptions(Config $config, InputInterface $input): array
     {
@@ -77,7 +77,9 @@ final class ConsoleUtil
         }
 
         if ($input->getOption('prefer-source') || $input->getOption('prefer-dist')) {
+            /** @var bool $preferSource */
             $preferSource = $input->getOption('prefer-source');
+            /** @var bool $preferDist */
             $preferDist = $input->getOption('prefer-dist');
         }
 

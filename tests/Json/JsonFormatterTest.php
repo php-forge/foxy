@@ -48,6 +48,11 @@ final class JsonFormatterTest extends \PHPUnit\Framework\TestCase
         Assert::equalsWithoutLE($expected, JsonFormatter::format($content, [], 2));
     }
 
+    public function testFormatWithEmptyContent(): void
+    {
+        $this->assertEmpty(JsonFormatter::format('', [], 2));
+    }
+
     public function testGetArrayKeys(): void
     {
         $content = <<<JSON

@@ -47,16 +47,26 @@ final class PackageUtil
      *
      * @return array The lock data
      */
-    public static function loadLockPackage(ArrayLoader $loader, array $lockData, $dev = false): array
+    public static function loadLockPackage(ArrayLoader $loader, array $lockData, bool $dev = false): array
     {
         $key = $dev ? 'packages-dev' : 'packages';
 
-        if (isset($lockData[$key])) {
-            foreach ($lockData[$key] as $i => $package) {
-                $package = $loader->load($package);
-                $lockData[$key][$i] = $package instanceof AliasPackage ? $package->getAliasOf() : $package;
-            }
+        $loadDataWithKeys = $lockData[$key] ?? [];
+
+        if ($loadDataWithKeys === []) {
+            return $lockData;
         }
+
+        /**
+         * @psalm-var array[] $loadDataWithKeys
+         */
+        foreach ($loadDataWithKeys as $index => $package) {
+            $package = $loader->load($package);
+            $package = $package instanceof AliasPackage ? $package->getAliasOf() : $package;
+            $loadDataWithKeys[$index] = $package;
+        }
+
+        $lockData[$key] = $loadDataWithKeys;
 
         return $lockData;
     }
@@ -70,15 +80,27 @@ final class PackageUtil
      */
     public static function convertLockAlias(array $lockData): array
     {
-        if (isset($lockData['aliases'])) {
-            $aliases = [];
+        $loadDatawithaliases = $lockData['aliases'] ?? [];
 
-            foreach ($lockData['aliases'] as $i => $config) {
-                $aliases[$config['package']][$config['version']] = ['alias' => $config['alias'], 'alias_normalized' => $config['alias_normalized']];
-            }
-
-            $lockData['aliases'] = $aliases;
+        if ($loadDatawithaliases === []) {
+            return $lockData;
         }
+
+        $alias = [];
+
+        /**
+         * @psalm-var array{
+         *   array{alias: string, alias_normalized: string, version: string, package: string}
+         * } $loadDatawithaliases
+         */
+        foreach ($loadDatawithaliases as $config) {
+            $alias[$config['package']][$config['version']] = [
+                'alias' => $config['alias'],
+                'alias_normalized' => $config['alias_normalized'],
+            ];
+        }
+
+        $lockData['aliases'] = $alias;
 
         return $lockData;
     }
