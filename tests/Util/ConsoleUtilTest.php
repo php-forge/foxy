@@ -17,7 +17,6 @@ use Composer\IO\IOInterface;
 use Foxy\Util\ConsoleUtil;
 use Symfony\Component\Console\Helper\HelperSet;
 use Symfony\Component\Console\Input\ArgvInput;
-use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\NullOutput;
 
 /**
@@ -47,7 +46,7 @@ final class ConsoleUtilTest extends \PHPUnit\Framework\TestCase
         static::assertInstanceOf('Symfony\Component\Console\Input\ArgvInput', ConsoleUtil::getInput($io));
     }
 
-    public function getPreferredInstallOptionsData()
+    public static function getPreferredInstallOptionsData(): array
     {
         return array(
             array(false, false, 'auto', false),
@@ -67,11 +66,7 @@ final class ConsoleUtilTest extends \PHPUnit\Framework\TestCase
      */
     public function testGetPreferredInstallOptions($expectedPreferSource, $expectedPreferDist, $preferedInstall, $inputPrefer)
     {
-        /** @var Config|\PHPUnit_Framework_MockObject_MockObject $config */
-        $config = $this->getMockBuilder(Config::class)->disableOriginalConstructor()
-            ->setMethods(array('get'))->getMock();
-
-        /** @var InputInterface|\PHPUnit_Framework_MockObject_MockObject $input */
+        $config = $this->getMockBuilder(Config::class)->disableOriginalConstructor()->onlyMethods(['get'])->getMock();
         $input = $this->getMockBuilder('Symfony\Component\Console\Input\InputInterface')->getMock();
 
         $config->expects(static::once())

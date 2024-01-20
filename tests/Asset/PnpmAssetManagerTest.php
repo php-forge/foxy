@@ -20,51 +20,38 @@ use Foxy\Asset\PnpmManager;
  *
  * @internal
  */
-final class PnpmAssetManagerTest extends AbstractAssetManagerTest
+final class PnpmAssetManagerTest extends AssetManager
 {
-    /**
-     * {@inheritdoc}
-     */
     protected function getManager()
     {
         return new PnpmManager($this->io, $this->config, $this->executor, $this->fs, $this->fallback);
     }
 
-    /**
-     * {@inheritdoc}
-     */
+    
     protected function getValidName()
     {
         return 'pnpm';
     }
 
-    /**
-     * {@inheritdoc}
-     */
+    
     protected function getValidLockPackageName()
     {
         return 'pnpm-lock.yaml';
     }
 
-    /**
-     * {@inheritdoc}
-     */
+    
     protected function getValidVersionCommand()
     {
         return 'pnpm --version';
     }
 
-    /**
-     * {@inheritdoc}
-     */
+    
     protected function getValidInstallCommand()
     {
         return 'pnpm install';
     }
 
-    /**
-     * {@inheritdoc}
-     */
+    
     protected function getValidUpdateCommand()
     {
         return 'pnpm update';

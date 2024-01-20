@@ -42,7 +42,7 @@ final class AssetUtilTest extends \PHPUnit\Framework\TestCase
     {
         parent::setUp();
 
-        $this->cwd = sys_get_temp_dir().\DIRECTORY_SEPARATOR.uniqid('foxy_asset_util_test_', true);
+        $this->cwd = sys_get_temp_dir() . \DIRECTORY_SEPARATOR . uniqid('foxy_asset_util_test_', true);
         $this->sfs = new Filesystem();
         $this->sfs->mkdir($this->cwd);
     }
@@ -73,7 +73,7 @@ final class AssetUtilTest extends \PHPUnit\Framework\TestCase
         /** @var InstallationManager|\PHPUnit_Framework_MockObject_MockObject $installationManager */
         $installationManager = $this->getMockBuilder('Composer\Installer\InstallationManager')
             ->disableOriginalConstructor()
-            ->setMethods(array('getInstallPath'))
+            ->onlyMethods(array('getInstallPath'))
             ->getMock()
         ;
         $installationManager->expects(static::never())
@@ -102,7 +102,7 @@ final class AssetUtilTest extends \PHPUnit\Framework\TestCase
         static::assertNull($res);
     }
 
-    public function getRequiresData()
+    public static function getRequiresData(): array
     {
         return array(
             array(array(new Link('root/package', 'foxy/foxy', new Constraint('=', '1.0.0'))), array(), false),
@@ -121,29 +121,17 @@ final class AssetUtilTest extends \PHPUnit\Framework\TestCase
      */
     public function testGetPathWithRequiredFoxy(array $requires, array $devRequires, $fileExists = false)
     {
-        /** @var InstallationManager|\PHPUnit_Framework_MockObject_MockObject $installationManager */
         $installationManager = $this->getMockBuilder('Composer\Installer\InstallationManager')
             ->disableOriginalConstructor()
-            ->setMethods(array('getInstallPath'))
-            ->getMock()
+            ->onlyMethods(['getInstallPath'])
+            ->getMock();
         ;
-        $installationManager->expects(static::once())
-            ->method('getInstallPath')
-            ->willReturn($this->cwd)
-        ;
-
-        /** @var AbstractAssetManager|\PHPUnit_Framework_MockObject_MockObject $assetManager */
+        $installationManager->expects(static::once())->method('getInstallPath')->willReturn($this->cwd);
         $assetManager = $this->getMockBuilder('Foxy\Asset\AbstractAssetManager')
             ->disableOriginalConstructor()
-            ->getMockForAbstractClass()
-        ;
-
-        /** @var PackageInterface|\PHPUnit_Framework_MockObject_MockObject $package */
+            ->getMockForAbstractClass();
         $package = $this->getMockBuilder('Composer\Package\PackageInterface')->getMock();
-        $package->expects(static::once())
-            ->method('getRequires')
-            ->willReturn($requires)
-        ;
+        $package->expects(static::once())->method('getRequires')->willReturn($requires);
 
         if (0 === \count($devRequires)) {
             $package->expects(static::never())
@@ -157,7 +145,7 @@ final class AssetUtilTest extends \PHPUnit\Framework\TestCase
         }
 
         if ($fileExists) {
-            $expectedFilename = $this->cwd.\DIRECTORY_SEPARATOR.$assetManager->getPackageName();
+            $expectedFilename = $this->cwd . \DIRECTORY_SEPARATOR . $assetManager->getPackageName();
             file_put_contents($expectedFilename, '{}');
             $expectedFilename = str_replace('\\', '/', realpath($expectedFilename));
         } else {
@@ -169,7 +157,7 @@ final class AssetUtilTest extends \PHPUnit\Framework\TestCase
         static::assertSame($expectedFilename, $res);
     }
 
-    public function getExtraData()
+    public static function getExtraData(): array
     {
         return array(
             array(false, false),
@@ -187,12 +175,10 @@ final class AssetUtilTest extends \PHPUnit\Framework\TestCase
      */
     public function testGetPathWithExtraActivation($withExtra, $fileExists = false)
     {
-        /** @var InstallationManager|\PHPUnit_Framework_MockObject_MockObject $installationManager */
         $installationManager = $this->getMockBuilder('Composer\Installer\InstallationManager')
             ->disableOriginalConstructor()
-            ->setMethods(array('getInstallPath'))
-            ->getMock()
-        ;
+            ->onlyMethods(array('getInstallPath'))
+            ->getMock();
 
         if ($withExtra && $fileExists) {
             $installationManager->expects(static::once())
@@ -200,14 +186,10 @@ final class AssetUtilTest extends \PHPUnit\Framework\TestCase
                 ->willReturn($this->cwd)
             ;
         }
-
-        /** @var AbstractAssetManager|\PHPUnit_Framework_MockObject_MockObject $assetManager */
         $assetManager = $this->getMockBuilder('Foxy\Asset\AbstractAssetManager')
             ->disableOriginalConstructor()
-            ->getMockForAbstractClass()
-        ;
+            ->getMockForAbstractClass();
 
-        /** @var PackageInterface|\PHPUnit_Framework_MockObject_MockObject $package */
         $package = $this->getMockBuilder('Composer\Package\PackageInterface')->getMock();
         $package->expects(static::any())
             ->method('getRequires')
@@ -227,7 +209,7 @@ final class AssetUtilTest extends \PHPUnit\Framework\TestCase
         ;
 
         if ($fileExists) {
-            $expectedFilename = $this->cwd.\DIRECTORY_SEPARATOR.$assetManager->getPackageName();
+            $expectedFilename = $this->cwd . \DIRECTORY_SEPARATOR . $assetManager->getPackageName();
             file_put_contents($expectedFilename, '{}');
             $expectedFilename = $withExtra ? str_replace('\\', '/', realpath($expectedFilename)) : null;
         } else {
@@ -255,7 +237,7 @@ final class AssetUtilTest extends \PHPUnit\Framework\TestCase
         )));
     }
 
-    public function getIsProjectActivationData()
+    public static function getIsProjectActivationData(): array
     {
         return array(
             array('full/qualified', true),
@@ -297,7 +279,7 @@ final class AssetUtilTest extends \PHPUnit\Framework\TestCase
         static::assertSame($expected, $res);
     }
 
-    public function getIsProjectActivationWithWildcardData()
+    public static function getIsProjectActivationWithWildcardData(): array
     {
         return array(
             array('full/qualified', true),
@@ -336,7 +318,7 @@ final class AssetUtilTest extends \PHPUnit\Framework\TestCase
         static::assertSame($expected, $res);
     }
 
-    public function getFormatPackageData()
+    public static function getFormatPackageData(): array
     {
         return array(
             array('1.0.0', null, '1.0.0'),

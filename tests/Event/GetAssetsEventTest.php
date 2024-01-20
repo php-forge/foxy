@@ -20,7 +20,7 @@ use Foxy\Event\GetAssetsEvent;
  *
  * @internal
  */
-final class GetAssetsEventTest extends AbstractSolveEventTest
+final class GetAssetsEventTest extends SolveEvent
 {
     /**
      * @var array
@@ -30,8 +30,6 @@ final class GetAssetsEventTest extends AbstractSolveEventTest
     );
 
     /**
-     * {@inheritdoc}
-     *
      * @return GetAssetsEvent
      */
     public function getEvent()

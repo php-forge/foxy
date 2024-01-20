@@ -64,7 +64,7 @@ final class ConfigTest extends \PHPUnit\Framework\TestCase
         ;
     }
 
-    public function getDataForGetConfig()
+    public static function getDataForGetConfig(): array
     {
         return array(
             array('foo', 42, 42),
@@ -106,7 +106,7 @@ final class ConfigTest extends \PHPUnit\Framework\TestCase
         $globalLogComposer = true;
         $globalLogConfig = true;
 
-        $globalPath = realpath(__DIR__.'/../Fixtures/package/global');
+        $globalPath = realpath(__DIR__ . '/../Fixtures/package/global');
         $this->composerConfig->expects(static::any())
             ->method('has')
             ->with('home')
@@ -179,7 +179,7 @@ final class ConfigTest extends \PHPUnit\Framework\TestCase
         static::assertSame($expected, $config->get($key, $default));
     }
 
-    public function getDataForGetArrayConfig()
+    public static function getDataForGetArrayConfig(): array
     {
         return array(
             array('foo', array(), array()),

@@ -113,17 +113,19 @@ final class SolverTest extends \PHPUnit\Framework\TestCase
         parent::setUp();
 
         $this->oldCwd = getcwd();
-        $this->cwd = sys_get_temp_dir().\DIRECTORY_SEPARATOR.uniqid('foxy_solver_test_', true);
+        $this->cwd = sys_get_temp_dir() . \DIRECTORY_SEPARATOR . uniqid('foxy_solver_test_', true);
         $this->config = new Config(array(
             'enabled' => true,
-            'composer-asset-dir' => $this->cwd.'/composer-asset-dir',
+            'composer-asset-dir' => $this->cwd . '/composer-asset-dir',
         ));
         $this->composer = $this->getMockBuilder('Composer\Composer')->disableOriginalConstructor()->getMock();
         $this->composerConfig = $this->getMockBuilder('Composer\Config')->disableOriginalConstructor()->getMock();
         $this->io = $this->getMockBuilder('Composer\IO\IOInterface')->getMock();
         $this->fs = $this->getMockBuilder('Composer\Util\Filesystem')->disableOriginalConstructor()->getMock();
-        $this->im = $this->getMockBuilder('Composer\Installer\InstallationManager')->disableOriginalConstructor()
-            ->setMethods(array('getInstallPath'))->getMock();
+        $this->im = $this->getMockBuilder('Composer\Installer\InstallationManager')
+            ->disableOriginalConstructor()
+            ->onlyMethods(array('getInstallPath'))
+            ->getMock();
         $this->sfs = new \Symfony\Component\Filesystem\Filesystem();
         $this->package = $this->getMockBuilder('Composer\Package\RootPackageInterface')->getMock();
         $this->manager = $this->getMockBuilder('Foxy\Asset\AssetManagerInterface')->getMock();
@@ -132,7 +134,7 @@ final class SolverTest extends \PHPUnit\Framework\TestCase
         chdir($this->cwd);
 
         $this->localRepo = $this->getMockBuilder('Composer\Repository\InstalledArrayRepository')
-            ->setMethods(array('getCanonicalPackages'))
+            ->onlyMethods(array('getCanonicalPackages'))
             ->getMock()
         ;
 
@@ -226,7 +228,7 @@ final class SolverTest extends \PHPUnit\Framework\TestCase
         $solver->solve($this->composer, $this->io);
     }
 
-    public function getSolveData()
+    public static function getSolveData(): array
     {
         return array(
             array(0),
@@ -266,7 +268,7 @@ final class SolverTest extends \PHPUnit\Framework\TestCase
             $requirePackage,
         ));
 
-        $requirePackagePath = $this->cwd.'/vendor/foo/bar';
+        $requirePackagePath = $this->cwd . '/vendor/foo/bar';
 
         $this->im->expects(static::once())
             ->method('getInstallPath')
@@ -300,7 +302,7 @@ final class SolverTest extends \PHPUnit\Framework\TestCase
             $this->expectExceptionMessage('The asset manager ended with an error');
         }
 
-        $requirePackageFilename = $requirePackagePath.\DIRECTORY_SEPARATOR.$this->manager->getPackageName();
+        $requirePackageFilename = $requirePackagePath . \DIRECTORY_SEPARATOR . $this->manager->getPackageName();
         $this->sfs->mkdir(\dirname($requirePackageFilename));
         file_put_contents($requirePackageFilename, '{}');
 

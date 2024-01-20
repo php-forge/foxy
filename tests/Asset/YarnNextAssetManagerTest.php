@@ -20,11 +20,8 @@ use Foxy\Asset\YarnManager;
  *
  * @internal
  */
-final class YarnNextAssetManagerTest extends AbstractAssetManagerTest
+final class YarnNextAssetManagerTest extends AssetManager
 {
-    /**
-     * {@inheritdoc}
-     */
     public function actionForTestRunForInstallCommand($action)
     {
         $this->executor->addExpectedValues(0, '2.0.0');
@@ -34,57 +31,43 @@ final class YarnNextAssetManagerTest extends AbstractAssetManagerTest
         }
     }
 
-    /**
-     * {@inheritdoc}
-     */
+    
     protected function getManager()
     {
         return new YarnManager($this->io, $this->config, $this->executor, $this->fs, $this->fallback);
     }
 
-    /**
-     * {@inheritdoc}
-     */
+    
     protected function getValidName()
     {
         return 'yarn';
     }
 
-    /**
-     * {@inheritdoc}
-     */
+    
     protected function getValidLockPackageName()
     {
         return 'yarn.lock';
     }
 
-    /**
-     * {@inheritdoc}
-     */
+    
     protected function getValidVersionCommand()
     {
         return 'yarn --version';
     }
 
-    /**
-     * {@inheritdoc}
-     */
+    
     protected function getValidInstallCommand()
     {
         return 'yarn install';
     }
 
-    /**
-     * {@inheritdoc}
-     */
+    
     protected function getValidUpdateCommand()
     {
         return 'yarn up';
     }
 
-    /**
-     * {@inheritdoc}
-     */
+    
     protected function actionForTestAddDependenciesForUpdateCommand()
     {
         $this->executor->addExpectedValues(0, '2.0.0');
