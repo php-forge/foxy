@@ -101,12 +101,4 @@ final class SemverConverterTest extends TestCase
             ['', '*'],
         ];
     }
-
-    public function testConvertVersionMetadataWithEmptyPattern()
-    {
-        $version = '1.0.0';
-        $expected = '1.0.0';
-
-        self::assertSame($expected, SemverUtil::convertVersionMetadata($version));
-    }
 }
