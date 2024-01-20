@@ -77,6 +77,8 @@ final class Foxy implements PluginInterface, EventSubscriberInterface
 
     /**
      * The list of the classes of asset managers.
+     *
+     * @psalm-var list<class-string<AssetManagerInterface>>
      */
     private static $assetManagers = [
         Asset\NpmManager::class,

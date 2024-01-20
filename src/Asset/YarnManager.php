@@ -71,7 +71,7 @@ final class YarnManager extends AbstractAssetManager
         $parser = new VersionParser();
         $constraint = $parser->parseConstraints('>=2.0.0');
 
-        return $constraint->matches($parser->parseConstraints($version));
+        return $version !== null ? $constraint->matches($parser->parseConstraints($version)) : false;
     }
 
     private function mergeInteractiveCommand(array $command): array
