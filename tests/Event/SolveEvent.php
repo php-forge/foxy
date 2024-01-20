@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -13,6 +15,7 @@ namespace Foxy\Tests\Event;
 
 use Composer\Package\PackageInterface;
 use Foxy\Event\AbstractSolveEvent;
+use PHPUnit\Framework\MockObject\MockObject;
 
 /**
  * Tests for solve events.
@@ -21,27 +24,18 @@ use Foxy\Event\AbstractSolveEvent;
  */
 abstract class SolveEvent extends \PHPUnit\Framework\TestCase
 {
-    /**
-     * @var string
-     */
-    protected $assetDir;
-
-    /**
-     * @var PackageInterface[]|\PHPUnit_Framework_MockObject_MockObject[]
-     */
-    protected $packages;
+    protected string $assetDir = '';
+    protected PackageInterface|MockObject|array|null $packages = null;
 
     protected function setUp(): void
     {
         $this->assetDir = sys_get_temp_dir() . \DIRECTORY_SEPARATOR . uniqid('foxy_event_test_', true);
-        $this->packages = array(
-            $this->getMockBuilder('Composer\Package\PackageInterface')->getMock(),
-        );
+        $this->packages = [$this->createMock(PackageInterface::class)];
     }
 
     protected function tearDown(): void
     {
-        $this->assetDir = null;
+        $this->assetDir = '';
         $this->packages = null;
     }
 
@@ -52,15 +46,17 @@ abstract class SolveEvent extends \PHPUnit\Framework\TestCase
      */
     abstract public function getEvent();
 
-    public function testGetAssetDir()
+    public function testGetAssetDir(): void
     {
         $event = $this->getEvent();
-        static::assertSame($this->assetDir, $event->getAssetDir());
+
+        $this->assertSame($this->assetDir, $event->getAssetDir());
     }
 
-    public function testGetPackages()
+    public function testGetPackages(): void
     {
         $event = $this->getEvent();
-        static::assertSame($this->packages, $event->getPackages());
+
+        $this->assertSame($this->packages, $event->getPackages());
     }
 }

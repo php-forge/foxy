@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -14,6 +16,7 @@ namespace Foxy\Tests\Asset;
 use Composer\Json\JsonFile;
 use Composer\Package\RootPackageInterface;
 use Foxy\Asset\AssetPackage;
+use PHPUnit\Framework\MockObject\MockObject;
 use Symfony\Component\Filesystem\Filesystem;
 
 /**
@@ -25,25 +28,10 @@ use Symfony\Component\Filesystem\Filesystem;
  */
 final class AssetPackageTest extends \PHPUnit\Framework\TestCase
 {
-    /**
-     * @var string
-     */
-    protected $cwd;
-
-    /**
-     * @var Filesystem
-     */
-    protected $sfs;
-
-    /**
-     * @var \PHPUnit_Framework_MockObject_MockObject|RootPackageInterface
-     */
-    protected $rootPackage;
-
-    /**
-     * @var JsonFile|\PHPUnit_Framework_MockObject_MockObject
-     */
-    protected $jsonFile;
+    protected string|null $cwd = '';
+    protected Filesystem|null $sfs = null;
+    protected MockObject|RootPackageInterface|null $rootPackage = null;
+    protected JsonFile|MockObject|null $jsonFile = null;
 
     protected function setUp(): void
     {
@@ -51,17 +39,14 @@ final class AssetPackageTest extends \PHPUnit\Framework\TestCase
 
         $this->cwd = sys_get_temp_dir() . \DIRECTORY_SEPARATOR . uniqid('foxy_asset_package_test_', true);
         $this->sfs = new Filesystem();
-        $this->rootPackage = $this->getMockBuilder('Composer\Package\RootPackageInterface')->getMock();
-        $this->jsonFile = $this->getMockBuilder('Composer\Json\JsonFile')
+        $this->rootPackage = $this->createMock(RootPackageInterface::class);
+        $this->jsonFile = $this->getMockBuilder(JsonFile::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(array('exists', 'getPath', 'read', 'write'))
+            ->onlyMethods(['exists', 'getPath', 'read', 'write'])
             ->getMock()
         ;
 
-        $this->rootPackage->expects(static::any())
-            ->method('getLicense')
-            ->willReturn(array())
-        ;
+        $this->rootPackage->expects($this->any())->method('getLicense')->willReturn([]);
 
         $this->sfs->mkdir($this->cwd);
     }
@@ -77,206 +62,179 @@ final class AssetPackageTest extends \PHPUnit\Framework\TestCase
         $this->cwd = null;
     }
 
-    public function testGetPackageWithExistingFile()
+    public function testGetPackageWithExistingFile(): void
     {
-        $package = array(
-            'name' => '@foo/bar',
-        );
+        $package = ['name' => '@foo/bar'];
         $contentString = json_encode($package);
         $this->addPackageFile($package, $contentString);
 
         $assetPackage = new AssetPackage($this->rootPackage, $this->jsonFile);
 
-        static::assertSame($package, $assetPackage->getPackage());
+        $this->assertSame($package, $assetPackage->getPackage());
     }
 
-    public function testWrite()
+    public function testWrite(): void
     {
-        $package = array(
-            'name' => '@foo/bar',
-        );
+        $package = ['name' => '@foo/bar'];
 
-        $this->jsonFile->expects(static::once())
-            ->method('exists')
-            ->willReturn(false)
-        ;
-
-        $this->jsonFile->expects(static::once())
-            ->method('write')
-            ->with($package)
-        ;
+        $this->jsonFile->expects($this->once())->method('exists')->willReturn(false);
+        $this->jsonFile->expects($this->once())->method('write')->with($package);
 
         $assetPackage = new AssetPackage($this->rootPackage, $this->jsonFile);
+
         $assetPackage->setPackage($package);
         $assetPackage->write();
     }
 
     public static function getDataRequiredKeys(): array
     {
-        return array(
-            array(
-                array(
+        return [
+            [
+                [
                     'name' => '@foo/bar',
                     'license' => 'MIT',
-                ),
-                array(
+                ],
+                [
                     'name' => '@foo/bar',
                     'license' => 'MIT',
-                ),
+                ],
                 'proprietary',
-            ),
-            array(
-                array(
+            ],
+            [
+                [
                     'name' => '@foo/bar',
                     'license' => 'MIT',
-                ),
-                array(
+                ],
+                [
                     'name' => '@foo/bar',
-                ),
+                ],
                 'MIT',
-            ),
-            array(
-                array(
+            ],
+            [
+                [
                     'name' => '@foo/bar',
                     'private' => true,
-                ),
-                array(
+                ],
+                [
                     'name' => '@foo/bar',
-                ),
+                ],
                 'proprietary',
-            ),
-        );
+            ],
+        ];
     }
 
     /**
      * @dataProvider getDataRequiredKeys
-     *
-     * @param string $license
      */
-    public function testInjectionOfRequiredKeys(array $expected, array $package, $license)
+    public function testInjectionOfRequiredKeys(array $expected, array $package, string $license): void
     {
         $this->addPackageFile($package);
 
-        $this->rootPackage = $this->getMockBuilder('Composer\Package\RootPackageInterface')->getMock();
-        $this->rootPackage->expects(static::any())
-            ->method('getLicense')
-            ->willReturn(array($license))
-        ;
+        $this->rootPackage = $this->createMock(RootPackageInterface::class);
+
+        $this->rootPackage->expects($this->any())->method('getLicense')->willReturn([$license]);
 
         $assetPackage = new AssetPackage($this->rootPackage, $this->jsonFile);
 
-        static::assertEquals($expected, $assetPackage->getPackage());
+        $this->assertEquals($expected, $assetPackage->getPackage());
     }
 
-    public function testGetInstalledDependencies()
+    public function testGetInstalledDependencies(): void
     {
-        $expected = array(
+        $expected = [
             '@composer-asset/foo--bar' => 'file:./path/foo/bar',
             '@composer-asset/baz--bar' => 'file:./path/baz/bar',
-        );
-        $package = array(
-            'dependencies' => array(
+        ];
+        $package = [
+            'dependencies' => [
                 '@composer-asset/foo--bar' => 'file:./path/foo/bar',
                 '@bar/foo' => '^1.0.0',
                 '@composer-asset/baz--bar' => 'file:./path/baz/bar',
-            ),
-        );
+            ],
+        ];
+
         $this->addPackageFile($package);
 
         $assetPackage = new AssetPackage($this->rootPackage, $this->jsonFile);
 
-        static::assertEquals($expected, $assetPackage->getInstalledDependencies());
+        $this->assertEquals($expected, $assetPackage->getInstalledDependencies());
     }
 
-    public function testAddNewDependencies()
+    public function testAddNewDependencies(): void
     {
-        $expected = array(
-            'dependencies' => array(
+        $expected = [
+            'dependencies' => [
                 '@bar/foo' => '^1.0.0',
                 '@composer-asset/baz--bar' => 'file:./path/baz/bar',
                 '@composer-asset/foo--bar' => 'file:./path/foo/bar',
                 '@composer-asset/new--dependency' => 'file:./path/new/dependency',
-            ),
-        );
-        $expectedExisting = array(
-            '@composer-asset/foo--bar',
-            '@composer-asset/baz--bar',
-        );
+            ],
+        ];
+        $expectedExisting = ['@composer-asset/foo--bar', '@composer-asset/baz--bar'];
 
-        $package = array(
-            'dependencies' => array(
+        $package = [
+            'dependencies' => [
                 '@composer-asset/foo--bar' => 'file:./path/foo/bar',
                 '@bar/foo' => '^1.0.0',
                 '@composer-asset/baz--bar' => 'file:./path/baz/bar',
-            ),
-        );
-        $dependencies = array(
+            ],
+        ];
+        $dependencies = [
             '@composer-asset/foo--bar' => 'path/foo/bar/package.json',
             '@composer-asset/baz--bar' => 'path/baz/bar/package.json',
             '@composer-asset/new--dependency' => 'path/new/dependency/package.json',
-        );
+        ];
+
         $this->addPackageFile($package);
 
         $assetPackage = new AssetPackage($this->rootPackage, $this->jsonFile);
         $existing = $assetPackage->addNewDependencies($dependencies);
 
-        static::assertSame($expected, $assetPackage->getPackage());
-        static::assertSame($expectedExisting, $existing);
+        $this->assertSame($expected, $assetPackage->getPackage());
+        $this->assertSame($expectedExisting, $existing);
     }
 
-    public function testRemoveUnusedDependencies()
+    public function testRemoveUnusedDependencies(): void
     {
-        $expected = array(
-            'dependencies' => array(
+        $expected = [
+            'dependencies' => [
                 '@composer-asset/foo--bar' => 'file:./path/foo/bar',
                 '@bar/foo' => '^1.0.0',
-            ),
-        );
+            ],
+        ];
 
-        $package = array(
-            'dependencies' => array(
+        $package = [
+            'dependencies' => [
                 '@composer-asset/foo--bar' => 'file:./path/foo/bar',
                 '@bar/foo' => '^1.0.0',
                 '@composer-asset/baz--bar' => 'file:./path/baz/bar',
-            ),
-        );
-        $dependencies = array(
-            '@composer-asset/foo--bar' => 'file:./path/foo/bar',
-        );
+            ],
+        ];
+        $dependencies = ['@composer-asset/foo--bar' => 'file:./path/foo/bar'];
+
         $this->addPackageFile($package);
 
         $assetPackage = new AssetPackage($this->rootPackage, $this->jsonFile);
         $assetPackage->removeUnusedDependencies($dependencies);
 
-        static::assertEquals($expected, $assetPackage->getPackage());
+        $this->assertEquals($expected, $assetPackage->getPackage());
     }
 
     /**
      * Add the package in file.
      *
-     * @param array       $package       The package
-     * @param null|string $contentString The string content of package
+     * @param array $package The package.
+     * @param null|string $contentString The string content of package.
      */
-    protected function addPackageFile(array $package, $contentString = null)
+    protected function addPackageFile(array $package, $contentString = null): void
     {
         $filename = $this->cwd . '/package.json';
-        $contentString = null !== $contentString ? $contentString : json_encode($package);
+        $contentString ??= json_encode($package);
 
-        $this->jsonFile->expects(static::any())
-            ->method('exists')
-            ->willReturn(true)
-        ;
+        $this->jsonFile->expects($this->any())->method('exists')->willReturn(true);
+        $this->jsonFile->expects($this->any())->method('getPath')->willReturn($filename);
+        $this->jsonFile->expects($this->any())->method('read')->willReturn($package);
 
-        $this->jsonFile->expects(static::any())
-            ->method('getPath')
-            ->willReturn($filename)
-        ;
-
-        $this->jsonFile->expects(static::any())
-            ->method('read')
-            ->willReturn($package)
-        ;
-
-        file_put_contents($filename, $contentString);
+        \file_put_contents($filename, $contentString);
     }
 }

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -24,20 +26,9 @@ use Symfony\Component\Filesystem\Filesystem;
  */
 final class JsonFileTest extends \PHPUnit\Framework\TestCase
 {
-    /**
-     * @var Filesystem
-     */
-    protected $sfs;
-
-    /**
-     * @var string
-     */
-    protected $oldCwd;
-
-    /**
-     * @var string
-     */
-    protected $cwd;
+    private Filesystem|null $sfs = null;
+    private string|null $oldCwd = '';
+    private string|null $cwd = '';
 
     protected function setUp(): void
     {
@@ -47,33 +38,33 @@ final class JsonFileTest extends \PHPUnit\Framework\TestCase
         $this->cwd = sys_get_temp_dir() . \DIRECTORY_SEPARATOR . uniqid('foxy_asset_json_file_test_', true);
         $this->sfs = new Filesystem();
         $this->sfs->mkdir($this->cwd);
-        chdir($this->cwd);
+
+        \chdir($this->cwd);
     }
 
     protected function tearDown(): void
     {
         parent::tearDown();
 
-        chdir($this->oldCwd);
+        \chdir($this->oldCwd);
+
         $this->sfs->remove($this->cwd);
         $this->sfs = null;
         $this->oldCwd = null;
         $this->cwd = null;
     }
 
-    public function testGetArrayKeysWithoutFile()
+    public function testGetArrayKeysWithoutFile(): void
     {
         $filename = './package.json';
         $jsonFile = new JsonFile($filename);
 
-        static::assertSame(array(), $jsonFile->getArrayKeys());
+        $this->assertSame([], $jsonFile->getArrayKeys());
     }
 
-    public function testGetArrayKeysWithExistingFile()
+    public function testGetArrayKeysWithExistingFile(): void
     {
-        $expected = array(
-            'contributors',
-        );
+        $expected = ['contributors'];
         $content = <<<JSON
         {
           "name": "test",
@@ -84,93 +75,91 @@ final class JsonFileTest extends \PHPUnit\Framework\TestCase
 
         $filename = './package.json';
         file_put_contents($filename, $content);
-        static::assertFileExists($filename);
+        $this->assertFileExists($filename);
 
         $jsonFile = new JsonFile($filename);
 
-        static::assertSame($expected, $jsonFile->getArrayKeys());
+        $this->assertSame($expected, $jsonFile->getArrayKeys());
     }
 
-    public function testGetIndentWithoutFile()
+    public function testGetIndentWithoutFile(): void
     {
         $filename = './package.json';
         $jsonFile = new JsonFile($filename);
 
-        static::assertSame(4, $jsonFile->getIndent());
+        $this->assertSame(4, $jsonFile->getIndent());
     }
 
-    public function testGetIndentWithExistingFile()
+    public function testGetIndentWithExistingFile(): void
     {
-        $content = <<<'JSON'
-{
-  "name": "test"
-}
-JSON;
+        $content = <<<JSON
+        {
+          "name": "test"
+        }
+        JSON;
 
         $filename = './package.json';
         file_put_contents($filename, $content);
-        static::assertFileExists($filename);
+        $this->assertFileExists($filename);
 
         $jsonFile = new JsonFile($filename);
 
-        static::assertSame(2, $jsonFile->getIndent());
+        $this->assertSame(2, $jsonFile->getIndent());
     }
 
-    public function testWriteWithoutFile()
+    public function testWriteWithoutFile(): void
     {
-        $expected = <<<'JSON'
-{
-    "name": "test"
-}
+        $expected = <<<JSON
+        {
+            "name": "test"
+        }
 
-JSON;
+        JSON;
 
         $filename = './package.json';
-        $data = array(
-            'name' => 'test',
-        );
+        $data = ['name' => 'test'];
 
         $jsonFile = new JsonFile($filename);
         $jsonFile->write($data);
 
-        static::assertFileExists($filename);
+        $this->assertFileExists($filename);
         $content = file_get_contents($filename);
 
         Assert::equalsWithoutLE($expected, $content);
     }
 
-    public function testWriteWithExistingFile()
+    public function testWriteWithExistingFile(): void
     {
-        $expected = <<<'JSON'
-{
-  "name": "test",
-  "contributors": [],
-  "dependencies": {},
-  "private": true
-}
+        $expected = <<<JSON
+        {
+          "name": "test",
+          "contributors": [],
+          "dependencies": {},
+          "private": true
+        }
 
-JSON;
+        JSON;
         $content = <<<'JSON'
-{
-  "name": "test",
-  "contributors": [],
-  "dependencies": {}
-}
+        {
+          "name": "test",
+          "contributors": [],
+          "dependencies": {}
+        }
 
-JSON;
+        JSON;
 
         $filename = './package.json';
         file_put_contents($filename, $content);
-        static::assertFileExists($filename);
+        $this->assertFileExists($filename);
 
         $jsonFile = new JsonFile($filename);
         $data = (array) $jsonFile->read();
         $data['private'] = true;
         $jsonFile->write($data);
 
-        static::assertFileExists($filename);
+        $this->assertFileExists($filename);
         $content = file_get_contents($filename);
 
-        static::assertSame($expected, $content);
+        Assert::equalsWithoutLE($expected, $content);
     }
 }

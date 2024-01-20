@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -22,49 +24,46 @@ use Foxy\Event\GetAssetsEvent;
  */
 final class GetAssetsEventTest extends SolveEvent
 {
-    /**
-     * @var array
-     */
-    protected $assets = array(
-        '@composer-asset/foo--bar' => 'file:./vendor/foxy/composer-asset/foo/bar',
-    );
+    private array $assets = ['@composer-asset/foo--bar' => 'file:./vendor/foxy/composer-asset/foo/bar'];
 
-    /**
-     * @return GetAssetsEvent
-     */
-    public function getEvent()
+    
+    public function getEvent(): GetAssetsEvent
     {
         return new GetAssetsEvent($this->assetDir, $this->packages, $this->assets);
     }
 
-    public function testHasAsset()
+    public function testHasAsset(): void
     {
         $event = $this->getEvent();
-        static::assertTrue($event->hasAsset('@composer-asset/foo--bar'));
+
+        $this->assertTrue($event->hasAsset('@composer-asset/foo--bar'));
     }
 
-    public function testAddAsset()
+    public function testAddAsset(): void
     {
         $assetPackageName = '@composer-asset/bar--foo';
         $assetPackagePath = 'file:./vendor/foxy/composer-asset/bar/foo';
         $event = $this->getEvent();
 
-        static::assertFalse($event->hasAsset($assetPackageName));
+        $this->assertFalse($event->hasAsset($assetPackageName));
+
         $event->addAsset($assetPackageName, $assetPackagePath);
-        static::assertTrue($event->hasAsset($assetPackageName));
+
+        $this->assertTrue($event->hasAsset($assetPackageName));
     }
 
-    public function testGetAssets()
+    public function testGetAssets(): void
     {
         $event = $this->getEvent();
-        static::assertSame($this->assets, $event->getAssets());
+        $this->assertSame($this->assets, $event->getAssets());
 
-        $expectedAssets = array(
+        $expectedAssets = [
             '@composer-asset/foo--bar' => 'file:./vendor/foxy/composer-asset/foo/bar',
             '@composer-asset/bar--foo' => 'file:./vendor/foxy/composer-asset/bar/foo',
-        );
+        ];
 
         $event->addAsset('@composer-asset/bar--foo', 'file:./vendor/foxy/composer-asset/bar/foo');
-        static::assertSame($expectedAssets, $event->getAssets());
+
+        $this->assertSame($expectedAssets, $event->getAssets());
     }
 }

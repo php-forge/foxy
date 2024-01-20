@@ -22,7 +22,7 @@ use Composer\Util\ProcessExecutor;
 if (version_compare(Composer::VERSION, '2.3.0', '<')) {
     class ProcessExecutorMock extends AbstractProcessExecutorMock
     {
-        public function execute($command, &$output = null, $cwd = null)
+        public function execute($command, &$output = null, $cwd = null): int
         {
             return $this->doExecute($command, $output, $cwd);
         }

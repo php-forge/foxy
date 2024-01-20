@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -24,33 +26,31 @@ final class ComposerUtilTest extends \PHPUnit\Framework\TestCase
 {
     public static function getValidateVersionData(): array
     {
-        return array(
-            array('@package_version@', '^1.5.0', true),
-            array('@package_version@', '^1.5.0|^2.0.0', true),
-            array('d173af2d7ac1408655df2cf6670ea0262e06d137', '^1.5.0|^2.0.0', true),
-            array('1.6.0', '^1.5.0', true),
-            array('1.5.1', '^1.5.0', true),
-            array('1.5.0', '^1.5.0', true),
-            array('1.5.0', '^1.5.0|^2.0.0', true),
-            array('1.5.0', '^1.5.1', false),
-            array('1.0.0', '^1.5.0', false),
-        );
+        return [
+            ['@package_version@', '^1.5.0', true],
+            ['@package_version@', '^1.5.0|^2.0.0', true],
+            ['d173af2d7ac1408655df2cf6670ea0262e06d137', '^1.5.0|^2.0.0', true],
+            ['1.6.0', '^1.5.0', true],
+            ['1.5.1', '^1.5.0', true],
+            ['1.5.0', '^1.5.0', true],
+            ['1.5.0', '^1.5.0|^2.0.0', true],
+            ['1.5.0', '^1.5.1', false],
+            ['1.0.0', '^1.5.0', false],
+        ];
     }
 
     /**
      * @dataProvider getValidateVersionData
-     *
-     * @param string $composerVersion
-     * @param string $requiredVersion
-     * @param bool   $valid
      */
-    public function testValidateVersion($composerVersion, $requiredVersion, $valid)
+    public function testValidateVersion(string $composerVersion, string $requiredVersion, bool $valid): void
     {
         if ($valid) {
-            static::assertTrue(true, 'Composer\'s version is valid');
+            $this->assertTrue(true, 'Composer\'s version is valid');
         } else {
-            $this->expectException('Foxy\Exception\RuntimeException');
-            $this->expectExceptionMessageMatches('/Foxy requires the Composer\'s minimum version "([\d\.^|, ]+)", current version is "([\d\.]+)"/');
+            $this->expectException(\Foxy\Exception\RuntimeException::class);
+            $this->expectExceptionMessageMatches(
+                '/Foxy requires the Composer\'s minimum version "([\d\.^|, ]+)", current version is "([\d\.]+)"/'
+            );
         }
 
         ComposerUtil::validateVersion($requiredVersion, $composerVersion);

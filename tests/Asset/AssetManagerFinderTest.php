@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -23,109 +25,75 @@ use PHPUnit\Framework\TestCase;
  */
 final class AssetManagerFinderTest extends TestCase
 {
-    public function testFindManagerWithValidManager()
+    public function testFindManagerWithValidManager(): void
     {
-        $am = $this->getMockBuilder('Foxy\Asset\AssetManagerInterface')->getMock();
+        $am = $this->createMock(\Foxy\Asset\AssetManagerInterface::class);
 
-        $am->expects(static::once())
-            ->method('getName')
-            ->willReturn('foo')
-        ;
+        $am->expects($this->once())->method('getName')->willReturn('foo');
 
-        $amf = new AssetManagerFinder(array($am));
+        $amf = new AssetManagerFinder([$am]);
         $res = $amf->findManager('foo');
 
-        static::assertSame($am, $res);
+        $this->assertSame($am, $res);
     }
 
-    public function testFindManagerWithInvalidManager()
+    public function testFindManagerWithInvalidManager(): void
     {
-        static::expectException('Foxy\Exception\RuntimeException');
-        static::expectExceptionMessage('The asset manager "bar" doesn\'t exist');
+        $this->expectException(\Foxy\Exception\RuntimeException::class);
+        $this->expectExceptionMessage('The asset manager "bar" doesn\'t exist');
 
-        $am = $this->getMockBuilder('Foxy\Asset\AssetManagerInterface')->getMock();
+        $am = $this->createMock(\Foxy\Asset\AssetManagerInterface::class);
 
-        $am->expects(static::once())
-            ->method('getName')
-            ->willReturn('foo')
-        ;
+        $am->expects($this->once())->method('getName')->willReturn('foo');
 
-        $amf = new AssetManagerFinder(array($am));
+        $amf = new AssetManagerFinder([$am]);
+
         $amf->findManager('bar');
     }
 
-    public function testFindManagerWithAutoManagerAndAvailableManagerByLockFile()
+    public function testFindManagerWithAutoManagerAndAvailableManagerByLockFile(): void
     {
-        $am = $this->getMockBuilder('Foxy\Asset\AssetManagerInterface')->getMock();
+        $am = $this->createMock(\Foxy\Asset\AssetManagerInterface::class);
 
-        $am->expects(static::once())
-            ->method('getName')
-            ->willReturn('foo')
-        ;
+        $am->expects($this->once())->method('getName')->willReturn('foo');
+        $am->expects($this->once())->method('hasLockFile')->willReturn(true);
+        $am->expects($this->never())->method('isAvailable');
 
-        $am->expects(static::once())
-            ->method('hasLockFile')
-            ->willReturn(true)
-        ;
+        $amf = new AssetManagerFinder([$am]);
 
-        $am->expects(static::never())
-            ->method('isAvailable')
-        ;
-
-        $amf = new AssetManagerFinder(array($am));
         $res = $amf->findManager(null);
 
-        static::assertSame($am, $res);
+        $this->assertSame($am, $res);
     }
 
-    public function testFindManagerWithAutoManagerAndAvailableManagerByAvailability()
+    public function testFindManagerWithAutoManagerAndAvailableManagerByAvailability(): void
     {
-        $am = $this->getMockBuilder('Foxy\Asset\AssetManagerInterface')->getMock();
+        $am = $this->createMock(\Foxy\Asset\AssetManagerInterface::class);
 
-        $am->expects(static::once())
-            ->method('getName')
-            ->willReturn('foo')
-        ;
+        $am->expects($this->once())->method('getName')->willReturn('foo');
+        $am->expects($this->once())->method('hasLockFile')->willReturn(false);
+        $am->expects($this->once())->method('isAvailable')->willReturn(true);
 
-        $am->expects(static::once())
-            ->method('hasLockFile')
-            ->willReturn(false)
-        ;
+        $amf = new AssetManagerFinder([$am]);
 
-        $am->expects(static::once())
-            ->method('isAvailable')
-            ->willReturn(true)
-        ;
-
-        $amf = new AssetManagerFinder(array($am));
         $res = $amf->findManager(null);
 
-        static::assertSame($am, $res);
+        $this->assertSame($am, $res);
     }
 
-    public function testFindManagerWithAutoManagerAndNoAvailableManager()
+    public function testFindManagerWithAutoManagerAndNoAvailableManager(): void
     {
-        static::expectException('Foxy\Exception\RuntimeException');
-        static::expectExceptionMessage('No asset manager is found');
+        $this->expectException(\Foxy\Exception\RuntimeException::class);
+        $this->expectExceptionMessage('No asset manager is found');
 
-        $am = $this->getMockBuilder('Foxy\Asset\AssetManagerInterface')->getMock();
+        $am = $this->getMockBuilder(\Foxy\Asset\AssetManagerInterface::class)->getMock();
 
-        $am->expects(static::atLeastOnce())
-            ->method('getName')
-            ->willReturn('foo')
-        ;
+        $am->expects($this->atLeastOnce())->method('getName')->willReturn('foo');
+        $am->expects($this->once())->method('hasLockFile')->willReturn(false);
+        $am->expects($this->once())->method('isAvailable')->willReturn(false);
 
-        $am->expects(static::once())
-            ->method('hasLockFile')
-            ->willReturn(false)
-        ;
+        $amf = new AssetManagerFinder([$am]);
 
-        $am->expects(static::once())
-            ->method('isAvailable')
-            ->willReturn(false)
-        ;
-
-        $amf = new AssetManagerFinder(array($am));
         $amf->findManager(null);
     }
 }
