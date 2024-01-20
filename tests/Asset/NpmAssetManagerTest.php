@@ -20,51 +20,38 @@ use Foxy\Asset\NpmManager;
  *
  * @internal
  */
-final class NpmAssetManagerTest extends AbstractAssetManagerTest
+final class NpmAssetManagerTest extends AssetManager
 {
-    /**
-     * {@inheritdoc}
-     */
     protected function getManager()
     {
         return new NpmManager($this->io, $this->config, $this->executor, $this->fs, $this->fallback);
     }
 
-    /**
-     * {@inheritdoc}
-     */
+    
     protected function getValidName()
     {
         return 'npm';
     }
 
-    /**
-     * {@inheritdoc}
-     */
+    
     protected function getValidLockPackageName()
     {
         return 'package-lock.json';
     }
 
-    /**
-     * {@inheritdoc}
-     */
+    
     protected function getValidVersionCommand()
     {
         return 'npm --version';
     }
 
-    /**
-     * {@inheritdoc}
-     */
+    
     protected function getValidInstallCommand()
     {
         return 'npm install';
     }
 
-    /**
-     * {@inheritdoc}
-     */
+    
     protected function getValidUpdateCommand()
     {
         return 'npm update';

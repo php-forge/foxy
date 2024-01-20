@@ -20,11 +20,9 @@ use Foxy\Event\PreSolveEvent;
  *
  * @internal
  */
-final class PreSolveEventTest extends AbstractSolveEventTest
+final class PreSolveEventTest extends SolveEvent
 {
     /**
-     * {@inheritdoc}
-     *
      * @return PreSolveEvent
      */
     public function getEvent()

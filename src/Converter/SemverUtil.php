@@ -31,7 +31,7 @@ abstract class SemverUtil
     {
         if (preg_match('/^\d{7,}\./', $version)) {
             $pos = strpos($version, '.');
-            $version = substr($version, 0, $pos).self::convertDateMinorVersion(substr($version, $pos + 1));
+            $version = substr($version, 0, $pos) . self::convertDateMinorVersion(substr($version, $pos + 1));
         }
 
         return $version;
@@ -39,8 +39,6 @@ abstract class SemverUtil
 
     /**
      * Converts the version metadata.
-     *
-     * @param string $version
      */
     public static function convertVersionMetadata(string $version): string
     {
@@ -75,10 +73,10 @@ abstract class SemverUtil
     public static function createPattern(string $pattern): string
     {
         $numVer = '([0-9]+|x|\*)';
-        $numVer2 = '('.$numVer.'\.'.$numVer.')';
-        $numVer3 = '('.$numVer.'\.'.$numVer.'\.'.$numVer.')';
+        $numVer2 = '(' . $numVer . '\.' . $numVer . ')';
+        $numVer3 = '(' . $numVer . '\.' . $numVer . '\.' . $numVer . ')';
 
-        return '/^('.$numVer.'|'.$numVer2.'|'.$numVer3.')'.$pattern.'/';
+        return '/^(' . $numVer . '|' . $numVer2 . '|' . $numVer3 . ')' . $pattern . '/';
     }
 
     /**
@@ -108,7 +106,7 @@ abstract class SemverUtil
     private static function cleanVersion(string $version, array $matches): array
     {
         $end = substr($version, \strlen($matches[1][0][0]));
-        $version = $matches[1][0][0].'-';
+        $version = $matches[1][0][0] . '-';
 
         $matches = array();
         if (preg_match('/^([-+])/', $end, $matches)) {
@@ -178,6 +176,6 @@ abstract class SemverUtil
         $minor = (int) $split[0];
         $revision = isset($split[1]) ? (int) $split[1] : 0;
 
-        return '.'.sprintf('%03d', $minor).sprintf('%03d', $revision);
+        return '.' . sprintf('%03d', $minor) . sprintf('%03d', $revision);
     }
 }

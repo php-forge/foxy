@@ -7,9 +7,10 @@ on:
       - '.gitignore'
       - '.gitattributes'
       - 'infection.json.dist'
-      - 'psalm.xml'
+      - 'phpunit.xml.dist'
 
   push:
+    branches: ['main']
     paths-ignore:
       - 'docs/**'
       - 'README.md'
@@ -17,17 +18,17 @@ on:
       - '.gitignore'
       - '.gitattributes'
       - 'infection.json.dist'
-      - 'psalm.xml'
+      - 'phpunit.xml.dist'
 
-name: build
+name: ecs
 
 jobs:
-  phpunit:
-    uses: php-forge/actions/.github/workflows/phpunit.yml@main
+  easy-coding-standard:
+    uses: php-forge/actions/.github/workflows/ecs.yml@main
     secrets:
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
     with:
       os: >-
-        ['ubuntu-latest', 'windows-latest']
+        ['ubuntu-latest']
       php: >-
-        ['8.1', '8.2', '8.3']
+        ['8.1']

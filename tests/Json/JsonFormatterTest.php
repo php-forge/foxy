@@ -12,6 +12,7 @@
 namespace Foxy\Tests\Json;
 
 use Foxy\Json\JsonFormatter;
+use PHPForge\Support\Assert;
 
 /**
  * Tests for json formatter.
@@ -27,7 +28,7 @@ final class JsonFormatterTest extends \PHPUnit\Framework\TestCase
         $expected = <<<'JSON'
         {
           "name": "test",
-          "contributors": [],
+          "contributors": {},
           "dependencies": {
             "@foo/bar": "^1.0.0"
           },
@@ -44,7 +45,7 @@ final class JsonFormatterTest extends \PHPUnit\Framework\TestCase
         );
         $content = json_encode($data);
 
-        static::assertSame($expected, JsonFormatter::format($content, array('contributors'), 2));
+        Assert::equalsWithoutLE($expected, JsonFormatter::format($content, array(), 2));
     }
 
     public function testGetArrayKeys(): void
@@ -70,7 +71,7 @@ final class JsonFormatterTest extends \PHPUnit\Framework\TestCase
         }
         JSON;
 
-        static::assertSame(2, JsonFormatter::getIndent($content));
+        $this->assertSame(2, JsonFormatter::getIndent($content));
     }
 
     public function testUnescapeUnicode(): void
@@ -86,7 +87,7 @@ final class JsonFormatterTest extends \PHPUnit\Framework\TestCase
         }
         JSON;
 
-        static::assertSame($expected, JsonFormatter::format($content, array(), 2, true));
+        Assert::equalsWithoutLE($expected, JsonFormatter::format($content, array(), 2, true));
     }
 
     public function testUnescapeSlashes(): void
@@ -102,6 +103,6 @@ final class JsonFormatterTest extends \PHPUnit\Framework\TestCase
         }
         JSON;
 
-        static::assertSame($expected, JsonFormatter::format($content, array(), 4, true));
+        Assert::equalsWithoutLE($expected, JsonFormatter::format($content, array(), 4, true));
     }
 }

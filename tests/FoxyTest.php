@@ -155,7 +155,7 @@ final class FoxyTest extends \PHPUnit\Framework\TestCase
         $foxy->activate($this->composer, $this->io);
     }
 
-    public function getSolveAssetsData()
+    public static function getSolveAssetsData(): array
     {
         return array(
             array('solve_event_install', false),

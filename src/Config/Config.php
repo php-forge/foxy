@@ -82,7 +82,7 @@ final class Config
      */
     private function convertEnvKey(string $key): string
     {
-        return 'FOXY__'.strtoupper(str_replace('-', '_', $key));
+        return 'FOXY__' . strtoupper(str_replace('-', '_', $key));
     }
 
     /**

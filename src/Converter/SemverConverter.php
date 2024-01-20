@@ -23,7 +23,7 @@ final class SemverConverter implements VersionConverterInterface
     public function convertVersion(string $version = null): string
     {
         if (\in_array($version, array(null, '', 'latest'), true)) {
-            return ('latest' === $version ? 'default || ' : '').'*';
+            return ('latest' === $version ? 'default || ' : '') . '*';
         }
 
         $version = str_replace('–', '-', $version);
@@ -32,6 +32,6 @@ final class SemverConverter implements VersionConverterInterface
         $version = SemverUtil::convertVersionMetadata($version);
         $version = SemverUtil::convertDateVersion($version);
 
-        return $prefix.$version;
+        return $prefix . $version;
     }
 }

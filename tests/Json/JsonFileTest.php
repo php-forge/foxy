@@ -12,6 +12,7 @@
 namespace Foxy\Tests\Json;
 
 use Foxy\Json\JsonFile;
+use PHPForge\Support\Assert;
 use Symfony\Component\Filesystem\Filesystem;
 
 /**
@@ -43,7 +44,7 @@ final class JsonFileTest extends \PHPUnit\Framework\TestCase
         parent::setUp();
 
         $this->oldCwd = getcwd();
-        $this->cwd = sys_get_temp_dir().\DIRECTORY_SEPARATOR.uniqid('foxy_asset_json_file_test_', true);
+        $this->cwd = sys_get_temp_dir() . \DIRECTORY_SEPARATOR . uniqid('foxy_asset_json_file_test_', true);
         $this->sfs = new Filesystem();
         $this->sfs->mkdir($this->cwd);
         chdir($this->cwd);
@@ -73,14 +74,13 @@ final class JsonFileTest extends \PHPUnit\Framework\TestCase
         $expected = array(
             'contributors',
         );
-        $content = <<<'JSON'
-{
-  "name": "test",
-  "contributors": [],
-  "dependencies": {}
-}
-
-JSON;
+        $content = <<<JSON
+        {
+          "name": "test",
+          "contributors": [],
+          "dependencies": {}
+        }
+        JSON;
 
         $filename = './package.json';
         file_put_contents($filename, $content);
@@ -136,7 +136,7 @@ JSON;
         static::assertFileExists($filename);
         $content = file_get_contents($filename);
 
-        static::assertSame($expected, $content);
+        Assert::equalsWithoutLE($expected, $content);
     }
 
     public function testWriteWithExistingFile()

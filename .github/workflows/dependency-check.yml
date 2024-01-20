@@ -7,6 +7,7 @@ on:
       - '.gitignore'
       - '.gitattributes'
       - 'infection.json.dist'
+      - 'phpunit.xml.dist'
       - 'psalm.xml'
 
   push:
@@ -17,17 +18,16 @@ on:
       - '.gitignore'
       - '.gitattributes'
       - 'infection.json.dist'
+      - 'phpunit.xml.dist'
       - 'psalm.xml'
 
-name: build
+name: dependency-check
 
 jobs:
-  phpunit:
-    uses: php-forge/actions/.github/workflows/phpunit.yml@main
-    secrets:
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+  composer-require-checker:
+    uses: php-forge/actions/.github/workflows/composer-require-checker.yml@main
     with:
       os: >-
-        ['ubuntu-latest', 'windows-latest']
+        ['ubuntu-latest']
       php: >-
-        ['8.1', '8.2', '8.3']
+        ['8.1']

@@ -66,7 +66,7 @@ abstract class ConfigBuilder
     private static function getGlobalConfig(Composer $composer, string $filename, IOInterface $io = null): array
     {
         $home = self::getComposerHome($composer);
-        $file = new JsonFile($home.'/'.$filename.'.json');
+        $file = new JsonFile($home . '/' . $filename . '.json');
         $config = array();
 
         if ($file->exists()) {
@@ -76,7 +76,7 @@ abstract class ConfigBuilder
                 $config = $data['config']['foxy'];
 
                 if ($io instanceof IOInterface && $io->isDebug()) {
-                    $io->writeError('Loading Foxy config in file '.$file->getPath());
+                    $io->writeError('Loading Foxy config in file ' . $file->getPath());
                 }
             }
         }
@@ -91,8 +91,6 @@ abstract class ConfigBuilder
      */
     private static function getComposerHome(Composer $composer): string
     {
-        return null !== $composer->getConfig() && $composer->getConfig()->has('home')
-            ? $composer->getConfig()->get('home')
-            : '';
+        return $composer->getConfig()->has('home') ? $composer->getConfig()->get('home') : '';
     }
 }

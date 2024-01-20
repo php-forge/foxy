@@ -37,10 +37,9 @@ final class Solver implements SolverInterface
     /**
      * Constructor.
      *
-     * @param AssetManagerInterface  $assetManager     The asset manager
-     * @param Config                 $config           The config
-     * @param Filesystem             $filesystem       The composer filesystem
-     * @param null|FallbackInterface $composerFallback The composer fallback
+     * @param AssetManagerInterface $assetManager The asset manager instance.
+     * @param Config $config The config instance.
+     * @param null|FallbackInterface $composerFallback The composer fallback instance.
      */
     public function __construct(
         protected AssetManagerInterface $assetManager,
@@ -66,7 +65,7 @@ final class Solver implements SolverInterface
         $dispatcher = $composer->getEventDispatcher();
         $packages = $composer->getRepositoryManager()->getLocalRepository()->getCanonicalPackages();
         $vendorDir = $composer->getConfig()->get('vendor-dir');
-        $assetDir = $this->config->get('composer-asset-dir', $vendorDir.'/foxy/composer-asset/');
+        $assetDir = $this->config->get('composer-asset-dir', $vendorDir . '/foxy/composer-asset/');
         $dispatcher->dispatch(FoxyEvents::PRE_SOLVE, new PreSolveEvent($assetDir, $packages));
         $this->fs->remove($assetDir);
 
@@ -125,8 +124,8 @@ final class Solver implements SolverInterface
     protected function getMockPackagePath(PackageInterface $package, string $assetDir, string $filename): array
     {
         $packageName = AssetUtil::getName($package);
-        $packagePath = \rtrim($assetDir, '/').'/'.$package->getName();
-        $newFilename = $packagePath.'/'. \basename($filename);
+        $packagePath = \rtrim($assetDir, '/') . '/' . $package->getName();
+        $newFilename = $packagePath . '/' . \basename($filename);
 
         \mkdir($packagePath, 0777, true);
         \copy($filename, $newFilename);

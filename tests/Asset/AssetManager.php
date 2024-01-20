@@ -26,7 +26,7 @@ use Foxy\Tests\Fixtures\Util\ProcessExecutorMock;
  *
  * @author François Pluchino <francois.pluchino@gmail.com>
  */
-abstract class AbstractAssetManagerTest extends \PHPUnit\Framework\TestCase
+abstract class AssetManager extends \PHPUnit\Framework\TestCase
 {
     /**
      * @var Config
@@ -85,7 +85,7 @@ abstract class AbstractAssetManagerTest extends \PHPUnit\Framework\TestCase
         $this->fallback = $this->getMockBuilder('Foxy\Fallback\FallbackInterface')->getMock();
         $this->manager = $this->getManager();
         $this->oldCwd = getcwd();
-        $this->cwd = sys_get_temp_dir().\DIRECTORY_SEPARATOR.uniqid('foxy_asset_manager_test_', true);
+        $this->cwd = sys_get_temp_dir() . \DIRECTORY_SEPARATOR . uniqid('foxy_asset_manager_test_', true);
         $this->sfs->mkdir($this->cwd);
         chdir($this->cwd);
     }
@@ -236,7 +236,7 @@ abstract class AbstractAssetManagerTest extends \PHPUnit\Framework\TestCase
             '@composer-asset/foo--bar' => 'path/foo/bar/package.json',
             '@composer-asset/new--dependency' => 'path/new/dependency/package.json',
         );
-        $jsonFile = new JsonFile($this->cwd.'/package.json');
+        $jsonFile = new JsonFile($this->cwd . '/package.json');
 
         /** @var \PHPUnit_Framework_MockObject_MockObject|RootPackageInterface $rootPackage */
         $rootPackage = $this->getMockBuilder('Composer\Package\RootPackageInterface')->getMock();
@@ -244,13 +244,13 @@ abstract class AbstractAssetManagerTest extends \PHPUnit\Framework\TestCase
             ->method('getLicense')
             ->willReturn(array())
         ;
-        $nodeModulePath = $this->cwd.ltrim(AbstractAssetManager::NODE_MODULES_PATH, '.');
+        $nodeModulePath = $this->cwd . ltrim(AbstractAssetManager::NODE_MODULES_PATH, '.');
 
         $jsonFile->write($package);
         static::assertFileExists($jsonFile->getPath());
         $this->sfs->mkdir($nodeModulePath);
         static::assertFileExists($nodeModulePath);
-        $lockFilePath = $this->cwd.\DIRECTORY_SEPARATOR.$this->manager->getLockPackageName();
+        $lockFilePath = $this->cwd . \DIRECTORY_SEPARATOR . $this->manager->getLockPackageName();
         file_put_contents($lockFilePath, '{}');
         static::assertFileExists($lockFilePath);
         static::assertTrue($this->manager->isInstalled());
@@ -271,7 +271,7 @@ abstract class AbstractAssetManagerTest extends \PHPUnit\Framework\TestCase
         static::assertSame(0, $this->getManager()->run());
     }
 
-    public function getRunData()
+    public static function getRunData(): array
     {
         return array(
             array(0, 'install'),
@@ -301,11 +301,11 @@ abstract class AbstractAssetManagerTest extends \PHPUnit\Framework\TestCase
             $expectedCommand = $this->getValidInstallCommand();
         } else {
             $expectedCommand = $this->getValidUpdateCommand();
-            file_put_contents($this->cwd.\DIRECTORY_SEPARATOR.$this->manager->getPackageName(), '{}');
-            $nodeModulePath = $this->cwd.ltrim(AbstractAssetManager::NODE_MODULES_PATH, '.');
+            file_put_contents($this->cwd . \DIRECTORY_SEPARATOR . $this->manager->getPackageName(), '{}');
+            $nodeModulePath = $this->cwd . ltrim(AbstractAssetManager::NODE_MODULES_PATH, '.');
             $this->sfs->mkdir($nodeModulePath);
             static::assertFileExists($nodeModulePath);
-            $lockFilePath = $this->cwd.\DIRECTORY_SEPARATOR.$this->manager->getLockPackageName();
+            $lockFilePath = $this->cwd . \DIRECTORY_SEPARATOR . $this->manager->getLockPackageName();
             file_put_contents($lockFilePath, '{}');
             static::assertFileExists($lockFilePath);
             static::assertTrue($this->manager->isInstalled());

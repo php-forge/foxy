@@ -49,11 +49,12 @@ final class AssetPackageTest extends \PHPUnit\Framework\TestCase
     {
         parent::setUp();
 
-        $this->cwd = sys_get_temp_dir().\DIRECTORY_SEPARATOR.uniqid('foxy_asset_package_test_', true);
+        $this->cwd = sys_get_temp_dir() . \DIRECTORY_SEPARATOR . uniqid('foxy_asset_package_test_', true);
         $this->sfs = new Filesystem();
         $this->rootPackage = $this->getMockBuilder('Composer\Package\RootPackageInterface')->getMock();
-        $this->jsonFile = $this->getMockBuilder('Composer\Json\JsonFile')->disableOriginalConstructor()
-            ->setMethods(array('exists', 'getPath', 'read', 'write'))
+        $this->jsonFile = $this->getMockBuilder('Composer\Json\JsonFile')
+            ->disableOriginalConstructor()
+            ->onlyMethods(array('exists', 'getPath', 'read', 'write'))
             ->getMock()
         ;
 
@@ -110,7 +111,7 @@ final class AssetPackageTest extends \PHPUnit\Framework\TestCase
         $assetPackage->write();
     }
 
-    public function getDataRequiredKeys()
+    public static function getDataRequiredKeys(): array
     {
         return array(
             array(
@@ -258,7 +259,7 @@ final class AssetPackageTest extends \PHPUnit\Framework\TestCase
      */
     protected function addPackageFile(array $package, $contentString = null)
     {
-        $filename = $this->cwd.'/package.json';
+        $filename = $this->cwd . '/package.json';
         $contentString = null !== $contentString ? $contentString : json_encode($package);
 
         $this->jsonFile->expects(static::any())

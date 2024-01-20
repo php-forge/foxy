@@ -137,7 +137,7 @@ abstract class AbstractAssetManager implements AssetManagerInterface
         $timeout = ProcessExecutor::getTimeout();
         ProcessExecutor::setTimeout($this->config->get('manager-timeout', PHP_INT_MAX));
         $cmd = $updatable ? $this->getUpdateCommand() : $this->getInstallCommand();
-        $res = (int) $this->executor->execute($cmd);
+        $res = $this->executor->execute($cmd);
         ProcessExecutor::setTimeout($timeout);
 
         if ($res > 0 && null !== $this->fallback) {
@@ -151,7 +151,7 @@ abstract class AbstractAssetManager implements AssetManagerInterface
      * Action when the composer dependencies are already installed.
      *
      * @param array $names the asset package name of composer dependencies.
-     * 
+     *
      * @psalm-param list<string> $names
      */
     protected function actionWhenComposerDependenciesAreAlreadyInstalled(array $names): void
@@ -173,11 +173,11 @@ abstract class AbstractAssetManager implements AssetManagerInterface
         $bin = $this->config->get('manager-bin', $defaultBin);
         $bin = Platform::isWindows() ? str_replace('/', '\\', $bin) : $bin;
         $gOptions = trim($this->config->get('manager-options', ''));
-        $options = trim($this->config->get('manager-'.$action.'-options', ''));
+        $options = trim($this->config->get('manager-' . $action . '-options', ''));
 
-        return $bin.' '.implode(' ', (array) $command)
-            .(empty($gOptions) ? '' : ' '.$gOptions)
-            .(empty($options) ? '' : ' '.$options);
+        return $bin . ' ' . implode(' ', (array) $command)
+            . (empty($gOptions) ? '' : ' ' . $gOptions)
+            . (empty($options) ? '' : ' ' . $options);
     }
 
     protected function getVersion(): string|null

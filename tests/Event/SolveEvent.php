@@ -19,7 +19,7 @@ use Foxy\Event\AbstractSolveEvent;
  *
  * @author François Pluchino <francois.pluchino@gmail.com>
  */
-abstract class AbstractSolveEventTest extends \PHPUnit\Framework\TestCase
+abstract class SolveEvent extends \PHPUnit\Framework\TestCase
 {
     /**
      * @var string
@@ -33,7 +33,7 @@ abstract class AbstractSolveEventTest extends \PHPUnit\Framework\TestCase
 
     protected function setUp(): void
     {
-        $this->assetDir = sys_get_temp_dir().\DIRECTORY_SEPARATOR.uniqid('foxy_event_test_', true);
+        $this->assetDir = sys_get_temp_dir() . \DIRECTORY_SEPARATOR . uniqid('foxy_event_test_', true);
         $this->packages = array(
             $this->getMockBuilder('Composer\Package\PackageInterface')->getMock(),
         );

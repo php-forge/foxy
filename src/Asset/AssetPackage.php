@@ -88,7 +88,7 @@ final class AssetPackage implements AssetPackageInterface
             if (isset($installedAssets[$name])) {
                 $existingPackages[] = $name;
             } else {
-                $this->package[self::SECTION_DEPENDENCIES][$name] = 'file:./'.\dirname($path);
+                $this->package[self::SECTION_DEPENDENCIES][$name] = 'file:./' . \dirname($path);
             }
         }
 

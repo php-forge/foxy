@@ -22,7 +22,7 @@ use Foxy\Util\ComposerUtil;
  */
 final class ComposerUtilTest extends \PHPUnit\Framework\TestCase
 {
-    public function getValidateVersionData()
+    public static function getValidateVersionData(): array
     {
         return array(
             array('@package_version@', '^1.5.0', true),

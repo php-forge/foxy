@@ -13,12 +13,10 @@ declare(strict_types=1);
 
 namespace Foxy\Util;
 
-use Composer\Composer;
 use Composer\Installer\InstallationManager;
 use Composer\IO\IOInterface;
 use Composer\Json\JsonFile;
 use Composer\Package\Locker;
-use Composer\Repository\RepositoryManager;
 
 /**
  * Helper for Locker.

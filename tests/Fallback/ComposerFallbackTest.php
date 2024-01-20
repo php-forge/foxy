@@ -84,15 +84,21 @@ final class ComposerFallbackTest extends \PHPUnit\Framework\TestCase
         parent::setUp();
 
         $this->oldCwd = getcwd();
-        $this->cwd = sys_get_temp_dir().\DIRECTORY_SEPARATOR.uniqid('foxy_composer_fallback_test_', true);
+        $this->cwd = sys_get_temp_dir() . \DIRECTORY_SEPARATOR . uniqid('foxy_composer_fallback_test_', true);
         $this->config = new Config(array(
             'fallback-composer' => true,
         ));
         $this->composer = $this->getMockBuilder('Composer\Composer')->disableOriginalConstructor()->getMock();
         $this->io = $this->getMockBuilder('Composer\IO\IOInterface')->getMock();
         $this->input = $this->getMockBuilder('Symfony\Component\Console\Input\InputInterface')->getMock();
-        $this->fs = $this->getMockBuilder('Composer\Util\Filesystem')->disableOriginalConstructor()->setMethods(array('remove'))->getMock();
-        $this->installer = $this->getMockBuilder('Composer\Installer')->disableOriginalConstructor()->setMethods(array('run'))->getMock();
+        $this->fs = $this->getMockBuilder('Composer\Util\Filesystem')
+            ->disableOriginalConstructor()
+            ->onlyMethods(array('remove'))
+            ->getMock();
+        $this->installer = $this->getMockBuilder('Composer\Installer')
+            ->disableOriginalConstructor()
+            ->onlyMethods(array('run'))
+            ->getMock();
         $this->sfs = new \Symfony\Component\Filesystem\Filesystem();
         $this->sfs->mkdir($this->cwd);
         chdir($this->cwd);
@@ -118,7 +124,7 @@ final class ComposerFallbackTest extends \PHPUnit\Framework\TestCase
         $this->cwd = null;
     }
 
-    public function getSaveData()
+    public static function getSaveData(): array
     {
         return array(
             array(true),
@@ -145,10 +151,10 @@ final class ComposerFallbackTest extends \PHPUnit\Framework\TestCase
             ->willReturn($im)
         ;
 
-        file_put_contents($this->cwd.'/composer.json', '{}');
+        file_put_contents($this->cwd . '/composer.json', '{}');
 
         if ($withLockFile) {
-            file_put_contents($this->cwd.'/composer.lock', json_encode(array('content-hash' => 'HASH_VALUE')));
+            file_put_contents($this->cwd . '/composer.lock', json_encode(array('content-hash' => 'HASH_VALUE')));
         }
 
         static::assertInstanceOf('Foxy\Fallback\ComposerFallback', $this->composerFallback->save());
@@ -168,7 +174,7 @@ final class ComposerFallbackTest extends \PHPUnit\Framework\TestCase
         $composerFallback->restore();
     }
 
-    public function getRestoreData()
+    public static function getRestoreData(): array
     {
         return array(
             array(array()),
@@ -189,10 +195,10 @@ final class ComposerFallbackTest extends \PHPUnit\Framework\TestCase
         $composerFile = 'composer.json';
         $composerContent = '{}';
         $lockFile = 'composer.lock';
-        $vendorDir = $this->cwd.'/vendor/';
+        $vendorDir = $this->cwd . '/vendor/';
 
-        file_put_contents($this->cwd.'/'.$composerFile, $composerContent);
-        file_put_contents($this->cwd.'/'.$lockFile, json_encode(array(
+        file_put_contents($this->cwd . '/' . $composerFile, $composerContent);
+        file_put_contents($this->cwd . '/' . $lockFile, json_encode(array(
             'content-hash' => 'HASH_VALUE',
             'packages' => $packages,
             'packages-dev' => array(),
@@ -235,7 +241,10 @@ final class ComposerFallbackTest extends \PHPUnit\Framework\TestCase
             ->willReturn($locker)
         ;
 
-        $config = $this->getMockBuilder('Composer\Config')->disableOriginalConstructor()->setMethods(array('get'))->getMock();
+        $config = $this->getMockBuilder('Composer\Config')
+            ->disableOriginalConstructor()
+            ->onlyMethods(array('get'))
+            ->getMock();
         $this->composer->expects(static::atLeastOnce())
             ->method('getConfig')
             ->willReturn($config)

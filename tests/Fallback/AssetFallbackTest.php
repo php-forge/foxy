@@ -65,12 +65,15 @@ final class AssetFallbackTest extends \PHPUnit\Framework\TestCase
         parent::setUp();
 
         $this->oldCwd = getcwd();
-        $this->cwd = sys_get_temp_dir().\DIRECTORY_SEPARATOR.uniqid('foxy_asset_fallback_test_', true);
+        $this->cwd = sys_get_temp_dir() . \DIRECTORY_SEPARATOR . uniqid('foxy_asset_fallback_test_', true);
         $this->config = new Config(array(
             'fallback-asset' => true,
         ));
         $this->io = $this->getMockBuilder('Composer\IO\IOInterface')->getMock();
-        $this->fs = $this->getMockBuilder('Composer\Util\Filesystem')->disableOriginalConstructor()->setMethods(array('remove'))->getMock();
+        $this->fs = $this->getMockBuilder('Composer\Util\Filesystem')
+            ->disableOriginalConstructor()
+            ->onlyMethods(array('remove'))
+            ->getMock();
         $this->sfs = new \Symfony\Component\Filesystem\Filesystem();
         $this->sfs->mkdir($this->cwd);
         chdir($this->cwd);
@@ -93,7 +96,7 @@ final class AssetFallbackTest extends \PHPUnit\Framework\TestCase
         $this->cwd = null;
     }
 
-    public function getSaveData()
+    public static function getSaveData(): array
     {
         return array(
             array(true),
@@ -109,7 +112,7 @@ final class AssetFallbackTest extends \PHPUnit\Framework\TestCase
     public function testSave($withPackageFile)
     {
         if ($withPackageFile) {
-            file_put_contents($this->cwd.'/package.json', '{}');
+            file_put_contents($this->cwd . '/package.json', '{}');
         }
 
         static::assertInstanceOf('Foxy\Fallback\AssetFallback', $this->assetFallback->save());
@@ -133,7 +136,7 @@ final class AssetFallbackTest extends \PHPUnit\Framework\TestCase
         $assetFallback->restore();
     }
 
-    public function getRestoreData()
+    public static function getRestoreData(): array
     {
         return array(
             array(true),
@@ -149,7 +152,7 @@ final class AssetFallbackTest extends \PHPUnit\Framework\TestCase
     public function testRestore($withPackageFile)
     {
         $content = '{}';
-        $path = $this->cwd.'/package.json';
+        $path = $this->cwd . '/package.json';
 
         if ($withPackageFile) {
             file_put_contents($path, $content);

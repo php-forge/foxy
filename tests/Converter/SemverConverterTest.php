@@ -50,11 +50,11 @@ final class SemverConverterTest extends TestCase
         static::assertEquals($composer, $this->converter->convertVersion($semver));
 
         if (!ctype_alpha((string) $semver) && !\in_array($semver, array(null, ''), true)) {
-            static::assertEquals('v'.$composer, $this->converter->convertVersion('v'.$semver));
+            static::assertEquals('v' . $composer, $this->converter->convertVersion('v' . $semver));
         }
     }
 
-    public function getTestVersions()
+    public static function getTestVersions(): array
     {
         return array(
             array('1.2.3', '1.2.3'),

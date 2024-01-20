@@ -20,11 +20,9 @@ use Foxy\Event\PostSolveEvent;
  *
  * @internal
  */
-final class PostSolveEventTest extends AbstractSolveEventTest
+final class PostSolveEventTest extends SolveEvent
 {
     /**
-     * {@inheritdoc}
-     *
      * @return PostSolveEvent
      */
     public function getEvent()

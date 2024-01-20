@@ -91,8 +91,6 @@ interface AssetManagerInterface
      *
      * @param RootPackageInterface $rootPackage  The composer root package
      * @param array $dependencies The asset local dependencies
-     *
-     * @return AssetPackageInterface
      */
     public function addDependencies(RootPackageInterface $rootPackage, array $dependencies): AssetPackageInterface;
 

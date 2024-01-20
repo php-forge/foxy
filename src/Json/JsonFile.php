@@ -38,11 +38,11 @@ final class JsonFile extends \Composer\Json\JsonFile
      */
     public function getArrayKeys(): array
     {
-        if ([] === $this->arrayKeys) {
+        if ($this->arrayKeys === []) {
             $this->parseOriginalContent();
         }
 
-        return $this->arrayKeys;
+        return $this->arrayKeys ?? [];
     }
 
     /**
@@ -50,11 +50,11 @@ final class JsonFile extends \Composer\Json\JsonFile
      */
     public function getIndent(): int
     {
-        if (null === $this->indent) {
+        if ($this->indent === null) {
             $this->parseOriginalContent();
         }
 
-        return $this->indent;
+        return $this->indent ?? JsonFormatter::DEFAULT_INDENT;
     }
 
     public function read(): array
@@ -75,9 +75,7 @@ final class JsonFile extends \Composer\Json\JsonFile
         self::$encodeIndent = 4;
     }
 
-    /**
-     * {@inheritdoc}
-     */
+    
     public static function encode(mixed $data, int $options = 448, string $indent = self::INDENT_DEFAULT): string
     {
         $result = parent::encode($data, $options, $indent);
