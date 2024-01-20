@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -23,7 +25,7 @@ abstract class FoxyEvents
      *
      * @Event("Foxy\Event\PreSolveEvent")
      */
-    const PRE_SOLVE = 'foxy.pre-solve';
+    public const PRE_SOLVE = 'foxy.pre-solve';
 
     /**
      * The "GET_ASSETS" event is triggered before the `solve` action of asset packages
@@ -31,7 +33,7 @@ abstract class FoxyEvents
      *
      * @Event("Foxy\Event\GetAssetsEvent")
      */
-    const GET_ASSETS = 'foxy.get-assets';
+    public const GET_ASSETS = 'foxy.get-assets';
 
     /**
      * The "POST_SOLVE" event is triggered after the `solve` action of asset packages and before
@@ -39,5 +41,5 @@ abstract class FoxyEvents
      *
      * @Event("Foxy\Event\PostSolveEvent")
      */
-    const POST_SOLVE = 'foxy.post-solve';
+    public const POST_SOLVE = 'foxy.post-solve';
 }

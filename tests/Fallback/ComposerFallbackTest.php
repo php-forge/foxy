@@ -228,7 +228,7 @@ final class ComposerFallbackTest extends \PHPUnit\Framework\TestCase
             ->method('write')
         ;
 
-        $locker = LockerUtil::getLocker($this->io, $rm, $im, $composerFile);
+        $locker = LockerUtil::getLocker($this->io, $im, $composerFile);
 
         $this->composer->expects(static::atLeastOnce())
             ->method('getLocker')

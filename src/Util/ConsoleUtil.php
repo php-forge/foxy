@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -21,16 +23,14 @@ use Symfony\Component\Console\Input\InputInterface;
  *
  * @author François Pluchino <francois.pluchino@gmail.com>
  */
-class ConsoleUtil
+final class ConsoleUtil
 {
     /**
      * Get the console input.
      *
      * @param IOInterface $io The IO
-     *
-     * @return InputInterface
      */
-    public static function getInput(IOInterface $io)
+    public static function getInput(IOInterface $io): InputInterface
     {
         $ref = new \ReflectionClass($io);
 
@@ -50,12 +50,12 @@ class ConsoleUtil
     /**
      * Returns preferSource and preferDist values based on the configuration.
      *
-     * @param Config         $config The composer config
-     * @param InputInterface $input  The console input
+     * @param Config $config The composer config.
+     * @param InputInterface $input The console input
      *
-     * @return bool[] An array composed of the preferSource and preferDist values
+     * @psalm-return bool[] An array composed of the preferSource and preferDist values
      */
-    public static function getPreferredInstallOptions(Config $config, InputInterface $input)
+    public static function getPreferredInstallOptions(Config $config, InputInterface $input): array
     {
         $preferSource = false;
         $preferDist = false;
@@ -65,7 +65,7 @@ class ConsoleUtil
                 $preferSource = true;
 
                 break;
-
+                
             case 'dist':
                 $preferDist = true;
 

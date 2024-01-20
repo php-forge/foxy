@@ -61,7 +61,7 @@ final class ComposerFallback implements FallbackInterface
         $rm = $this->composer->getRepositoryManager();
         $im = $this->composer->getInstallationManager();
         $composerFile = Factory::getComposerFile();
-        $locker = LockerUtil::getLocker($this->io, $rm, $im, $composerFile);
+        $locker = LockerUtil::getLocker($this->io, $im, $composerFile);
 
         try {
             $lock = $locker->getLockData();

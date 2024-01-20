@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -20,26 +22,23 @@ use Foxy\Exception\RuntimeException;
  *
  * @author François Pluchino <francois.pluchino@gmail.com>
  */
-class ComposerUtil
+final class ComposerUtil
 {
     /**
      * Get the event name to init the plugin.
-     *
-     * @return string
      */
-    public static function getInitEventName()
+    public static function getInitEventName(): string
     {
-        return \defined('Composer\Installer\InstallerEvents::PRE_DEPENDENCIES_SOLVING')
-            ? InstallerEvents::PRE_DEPENDENCIES_SOLVING : InstallerEvents::PRE_OPERATIONS_EXEC;
+        return InstallerEvents::PRE_OPERATIONS_EXEC;
     }
 
     /**
      * Validate the composer version.
      *
-     * @param string $requiredVersion The composer required version
-     * @param string $composerVersion The composer version
+     * @param string $requiredVersion The composer required version.
+     * @param string $composerVersion The composer version.
      */
-    public static function validateVersion($requiredVersion, $composerVersion)
+    public static function validateVersion(string $requiredVersion, string $composerVersion): void
     {
         $isBranch = false !== strpos($composerVersion, '@');
         $isSnapshot = (bool) preg_match('/^[0-9a-f]{40}$/i', $composerVersion);
