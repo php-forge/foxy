@@ -29,10 +29,10 @@ final class PackageUtilTest extends \PHPUnit\Framework\TestCase
     {
         $lockData = [
             'packages' => [
-                ['name' => 'foo/bar', 'version' => '1.0.0.0']
+                ['name' => 'foo/bar', 'version' => '1.0.0.0'],
             ],
             'packages-dev' => [
-                ['name' => 'bar/foo', 'version' => '1.0.0.0']
+                ['name' => 'bar/foo', 'version' => '1.0.0.0'],
             ],
         ];
 
@@ -82,8 +82,8 @@ final class PackageUtilTest extends \PHPUnit\Framework\TestCase
             'foo/bar' => [
                 'dev-feature/1.0-test' => [
                     'alias' => '1.0.0',
-                    'alias_normalized' => '1.0.0.0'
-                ]
+                    'alias_normalized' => '1.0.0.0',
+                ],
             ],
             'foo/baz' => [
                 'dev-feature/2.2-test' => [

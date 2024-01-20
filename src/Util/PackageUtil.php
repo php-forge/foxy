@@ -33,11 +33,9 @@ final class PackageUtil
     public static function loadLockPackages(array $lockData): array
     {
         $loader = new ArrayLoader();
-        $lockData = static::loadLockPackage($loader, $lockData);
-        $lockData = static::loadLockPackage($loader, $lockData, true);
-        $lockData = static::convertLockAlias($lockData);
-
-        return $lockData;
+        $lockData = self::loadLockPackage($loader, $lockData);
+        $lockData = self::loadLockPackage($loader, $lockData, true);
+        return self::convertLockAlias($lockData);
     }
 
     /**

@@ -79,7 +79,7 @@ class SolverTest extends \PHPUnit\Framework\TestCase
 
         $this->localRepo = $this->createMock(InstalledArrayRepository::class);
 
-        if (\class_exists(\Composer\Util\HttpDownloader::class)) {
+        if (\class_exists(HttpDownloader::class)) {
             $rm = new RepositoryManager($this->io, $this->composerConfig, new HttpDownloader($this->io, $this->composerConfig));
             $rm->setLocalRepository($this->localRepo);
         } else {
@@ -156,7 +156,7 @@ class SolverTest extends \PHPUnit\Framework\TestCase
      */
     public function testSolve(int $resRunManager): void
     {
-        /** @var PackageInterface|MockObject $requirePackage */
+        /** @var MockObject|PackageInterface $requirePackage */
         $requirePackage = $this->createMock(PackageInterface::class);
 
         $requirePackage->expects($this->any())->method('getPrettyVersion')->willReturn('1.0.0');

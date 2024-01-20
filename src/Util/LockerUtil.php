@@ -34,7 +34,7 @@ final class LockerUtil
         string $composerFile
     ): Locker {
         $lockFile = str_replace('.json', '.lock', $composerFile);
-        
+
         return new Locker($io, new JsonFile($lockFile, null, $io), $im, file_get_contents($composerFile));
     }
 }

@@ -224,7 +224,7 @@ final class AssetPackageTest extends \PHPUnit\Framework\TestCase
      * Add the package in file.
      *
      * @param array $package The package.
-     * @param null|string $contentString The string content of package.
+     * @param string|null $contentString The string content of package.
      */
     protected function addPackageFile(array $package, $contentString = null): void
     {

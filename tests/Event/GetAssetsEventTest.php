@@ -26,7 +26,6 @@ final class GetAssetsEventTest extends SolveEvent
 {
     private array $assets = ['@composer-asset/foo--bar' => 'file:./vendor/foxy/composer-asset/foo/bar'];
 
-    
     public function getEvent(): GetAssetsEvent
     {
         return new GetAssetsEvent($this->assetDir, $this->packages, $this->assets);

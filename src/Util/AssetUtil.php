@@ -52,7 +52,7 @@ final class AssetUtil
     ): string|null {
         $path = null;
 
-        if (static::isAsset($package, $configPackages)) {
+        if (self::isAsset($package, $configPackages)) {
             $installPath = $installationManager->getInstallPath($package);
             $filename = $installPath . '/' . $assetManager->getPackageName();
             $path = \file_exists($filename) ? \str_replace('\\', '/', \realpath($filename)) : null;
@@ -72,9 +72,9 @@ final class AssetUtil
         $projectConfig = self::getProjectActivation($package, $configPackages);
         $enabled = false !== $projectConfig;
 
-        return $enabled && (static::hasExtraActivation($package)
-            || static::hasPluginDependency($package->getRequires())
-            || static::hasPluginDependency($package->getDevRequires())
+        return $enabled && (self::hasExtraActivation($package)
+            || self::hasPluginDependency($package->getRequires())
+            || self::hasPluginDependency($package->getDevRequires())
             || true === $projectConfig);
     }
 
@@ -173,7 +173,7 @@ final class AssetUtil
      * @param PackageInterface $package The package instance.
      * @param array $configPackages The packages defined in config.
      *
-     * @return null|bool returns NULL, if the package isn't defined in the project config
+     * @return bool|null returns NULL, if the package isn't defined in the project config
      */
     private static function getProjectActivation(PackageInterface $package, array $configPackages): bool|null
     {
