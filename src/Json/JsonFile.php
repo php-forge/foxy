@@ -21,7 +21,7 @@ namespace Foxy\Json;
 final class JsonFile extends \Composer\Json\JsonFile
 {
     /**
-     * @psalm-var string[]|null
+     * @psalm-var string[]
      */
     private array $arrayKeys = [];
     private int|null $indent = null;
@@ -42,7 +42,7 @@ final class JsonFile extends \Composer\Json\JsonFile
             $this->parseOriginalContent();
         }
 
-        return $this->arrayKeys ?? [];
+        return $this->arrayKeys;
     }
 
     /**

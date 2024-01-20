@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Foxy\Tests\Converter;
 
 use Foxy\Converter\SemverConverter;
+use Foxy\Converter\SemverUtil;
 use Foxy\Converter\VersionConverterInterface;
 use PHPUnit\Framework\TestCase;
 
@@ -99,5 +100,13 @@ final class SemverConverterTest extends TestCase
             [null, '*'],
             ['', '*'],
         ];
+    }
+
+    public function testConvertVersionMetadataWithEmptyPattern()
+    {
+        $version = '1.0.0';
+        $expected = '1.0.0';
+
+        static::assertSame($expected, SemverUtil::convertVersionMetadata($version));
     }
 }
