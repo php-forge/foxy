@@ -40,7 +40,7 @@ final class ComposerUtil
      */
     public static function validateVersion(string $requiredVersion, string $composerVersion): void
     {
-        $isBranch = false !== strpos($composerVersion, '@');
+        $isBranch = str_contains($composerVersion, '@');
         $isSnapshot = (bool) preg_match('/^[0-9a-f]{40}$/i', $composerVersion);
 
         if (!$isBranch && !$isSnapshot && !Semver::satisfies($composerVersion, $requiredVersion)) {

@@ -25,7 +25,7 @@ abstract class FoxyEvents
      *
      * @Event("Foxy\Event\PreSolveEvent")
      */
-    public const PRE_SOLVE = 'foxy.pre-solve';
+    final public const PRE_SOLVE = 'foxy.pre-solve';
 
     /**
      * The "GET_ASSETS" event is triggered before the `solve` action of asset packages
@@ -33,7 +33,7 @@ abstract class FoxyEvents
      *
      * @Event("Foxy\Event\GetAssetsEvent")
      */
-    public const GET_ASSETS = 'foxy.get-assets';
+    final public const GET_ASSETS = 'foxy.get-assets';
 
     /**
      * The "POST_SOLVE" event is triggered after the `solve` action of asset packages and before
@@ -41,5 +41,5 @@ abstract class FoxyEvents
      *
      * @Event("Foxy\Event\PostSolveEvent")
      */
-    public const POST_SOLVE = 'foxy.post-solve';
+    final public const POST_SOLVE = 'foxy.post-solve';
 }

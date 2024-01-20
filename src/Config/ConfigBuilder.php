@@ -51,7 +51,7 @@ abstract class ConfigBuilder
         $packageConfig = $composer->getPackage()->getConfig();
         $packageConfig = isset($packageConfig['foxy']) && \is_array($packageConfig['foxy'])
             ? $packageConfig['foxy']
-            : array();
+            : [];
 
         return array_merge($globalPackageConfig, $globalConfig, $packageConfig);
     }
@@ -67,7 +67,7 @@ abstract class ConfigBuilder
     {
         $home = self::getComposerHome($composer);
         $file = new JsonFile($home . '/' . $filename . '.json');
-        $config = array();
+        $config = [];
 
         if ($file->exists()) {
             $data = $file->read();

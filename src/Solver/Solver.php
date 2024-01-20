@@ -95,13 +95,13 @@ final class Solver implements SolverInterface
     {
         $installationManager = $composer->getInstallationManager();
         $configPackages = $this->config->getArray('enable-packages');
-        $assets = array();
+        $assets = [];
 
         foreach ($packages as $package) {
             $filename = AssetUtil::getPath($installationManager, $this->assetManager, $package, $configPackages);
 
             if (null !== $filename) {
-                list($packageName, $packagePath) = $this->getMockPackagePath($package, $assetDir, $filename);
+                [$packageName, $packagePath] = $this->getMockPackagePath($package, $assetDir, $filename);
                 $assets[$packageName] = $packagePath;
             }
         }
@@ -135,6 +135,6 @@ final class Solver implements SolverInterface
 
         $jsonFile->write($packageValue);
 
-        return array($packageName, $this->fs->findShortestPath(getcwd(), $newFilename));
+        return [$packageName, $this->fs->findShortestPath(getcwd(), $newFilename)];
     }
 }

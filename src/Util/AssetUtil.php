@@ -33,7 +33,7 @@ final class AssetUtil
      */
     public static function getName(PackageInterface $package): string
     {
-        return AssetPackage::COMPOSER_PREFIX . \str_replace(array('/'), '--', $package->getName());
+        return AssetPackage::COMPOSER_PREFIX . \str_replace(['/'], '--', $package->getName());
     }
 
     /**
@@ -138,11 +138,11 @@ final class AssetUtil
             $extra = $package->getExtra();
             $version = $package->getPrettyVersion();
 
-            if (0 === \strpos($version, 'dev-') && isset($extra['branch-alias'][$version])) {
+            if (str_starts_with($version, 'dev-') && isset($extra['branch-alias'][$version])) {
                 $version = $extra['branch-alias'][$version];
             }
 
-            $packageValue['version'] = self::formatVersion(\str_replace('-dev', '', $version));
+            $packageValue['version'] = self::formatVersion(\str_replace('-dev', '', (string) $version));
         }
 
         return $packageValue;
@@ -155,7 +155,7 @@ final class AssetUtil
      */
     private static function formatVersion(string $version): string
     {
-        $version = \str_replace(array('x', 'X', '*'), '0', $version);
+        $version = \str_replace(['x', 'X', '*'], '0', $version);
         $exp = \explode('.', $version);
 
         if (($size = \count($exp)) < 3) {
@@ -186,7 +186,7 @@ final class AssetUtil
                 $activation = true;
             }
 
-            if ((0 === \strpos($pattern, '/') && \preg_match($pattern, $name)) || \fnmatch($pattern, $name)) {
+            if ((str_starts_with($pattern, '/') && \preg_match($pattern, $name)) || \fnmatch($pattern, $name)) {
                 $value = $activation;
 
                 break;

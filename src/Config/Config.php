@@ -115,7 +115,7 @@ class Config
     {
         $value = strtolower($value);
 
-        return \in_array($value, array('true', 'false', '1', '0', 'yes', 'no', 'y', 'n'), true);
+        return \in_array($value, ['true', 'false', '1', '0', 'yes', 'no', 'y', 'n'], true);
     }
 
     /**
@@ -125,7 +125,7 @@ class Config
      */
     private function convertBoolean(string $value): bool
     {
-        return \in_array($value, array('true', '1', 'yes', 'y'), true);
+        return \in_array($value, ['true', '1', 'yes', 'y'], true);
     }
 
     /**
@@ -155,7 +155,7 @@ class Config
      */
     private function isJson(string $value): bool
     {
-        return 0 === strpos($value, '{') || 0 === strpos($value, '[');
+        return str_starts_with($value, '{') || str_starts_with($value, '[');
     }
 
     /**
@@ -201,7 +201,7 @@ class Config
      */
     private function getByManager(string $key, mixed $value, mixed $default = null): mixed
     {
-        if (0 === strpos($key, 'manager-') && \is_array($value)) {
+        if (str_starts_with($key, 'manager-') && \is_array($value)) {
             $manager = $manager = $this->get('manager', '');
 
             $value = \array_key_exists($manager, $value)

@@ -43,7 +43,7 @@ final class YarnManager extends AbstractAssetManager
             return true;
         }
 
-        $cmd = $this->buildCommand('yarn', 'check', $this->mergeInteractiveCommand(array('check')));
+        $cmd = $this->buildCommand('yarn', 'check', $this->mergeInteractiveCommand(['check']));
 
         return 0 === $this->executor->execute($cmd);
     }
@@ -55,14 +55,14 @@ final class YarnManager extends AbstractAssetManager
 
     protected function getInstallCommand(): string
     {
-        return $this->buildCommand('yarn', 'install', $this->mergeInteractiveCommand(array('install')));
+        return $this->buildCommand('yarn', 'install', $this->mergeInteractiveCommand(['install']));
     }
 
     protected function getUpdateCommand(): string
     {
         $commandName = $this->isYarnNext() ? 'up' : 'upgrade';
 
-        return $this->buildCommand('yarn', 'update', $this->mergeInteractiveCommand(array($commandName)));
+        return $this->buildCommand('yarn', 'update', $this->mergeInteractiveCommand([$commandName]));
     }
 
     private function isYarnNext(): bool
