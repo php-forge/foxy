@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the Foxy package.
  *
@@ -39,9 +41,9 @@ use Foxy\Util\ConsoleUtil;
  *
  * @author François Pluchino <francois.pluchino@gmail.com>
  */
-class Foxy implements PluginInterface, EventSubscriberInterface
+final class Foxy implements PluginInterface, EventSubscriberInterface
 {
-    const REQUIRED_COMPOSER_VERSION = '^1.5.0|^2.0.0';
+    public const REQUIRED_COMPOSER_VERSION = '^2.0.0';
 
     /**
      * @var Config
@@ -105,10 +107,7 @@ class Foxy implements PluginInterface, EventSubscriberInterface
         'enable-packages' => array(),
     );
 
-    /**
-     * {@inheritdoc}
-     */
-    public static function getSubscribedEvents()
+    public static function getSubscribedEvents(): array
     {
         return array(
             ComposerUtil::getInitEventName() => array(
@@ -126,10 +125,7 @@ class Foxy implements PluginInterface, EventSubscriberInterface
         );
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function activate(Composer $composer, IOInterface $io)
+    public function activate(Composer $composer, IOInterface $io): void
     {
         ComposerUtil::validateVersion(static::REQUIRED_COMPOSER_VERSION, Composer::VERSION);
 
@@ -146,12 +142,12 @@ class Foxy implements PluginInterface, EventSubscriberInterface
         $this->assetManager->setFallback($this->assetFallback);
     }
 
-    public function deactivate(Composer $composer, IOInterface $io)
+    public function deactivate(Composer $composer, IOInterface $io): void
     {
         // Do nothing
     }
 
-    public function uninstall(Composer $composer, IOInterface $io)
+    public function uninstall(Composer $composer, IOInterface $io): void
     {
         // Do nothing
     }
@@ -161,7 +157,7 @@ class Foxy implements PluginInterface, EventSubscriberInterface
      *
      * @param PackageEvent $event The package event
      */
-    public function initOnInstall(PackageEvent $event)
+    public function initOnInstall(PackageEvent $event): void
     {
         $operation = $event->getOperation();
 
@@ -173,7 +169,7 @@ class Foxy implements PluginInterface, EventSubscriberInterface
     /**
      * Init the plugin.
      */
-    public function init()
+    public function init(): void
     {
         if (!$this->initialized) {
             $this->initialized = true;
@@ -189,9 +185,9 @@ class Foxy implements PluginInterface, EventSubscriberInterface
     /**
      * Set the solver.
      *
-     * @param SolverInterface $solver The solver
+     * @param SolverInterface $solver The solver instance.
      */
-    public function setSolver(SolverInterface $solver)
+    public function setSolver(SolverInterface $solver): void
     {
         $this->solver = $solver;
     }
@@ -199,9 +195,9 @@ class Foxy implements PluginInterface, EventSubscriberInterface
     /**
      * Solve the assets.
      *
-     * @param Event $event The composer script event
+     * @param Event $event The composer script event.
      */
-    public function solveAssets(Event $event)
+    public function solveAssets(Event $event): void
     {
         $this->solver->setUpdatable(false !== strpos($event->getName(), 'update'));
         $this->solver->solve($event->getComposer(), $event->getIO());
@@ -210,17 +206,19 @@ class Foxy implements PluginInterface, EventSubscriberInterface
     /**
      * Get the asset manager.
      *
-     * @param IOInterface     $io       The IO
-     * @param Config          $config   The config
-     * @param ProcessExecutor $executor The process executor
-     * @param Filesystem      $fs       The composer filesystem
+     * @param IOInterface $io The IO interface.
+     * @param Config $config The config of plugin.
+     * @param ProcessExecutor $executor The process executor.
+     * @param Filesystem $fs The composer filesystem.
      *
-     * @return AssetManagerInterface
-     *
-     * @throws RuntimeException When the asset manager is not found
+     * @throws RuntimeException When the asset manager is not found.
      */
-    protected function getAssetManager(IOInterface $io, Config $config, ProcessExecutor $executor, Filesystem $fs)
-    {
+    protected function getAssetManager(
+        IOInterface $io,
+        Config $config,
+        ProcessExecutor $executor,
+        Filesystem $fs
+    ): AssetManagerInterface {
         $amf = new AssetManagerFinder();
 
         foreach (self::$assetManagers as $class) {
