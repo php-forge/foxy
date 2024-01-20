@@ -184,7 +184,7 @@ final class AssetUtil
         $value = null;
 
         /**
-         * @var array<string|int, bool|string> $configPackages
+         * @var array<int|string, bool|string> $configPackages
          */
         foreach ($configPackages as $pattern => $activation) {
             if (\is_int($pattern) && \is_string($activation)) {
