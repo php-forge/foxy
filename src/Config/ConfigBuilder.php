@@ -70,6 +70,7 @@ abstract class ConfigBuilder
         $config = [];
 
         if ($file->exists()) {
+            /** @var array $data */
             $data = $file->read();
 
             if (isset($data['config']['foxy']) && \is_array($data['config']['foxy'])) {

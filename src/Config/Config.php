@@ -202,7 +202,8 @@ class Config
     private function getByManager(string $key, mixed $value, mixed $default = null): mixed
     {
         if (str_starts_with($key, 'manager-') && \is_array($value)) {
-            $manager = $manager = $this->get('manager', '');
+            /** @var string|int $manager */
+            $manager = $this->get('manager', '');
 
             $value = \array_key_exists($manager, $value)
                 ? $value[$manager]
