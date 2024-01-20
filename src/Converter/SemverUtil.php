@@ -47,11 +47,7 @@ abstract class SemverUtil
     {
         $pattern = self::createPattern('([a-zA-Z]+|(\-|\+)[a-zA-Z]+|(\-|\+)[0-9]+)');
 
-        if ($pattern === '') {
-            return $version;
-        }
-
-        if (preg_match_all($pattern, $version, $matches, PREG_OFFSET_CAPTURE)) {
+        if (preg_match_all($pattern, $version, $matches, PREG_OFFSET_CAPTURE) > 0) {
             [$type, $version, $end] = self::cleanVersion(strtolower($version), $matches);
             [$version, $patchVersion] = self::matchVersion($version, $type);
 
@@ -73,6 +69,8 @@ abstract class SemverUtil
      * @param string $pattern The pattern without '/'.
      *
      * @return string The full pattern with '/'.
+     *
+     * @psalm-return non-empty-string
      */
     public static function createPattern(string $pattern): string
     {

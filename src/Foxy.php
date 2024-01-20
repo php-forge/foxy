@@ -40,40 +40,18 @@ use Foxy\Util\ConsoleUtil;
  * Composer plugin.
  *
  * @author François Pluchino <francois.pluchino@gmail.com>
+ *
+ * @psalm-suppress MissingConstructor
  */
 final class Foxy implements PluginInterface, EventSubscriberInterface
 {
-    public const REQUIRED_COMPOSER_VERSION = '^2.0.0';
-
-    /**
-     * @var Config
-     */
-    protected $config;
-
-    /**
-     * @var AssetManagerInterface
-     */
-    protected $assetManager;
-
-    /**
-     * @var AssetFallback
-     */
-    protected $assetFallback;
-
-    /**
-     * @var ComposerFallback
-     */
-    protected $composerFallback;
-
-    /**
-     * @var SolverInterface
-     */
-    protected $solver;
-
-    /**
-     * @var bool
-     */
-    protected $initialized = false;
+    final public const REQUIRED_COMPOSER_VERSION = '^2.0.0';
+    private Config $config;
+    private AssetManagerInterface $assetManager;
+    private AssetFallback $assetFallback;
+    private ComposerFallback $composerFallback;
+    private SolverInterface $solver;
+    private bool $initialized = false;
 
     /**
      * The list of the classes of asset managers.
@@ -89,7 +67,7 @@ final class Foxy implements PluginInterface, EventSubscriberInterface
     /**
      * The default values of config.
      */
-    private static $defaultConfig = [
+    private static array $defaultConfig = [
         'enabled' => true,
         'manager' => null,
         'manager-version' => [

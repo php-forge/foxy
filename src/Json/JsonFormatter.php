@@ -91,7 +91,7 @@ final class JsonFormatter
         $array = \json_decode($json, true);
 
         if ($unescapeUnicode) {
-            \array_walk_recursive($array, function (&$item): void {
+            \array_walk_recursive($array, function (mixed &$item): void {
                 if (\is_string($item)) {
                     $item = \preg_replace_callback(
                         '/\\\\u([0-9a-fA-F]{4})/',
@@ -106,7 +106,7 @@ final class JsonFormatter
         }
 
         if ($unescapeSlashes) {
-            \array_walk_recursive($array, function (&$item): void {
+            \array_walk_recursive($array, function (mixed &$item): void {
                 if (\is_string($item)) {
                     $item = \str_replace('\\/', '/', $item);
                 }
