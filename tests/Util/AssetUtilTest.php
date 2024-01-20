@@ -62,7 +62,6 @@ final class AssetUtilTest extends \PHPUnit\Framework\TestCase
 
     public function testGetPathWithoutRequiredFoxy(): void
     {
-
         $installationManager = $this->createMock(InstallationManager::class);
 
         $installationManager->expects($this->never())->method('getInstallPath');

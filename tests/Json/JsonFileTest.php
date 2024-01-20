@@ -160,6 +160,6 @@ final class JsonFileTest extends \PHPUnit\Framework\TestCase
         $this->assertFileExists($filename);
         $content = file_get_contents($filename);
 
-        $this->assertSame($expected, $content);
+        Assert::equalsWithoutLE($expected, $content);
     }
 }

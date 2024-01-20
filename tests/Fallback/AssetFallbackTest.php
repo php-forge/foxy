@@ -28,17 +28,13 @@ use PHPUnit\Framework\MockObject\MockObject;
  */
 final class AssetFallbackTest extends \PHPUnit\Framework\TestCase
 {
+    protected AssetFallback|null $assetFallback = null;
     private Config|null $config = null;
     private IOInterface|MockObject|null $io = null;
     private Filesystem|MockObject|null $fs = null;
     private \Symfony\Component\Filesystem\Filesystem|null $sfs = null;
     private string|null $oldCwd = '';
     private string|null $cwd = '';
-
-    /**
-     * @var AssetFallback
-     */
-    protected $assetFallback;
 
     protected function setUp(): void
     {
