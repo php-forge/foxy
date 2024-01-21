@@ -79,6 +79,7 @@ definition file, in the previous state if NPM, Yarn or PNpM ends with an error.
 Features
 --------
 
+- Compatible with [Yii Assets](https://github.com/yiisoft/assets)
 - Compatible with [Symfony Webpack Encore](http://symfony.com/doc/current/frontend.html)
   and [Laravel Mix](https://laravel.com/docs/master/mix)
 - Works with Node.js and NPM, Yarn or PNpM
