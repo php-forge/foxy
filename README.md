@@ -24,11 +24,12 @@
 >
 > ⚠ This plugin is based on [Fxpio/Foxy](https://github.com/fxpio/foxy).
 > 
-> This version.
+> Updates:
 >  - PHP version to `8.1` or higher.
 >  - Composer version to `2.0` or higher.
 >  - Composer api version to `2.0` or higher.
 >  - Add static analysis with [Psalm](https://psalm.dev).
+>
 
 Foxy is a Composer plugin to automate the validation, installation, updating and removing of PHP libraries
 asset dependencies (javaScript, stylesheets, etc.) defined in the NPM `package.json` file of the project and
