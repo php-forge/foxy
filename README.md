@@ -20,6 +20,13 @@
     </a>  
 </p>
 
+> **Important:**
+>
+> ⚠ This plugin is based on [Fxpio/Foxy](https://github.com/fxpio/foxy).
+> 
+> This version removes all deprecated method in `Composer`, bumps the PHP version to `8.1`, supports only `composer-api:^2.0`,
+> and adds tests for PHP `8.1`, `8.2`, `8.3`, and add static analysis with `Psalm`.
+
 Foxy is a Composer plugin to automate the validation, installation, updating and removing of PHP libraries
 asset dependencies (javaScript, stylesheets, etc.) defined in the NPM `package.json` file of the project and
 PHP libraries during the execution of Composer. It handles restoring the project state in case
@@ -28,13 +35,6 @@ are available: [Npmrc](https://docs.npmjs.com/files/npmrc), [Yarnrc](https://yar
 [Webpack](https://webpack.js.org), [Gulp](https://gulpjs.com), [Grunt](https://gruntjs.com),
 [Babel](https://babeljs.io), [TypeScript](https://www.typescriptlang.org), [Scss/Sass](http://sass-lang.com),
 [Less](http://lesscss.org), etc.
-
-> **Important:**
->
-> ⚠ This plugin is based on [Fxpio/Foxy](https://github.com/fxpio/foxy).
-> 
-> This version removes all deprecated method in `Composer`, bumps the PHP version to 8.1, supports only `composer-api:^2.0`,
-> and adds tests for PHP `8.1`, `8.2`, `8.3`, and add static analysis with `Psalm`.
 
 It is certain that each language has its own dependency management system, and that it is highly recommended to use
 each package manager. NPM, Yarn or pnpm works very well when the asset dependencies are managed only in the PHP project,
