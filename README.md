@@ -110,14 +110,14 @@ Features
 Documentation
 -------------
 
-- [Guide](Resources/doc/index.md)
-- [FAQs](Resources/doc/faqs.md)
+- [Guide](resources/doc/index.md)
+- [FAQs](resources/doc/faqs.md)
 - [Release Notes](https://github.com/fxpio/foxy/releases)
 
 Installation
 ------------
 
-Installation instructions are located in [the guide](Resources/doc/index.md).
+Installation instructions are located in [the guide](resources/doc/index.md).
 
 License
 -------
