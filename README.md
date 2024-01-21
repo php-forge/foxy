@@ -29,6 +29,13 @@ are available: [Npmrc](https://docs.npmjs.com/files/npmrc), [Yarnrc](https://yar
 [Babel](https://babeljs.io), [TypeScript](https://www.typescriptlang.org), [Scss/Sass](http://sass-lang.com),
 [Less](http://lesscss.org), etc.
 
+> **Important:**
+>
+> ⚠ This plugin is based on [Fxpio/Foxy](https://github.com/fxpio/foxy).
+> 
+> This version removes all deprecated method in `Composer`, bumps the PHP version to 8.1, supports only `composer-api:^2.0`,
+> and adds tests for PHP `8.1`, `8.2`, `8.3`, and add static analysis with `Psalm`.
+
 It is certain that each language has its own dependency management system, and that it is highly recommended to use
 each package manager. NPM, Yarn or pnpm works very well when the asset dependencies are managed only in the PHP project,
 but when you create PHP libraries that using assets, there is no way to automatically add asset dependencies,
@@ -130,5 +137,3 @@ Acknowledgments
 ---------------
 
 Thanks to [Tobias Munk](https://github.com/schmunk42) to have suggesting this name
-
-> Note: This is a fork of https://github.com/fxpio/foxy
