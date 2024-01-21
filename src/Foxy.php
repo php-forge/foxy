@@ -133,7 +133,7 @@ final class Foxy implements PluginInterface, EventSubscriberInterface
     {
         $operation = $event->getOperation();
 
-        if ($operation instanceof InstallOperation && 'foxy/foxy' === $operation->getPackage()->getName()) {
+        if ($operation instanceof InstallOperation && 'php-forge/foxy' === $operation->getPackage()->getName()) {
             $this->init();
         }
     }

@@ -164,7 +164,7 @@ class SolverTest extends \PHPUnit\Framework\TestCase
         $requirePackage
             ->expects($this->any())
             ->method('getRequires')
-            ->willReturn([new Link('root/package', 'foxy/foxy', new Constraint('=', '1.0.0'))]);
+            ->willReturn([new Link('root/package', 'php-forge/foxy', new Constraint('=', '1.0.0'))]);
         $requirePackage->expects($this->any())->method('getDevRequires')->willReturn([]);
 
         $this->addInstalledPackages([$requirePackage]);

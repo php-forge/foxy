@@ -83,23 +83,23 @@ final class AssetUtilTest extends \PHPUnit\Framework\TestCase
     {
         return [
             [
-                [new Link('root/package', 'foxy/foxy', new Constraint('=', '1.0.0'))],
+                [new Link('root/package', 'php-forge/foxy', new Constraint('=', '1.0.0'))],
                 [],
                 false,
             ],
             [
                 [],
-                [new Link('root/package', 'foxy/foxy', new Constraint('=', '1.0.0'))],
+                [new Link('root/package', 'php-forge/foxy', new Constraint('=', '1.0.0'))],
                 false,
             ],
             [
-                [new Link('root/package', 'foxy/foxy', new Constraint('=', '1.0.0'))],
+                [new Link('root/package', 'php-forge/foxy', new Constraint('=', '1.0.0'))],
                 [],
                 true,
             ],
             [
                 [],
-                [new Link('root/package', 'foxy/foxy', new Constraint('=', '1.0.0'))],
+                [new Link('root/package', 'php-forge/foxy', new Constraint('=', '1.0.0'))],
                 true,
             ],
         ];
@@ -204,7 +204,7 @@ final class AssetUtilTest extends \PHPUnit\Framework\TestCase
             AssetUtil::hasPluginDependency(
                 [
                     new Link('root/package', 'foo/bar', new Constraint('=', '1.0.0')),
-                    new Link('root/package', 'foxy/foxy', new Constraint('=', '1.0.0')),
+                    new Link('root/package', 'php-forge/foxy', new Constraint('=', '1.0.0')),
                     new Link('root/package', 'bar/foo', new Constraint('=', '1.0.0')),
                 ],
             )
