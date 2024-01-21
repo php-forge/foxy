@@ -105,7 +105,7 @@ final class AssetUtil
         $assets = false;
 
         foreach ($requires as $require) {
-            if ('foxy/foxy' === $require->getTarget()) {
+            if ('php-forge/foxy' === $require->getTarget()) {
                 $assets = true;
 
                 break;

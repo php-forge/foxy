@@ -108,7 +108,7 @@ final class FoxyTest extends \PHPUnit\Framework\TestCase
     {
         $package = $this->createMock(Package::class);
 
-        $package->expects($this->once())->method('getName')->willReturn('foxy/foxy');
+        $package->expects($this->once())->method('getName')->willReturn('php-forge/foxy');
 
         $operation = $this->createMock(InstallOperation::class);
 
