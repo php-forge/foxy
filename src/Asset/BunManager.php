@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace Foxy\Asset;
 
+use Composer\Util\Platform;
+
 /**
  * Pnpm Manager.
  *
@@ -27,7 +29,7 @@ final class BunManager extends AbstractAssetManager
 
     public function getLockPackageName(): string
     {
-        return 'bun.lockb';
+        return 'yarn.lock';
     }
 
     public function isInstalled(): bool
@@ -37,16 +39,22 @@ final class BunManager extends AbstractAssetManager
 
     protected function getVersionCommand(): string
     {
-        return $this->buildCommand('bun', 'version', '--version');
+        $command = Platform::isWindows() ? 'bun.exe' : 'bun';
+
+        return $this->buildCommand($command, 'version', '--version');
     }
 
     protected function getInstallCommand(): string
     {
-        return $this->buildCommand('bun', 'install', 'install');
+        $command = Platform::isWindows() ? 'bun.exe' : 'bun';
+
+        return $this->buildCommand($command, 'install', 'install');
     }
 
     protected function getUpdateCommand(): string
     {
-        return $this->buildCommand('bun', 'update', 'update');
+        $command = Platform::isWindows() ? 'bun.exe' : 'bun';
+
+        return $this->buildCommand($command, 'update', 'update');
     }
 }
