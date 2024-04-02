@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Foxy\Tests\Asset;
 
+use Composer\Util\Platform;
 use Foxy\Asset\BunManager;
 
 /**
@@ -36,21 +37,21 @@ final class BunAssetManagerTest extends AssetManager
 
     protected function getValidLockPackageName(): string
     {
-        return 'bun.lockb';
+        return 'yarn.lock';
     }
 
     protected function getValidVersionCommand(): string
     {
-        return 'bun --version';
+        return Platform::isWindows() ? 'bun.exe --version' : 'bun --version';
     }
 
     protected function getValidInstallCommand(): string
     {
-        return 'bun install';
+        return Platform::isWindows() ? 'bun.exe install --yarn' : 'bun install --yarn';
     }
 
     protected function getValidUpdateCommand(): string
     {
-        return 'bun update';
+        return Platform::isWindows() ? 'bun.exe update' : 'bun update';
     }
 }
