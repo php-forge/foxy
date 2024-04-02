@@ -34,8 +34,9 @@
 Foxy is a Composer plugin to automate the validation, installation, updating and removing of PHP libraries
 asset dependencies (javaScript, stylesheets, etc.) defined in the NPM `package.json` file of the project and
 PHP libraries during the execution of Composer. It handles restoring the project state in case
-[NPM](https://www.npmjs.com) or [Yarn](https://yarnpkg.com) or [PNpM](https://PNpM.io) terminates with an error. All features and tools
-are available: [Npmrc](https://docs.npmjs.com/files/npmrc), [Yarnrc](https://yarnpkg.com/en/docs/yarnrc),
+[Bun](https://github.com/oven-sh/bun) or [NPM](https://www.npmjs.com) or [Yarn](https://yarnpkg.com) or [PNpM](https://PNpM.io) terminates with an error.
+
+All features and tools are available: [Npmrc](https://docs.npmjs.com/files/npmrc), [Yarnrc](https://yarnpkg.com/en/docs/yarnrc),
 [Webpack](https://webpack.js.org), [Gulp](https://gulpjs.com), [Grunt](https://gruntjs.com),
 [Babel](https://babeljs.io), [TypeScript](https://www.typescriptlang.org), [Scss/Sass](http://sass-lang.com),
 [Less](http://lesscss.org), etc.
@@ -127,18 +128,7 @@ Foxy is released under the MIT license. See the complete license in:
 
 [LICENSE](LICENSE)
 
-About
------
-
-Foxy is a [François Pluchino](https://github.com/francoispluchino) initiative.
-See also the list of [contributors](https://github.com/fxpio/foxy/contributors).
-
 Reporting an issue or a feature request
 ---------------------------------------
 
 Issues and feature requests are tracked in the [Github issue tracker](https://github.com/php-forge/foxy/issues).
-
-Acknowledgments
----------------
-
-Thanks to [Tobias Munk](https://github.com/schmunk42) to have suggesting this name

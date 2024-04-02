@@ -59,6 +59,7 @@ final class Foxy implements PluginInterface, EventSubscriberInterface
      * @psalm-var list<class-string<AssetManagerInterface>>
      */
     private static $assetManagers = [
+        Asset\BunManager::class,
         Asset\NpmManager::class,
         Asset\PnpmManager::class,
         Asset\YarnManager::class,
@@ -71,6 +72,7 @@ final class Foxy implements PluginInterface, EventSubscriberInterface
         'enabled' => true,
         'manager' => null,
         'manager-version' => [
+            'bun' => '>=1.1.0',
             'npm' => '>=5.0.0',
             'pnpm' => '>=7.0.0',
             'yarn' => '>=1.0.0',
