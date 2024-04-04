@@ -22,6 +22,8 @@
 
 Add to your `composer.json` file.
 
+Manager can be `bun`, `npm`, `yarn` or `pnpm`. For default, `npm` is used.
+
 ```json
 {
     "require": {
@@ -29,7 +31,7 @@ Add to your `composer.json` file.
     },    
     "config": {
         "foxy": {
-            "manager": "bun" // or "npm" or "yarn" or "pnpm" (default: "npm")
+            "manager": "bun"
         }
     }
 }
