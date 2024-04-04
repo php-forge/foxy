@@ -47,11 +47,11 @@ final class BunAssetManagerTest extends AssetManager
 
     protected function getValidInstallCommand(): string
     {
-        return Platform::isWindows() ? 'bun.exe install --yarn' : 'bun install --yarn';
+        return Platform::isWindows() ? 'bun.exe install -y' : 'bun install -y';
     }
 
     protected function getValidUpdateCommand(): string
     {
-        return Platform::isWindows() ? 'bun.exe update' : 'bun update';
+        return Platform::isWindows() ? 'bun.exe update -y' : 'bun update -y';
     }
 }

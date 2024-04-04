@@ -48,13 +48,13 @@ final class BunManager extends AbstractAssetManager
     {
         $command = Platform::isWindows() ? 'bun.exe' : 'bun';
 
-        return $this->buildCommand($command, 'install', 'install --yarn');
+        return $this->buildCommand($command, 'install', 'install -y');
     }
 
     protected function getUpdateCommand(): string
     {
         $command = Platform::isWindows() ? 'bun.exe' : 'bun';
 
-        return $this->buildCommand($command, 'update', 'update');
+        return $this->buildCommand($command, 'update', 'update -y');
     }
 }
