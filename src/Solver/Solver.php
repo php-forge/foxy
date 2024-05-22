@@ -67,7 +67,7 @@ final class Solver implements SolverInterface
         /** @var string $vendorDir */
         $vendorDir = $composer->getConfig()->get('vendor-dir');
         /** @var string $assetDir */
-        $assetDir = $this->config->get('composer-asset-dir', $vendorDir . '/foxy/composer-asset/');
+        $assetDir = $this->config->get('composer-asset-dir', $vendorDir . '/php-forge/composer-asset/');
         $dispatcher->dispatch(FoxyEvents::PRE_SOLVE, new PreSolveEvent($assetDir, $packages));
         $this->fs->remove($assetDir);
         $assets = $this->getAssets($composer, $assetDir, $packages);
