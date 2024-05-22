@@ -8,7 +8,7 @@ the `require` section of the Composer file.
 ```json
 {
     "require": {
-        "foxy/foxy": "^1.0.0"
+        "php-forge/foxy": "^0.1"
     }
 }
 ```
@@ -38,7 +38,7 @@ the `require-dev` section of the Composer file.
 ```json
 {
     "require-dev": {
-        "foxy/foxy": "^1.0.0"
+        "php-forge/foxy": "^0.1"
     }
 }
 ```

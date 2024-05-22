@@ -132,8 +132,11 @@ You can choose the asset manager with the option `config.foxy.manager` [`string`
 
 **Available values:**
 
+- `bun`
 - `npm`
+- `pnpm`
 - `yarn`
+
 
 **Example:**
 ```json
