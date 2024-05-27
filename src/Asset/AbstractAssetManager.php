@@ -139,7 +139,7 @@ abstract class AbstractAssetManager implements AssetManagerInterface
 
         $rootPackageDir = $this->config->get('root-package-dir');
 
-        if ($rootPackageDir !== null) {
+        if (\is_string($rootPackageDir)) {
             \chdir($rootPackageDir);
         }
 
