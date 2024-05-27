@@ -137,6 +137,12 @@ abstract class AbstractAssetManager implements AssetManagerInterface
             return 0;
         }
 
+        $rootPackageDir = $this->config->get('root-package-dir');
+
+        if ($rootPackageDir !== null) {
+            \chdir($rootPackageDir);
+        }
+
         $updatable = $this->isUpdatable();
         $info = sprintf('<info>%s %s dependencies</info>', $updatable ? 'Updating' : 'Installing', $this->getName());
         $this->io->write($info);
