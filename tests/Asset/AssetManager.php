@@ -290,6 +290,31 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
         $this->assertSame('ASSET MANAGER OUTPUT', $this->executor->getLastOutput());
     }
 
+    public function testSpecifyCustomDirectoryFromPackageJson(): void
+    {
+        $this->config = new Config(
+            [],
+            ['run-asset-manager' => true, 'root-package-dir' => dirname(__DIR__) . '/Fixtures/package/global'],
+        );
+        $this->manager = $this->getManager();
+
+        $this->assertSame(0, $this->getManager()->run());
+    }
+
+    public function testSpecifyCustomDirectoryFromPackageJsonException(): void
+    {
+        $this->expectException(\Foxy\Exception\RuntimeException::class);
+        $this->expectExceptionMessage('The root package directory "path/to/invalid" doesn\'t exist.');
+
+        $this->config = new Config(
+            [],
+            ['run-asset-manager' => true, 'root-package-dir' => 'path/to/invalid'],
+        );
+        $this->manager = $this->getManager();
+
+        $this->assertSame(0, $this->getManager()->run());
+    }
+
     abstract protected function getManager(): AssetManagerInterface;
 
     abstract protected function getValidName(): string;
