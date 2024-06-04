@@ -294,10 +294,11 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
     {
         $this->config = new Config(
             [],
-            ['run-asset-manager' => true, 'root-package-dir' => dirname(__DIR__) . '/Fixtures/package/global'],
+            ['run-asset-manager' => true, 'root-package-dir' => $this->cwd],
         );
         $this->manager = $this->getManager();
 
+        $this->assertSame($this->cwd, $this->config->get('root-package-dir'));
         $this->assertSame(0, $this->getManager()->run());
     }
 
