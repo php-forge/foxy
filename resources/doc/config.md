@@ -369,3 +369,18 @@ If you do not deactivate any packages, you can use a simple array.
     }
 }
 ```
+
+### Specify a custom directory for `package.json` file
+
+You can define the custom directory for `package.json` file with the option `root-package-dir` [`string`, default: `null`].
+
+**Example:**
+```json
+{
+    "config": {
+        "foxy": {
+            "root-package-dir": "./module/theme"
+        }
+    }
+}
+```
