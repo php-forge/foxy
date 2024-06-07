@@ -5,6 +5,12 @@
     "homepage": "https://github.com/fxpio/foxy",
     "type": "composer-plugin",
     "license": "MIT",
+    "funding": [
+        {
+            "type": "github",
+            "url": "https://github.com/sponsors/terabytesoftw"
+        }
+    ],
     "require": {
         "ext-ctype": "*",
         "ext-mbstring": "*",
