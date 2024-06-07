@@ -137,7 +137,7 @@ abstract class AbstractAssetManager implements AssetManagerInterface
             return 0;
         }
 
-        $rootPackageDir = $this->config->get('root-package-dir');
+        $rootPackageDir = $this->config->get('root-package-json-dir');
 
         if (is_string($rootPackageDir) && !empty($rootPackageDir)) {
             if (!is_dir($rootPackageDir)) {

@@ -379,7 +379,7 @@ You can define the custom directory for `package.json` file with the option `roo
 {
     "config": {
         "foxy": {
-            "root-package-dir": "./module/theme"
+            "root-package-json-dir": "module/theme"
         }
     }
 }

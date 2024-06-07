@@ -64,7 +64,7 @@ final class AssetUtil
             if (null !== $composerJsonPath && \file_exists($composerJsonPath)) {
                 /** @var array[] $composerJson */
                 $composerJson = \json_decode(\file_get_contents($composerJsonPath), true);
-                $rootPackageDir = $composerJson['config']['foxy']['root-package-dir'] ?? null;
+                $rootPackageDir = $composerJson['config']['foxy']['root-package-json-dir'] ?? null;
 
                 if (null !== $installPath && \is_string($rootPackageDir)) {
                     $installPath .= '/' . $rootPackageDir;

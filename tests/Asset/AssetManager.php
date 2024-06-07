@@ -294,11 +294,11 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
     {
         $this->config = new Config(
             [],
-            ['run-asset-manager' => true, 'root-package-dir' => $this->cwd],
+            ['run-asset-manager' => true, 'root-package-json-dir' => $this->cwd],
         );
         $this->manager = $this->getManager();
 
-        $this->assertSame($this->cwd, $this->config->get('root-package-dir'));
+        $this->assertSame($this->cwd, $this->config->get('root-package-json-dir'));
         $this->assertSame(0, $this->getManager()->run());
     }
 
@@ -309,7 +309,7 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
 
         $this->config = new Config(
             [],
-            ['run-asset-manager' => true, 'root-package-dir' => 'path/to/invalid'],
+            ['run-asset-manager' => true, 'root-package-json-dir' => 'path/to/invalid'],
         );
         $this->manager = $this->getManager();
 

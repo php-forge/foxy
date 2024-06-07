@@ -1,7 +1,7 @@
 {
     "config": {
         "foxy": {
-            "root-package-dir": "theme",
+            "root-package-json-dir": "theme",
             "global-composer-foo": 70,
             "global-composer-bar": 70
         }
