@@ -139,12 +139,11 @@ abstract class AbstractAssetManager implements AssetManagerInterface
 
         $rootPackageDir = $this->config->get('root-package-dir');
 
-        if (\is_string($rootPackageDir) && '' !== $rootPackageDir && \is_dir($rootPackageDir)) {
-            \chdir($rootPackageDir);
-        }
-
-        if (\is_string($rootPackageDir) && '' !== $rootPackageDir && \is_dir($rootPackageDir) === false) {
-            throw new RuntimeException(\sprintf('The root package directory "%s" doesn\'t exist.', $rootPackageDir));
+        if (is_string($rootPackageDir) && !empty($rootPackageDir)) {
+            if (!is_dir($rootPackageDir)) {
+                throw new RuntimeException(sprintf('The root package directory "%s" doesn\'t exist.', $rootPackageDir));
+            }
+            chdir($rootPackageDir);
         }
 
         $updatable = $this->isUpdatable();
