@@ -52,6 +52,7 @@ final class AssetUtil
     ): string|null {
         $path = null;
 
+
         if (self::isAsset($package, $configPackages)) {
             $composerJsonPath = null;
             $installPath = $installationManager->getInstallPath($package);
@@ -70,7 +71,8 @@ final class AssetUtil
                 }
             }
 
-            if ($installPath !== null) {
+
+            if (null !== $installPath) {
                 $filename = $installPath . '/' . $assetManager->getPackageName();
                 $path = \file_exists($filename) ? \str_replace('\\', '/', \realpath($filename)) : null;
             }
