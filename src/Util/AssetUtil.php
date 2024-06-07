@@ -52,10 +52,27 @@ final class AssetUtil
     ): string|null {
         $path = null;
 
+
         if (self::isAsset($package, $configPackages)) {
+            $composerJsonPath = null;
             $installPath = $installationManager->getInstallPath($package);
 
-            if ($installPath !== null) {
+            if (null !== $installPath) {
+                $composerJsonPath = $installPath . '/composer.json';
+            }
+
+            if (null !== $composerJsonPath && \file_exists($composerJsonPath)) {
+                /** @var array[] $composerJson */
+                $composerJson = \json_decode(\file_get_contents($composerJsonPath), true);
+                $rootPackageDir = $composerJson['config']['foxy']['root-package-json-dir'] ?? null;
+
+                if (null !== $installPath && \is_string($rootPackageDir)) {
+                    $installPath .= '/' . $rootPackageDir;
+                }
+            }
+
+
+            if (null !== $installPath) {
                 $filename = $installPath . '/' . $assetManager->getPackageName();
                 $path = \file_exists($filename) ? \str_replace('\\', '/', \realpath($filename)) : null;
             }

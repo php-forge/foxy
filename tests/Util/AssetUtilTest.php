@@ -18,6 +18,7 @@ use Composer\Package\Link;
 use Composer\Package\PackageInterface;
 use Composer\Semver\Constraint\Constraint;
 use Foxy\Asset\AbstractAssetManager;
+use Foxy\Asset\AssetManagerInterface;
 use Foxy\Util\AssetUtil;
 use PHPUnit\Framework\MockObject\MockObject;
 use Symfony\Component\Filesystem\Filesystem;
@@ -339,5 +340,32 @@ final class AssetUtilTest extends \PHPUnit\Framework\TestCase
         $res = AssetUtil::formatPackage($package, $packageName, $assetPackage);
 
         $this->assertEquals($expected, $res);
+    }
+
+    public function testGetPathWithRootPackageDir(): void
+    {
+        $installationManager = $this->createMock(InstallationManager::class);
+        $installationManager
+            ->expects($this->once())
+            ->method('getInstallPath')
+            ->willReturn('tests/Fixtures/package/global');
+
+        $assetManager = $this->createMock(AssetManagerInterface::class);
+        $assetManager->expects($this->once())->method('getPackageName')->willReturn('foo/bar');
+
+        $package = $this->createMock(PackageInterface::class);
+        $package->expects($this->once())->method('getName')->willReturn('foo/bar');
+        $package->expects($this->once())->method('getRequires')->willReturn([]);
+        $package->expects($this->once())->method('getDevRequires')->willReturn([]);
+
+        $configPackages = [
+            '/^foo\/bar$/' => true,
+        ];
+
+        $expectedPath = 'tests/Fixtures/package/global/theme/foo/bar';
+
+        $res = AssetUtil::getPath($installationManager, $assetManager, $package, $configPackages);
+
+        $this->assertStringContainsString($expectedPath, $res);
     }
 }
