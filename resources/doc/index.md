@@ -33,7 +33,7 @@ See the [Release Notes](https://github.com/fxpio/foxy/releases)
 to know the Composer version required.
 
 ```shell
-composer require "foxy/foxy:^1.0.0"
+composer require "php-forge/foxy:^0.1"
 ```
 
 Composer will install the plugin to your project's `vendor/foxy` directory.
