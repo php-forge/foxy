@@ -1,6 +1,8 @@
 Change Log
 ==========
 
+## 0.1.3 Under development
+
 ## 0.1.2 June 10, 2024
 
 - Bug #64: Update docs, `composer.lock` and change directory in `Solver.php` (@terabytesoftw)
