@@ -75,7 +75,7 @@ For more details, the plugin work in this order:
 2. Saving the status of project
 3. Installing/updating of the PHP dependencies by Composer
 4. Retrieving the entire list of installed packages
-5. Retains only PHP dependencies with the `foxy/foxy` dependency in the `require` or `require-dev` section of
+5. Retains only PHP dependencies with the `php-forge/foxy` dependency in the `require` or `require-dev` section of
    the `composer.json` file and with the presence of the `package.json` file
 6. Checking the lock file of asset manager
 7. Comparing the difference between the installed asset dependencies and the new asset dependencies, to determine
