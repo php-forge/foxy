@@ -23,7 +23,7 @@ name: build
 
 jobs:
   phpunit:
-    uses: php-forge/actions/.github/workflows/phpunit.yml@main
+    uses: php-forge/actions/.github/workflows/phpunit.yml@fix-phpunit-conditional
     secrets:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
     with:
