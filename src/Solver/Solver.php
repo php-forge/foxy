@@ -35,8 +35,6 @@ use Foxy\Util\AssetUtil;
 final class Solver implements SolverInterface
 {
     /**
-     * Constructor.
-     *
      * @param AssetManagerInterface $assetManager The asset manager instance.
      * @param Config $config The config instance.
      * @param FallbackInterface|null $composerFallback The composer fallback instance.

@@ -24,8 +24,6 @@ use Foxy\FoxyEvents;
 final class PreSolveEvent extends AbstractSolveEvent
 {
     /**
-     * Constructor.
-     *
      * @param string $assetDir The directory of mock assets.
      * @param array $packages All installed Composer packages.
      *

@@ -24,8 +24,6 @@ use Foxy\FoxyEvents;
 final class PostSolveEvent extends AbstractSolveEvent
 {
     /**
-     * Constructor.
-     *
      * @param string $assetDir The directory of mock assets.
      * @param array $packages  All installed Composer packages.
      * @param int $runResult The process result of asset manager execution.
