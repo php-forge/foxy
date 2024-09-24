@@ -163,8 +163,6 @@ abstract class SemverUtil
     {
         $type = match ($type) {
             'dev', 'snapshot' => 'dev',
-            'a' => 'alpha',
-            'b', 'pre' => 'beta',
             default => \in_array($type, ['alpha', 'beta', 'RC'], true) ? $type : 'patch',
         };
 
