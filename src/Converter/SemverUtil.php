@@ -140,12 +140,12 @@ abstract class SemverUtil
         $stability = strtolower($stability);
 
         return match ($stability) {
-            'a' => $stability = 'alpha',
-            'b', 'pre' => $stability = 'beta',
-            'build' => $stability = 'patch',
-            'rc' => $stability = 'RC',
-            'dev', 'snapshot' => $stability = 'dev',
-            default => $stability = VersionParser::normalizeStability($stability),
+            'a' => 'alpha',
+            'b', 'pre' => 'beta',
+            'build' => 'patch',
+            'rc' => 'RC',
+            'dev', 'snapshot' => 'dev',
+            default => VersionParser::normalizeStability($stability),
         };
     }
 
