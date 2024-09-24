@@ -25,8 +25,6 @@ class Config
     private array $cacheEnv = [];
 
     /**
-     * Constructor.
-     *
      * @param array $config The config.
      * @param array $defaults The default values.
      */

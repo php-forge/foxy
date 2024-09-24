@@ -29,8 +29,6 @@ final class AssetPackage implements AssetPackageInterface
     protected array $package = [];
 
     /**
-     * Constructor.
-     *
      * @param RootPackageInterface $rootPackage The composer root package
      * @param JsonFile $jsonFile    The json file
      */

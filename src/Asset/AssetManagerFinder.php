@@ -28,8 +28,6 @@ final class AssetManagerFinder
     private array $managers = [];
 
     /**
-     * Constructor.
-     *
      * @psalm-param AssetManagerInterface[] $managers The asset managers
      */
     public function __construct(array $managers = [])

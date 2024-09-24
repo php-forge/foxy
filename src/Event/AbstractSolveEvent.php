@@ -24,8 +24,6 @@ use Composer\Package\PackageInterface;
 abstract class AbstractSolveEvent extends Event
 {
     /**
-     * Constructor.
-     *
      * @param string $name The event name.
      * @param string $assetDir The directory of mock assets.
      * @param array $packages All installed Composer packages.

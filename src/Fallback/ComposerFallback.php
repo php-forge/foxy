@@ -36,8 +36,6 @@ final class ComposerFallback implements FallbackInterface
     protected array $lock = [];
 
     /**
-     * Constructor.
-     *
      * @param Composer $composer The composer.
      * @param IOInterface $io The IO.
      * @param Config $config The config.

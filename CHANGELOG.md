@@ -3,6 +3,8 @@ Change Log
 
 ## 0.1.3 Under development
 
+- Enh #87: Refactor `SemverUtil::class` stability normalization logic (@terabytesoftw)
+
 ## 0.1.2 June 10, 2024
 
 - Bug #64: Update docs, `composer.lock` and change directory in `Solver.php` (@terabytesoftw)

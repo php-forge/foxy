@@ -122,10 +122,31 @@ abstract class SemverUtil
 
         $matches = [];
         preg_match('/^[a-z]+/', $end, $matches);
-        $type = isset($matches[0]) ? VersionParser::normalizeStability($matches[0]) : '';
+        $type = isset($matches[0]) ? self::normalizeStability($matches[0]) : '';
         $end = substr($end, \strlen($type));
 
         return [$type, $version, $end];
+    }
+
+    /**
+     * Normalize the stability.
+     *
+     * @param string $stability The stability.
+     *
+     * @return string The normalized stability.
+     */
+    private static function normalizeStability(string $stability): string
+    {
+        $stability = strtolower($stability);
+
+        return match ($stability) {
+            'a' => 'alpha',
+            'b', 'pre' => 'beta',
+            'build' => 'patch',
+            'rc' => 'RC',
+            'dev', 'snapshot' => 'dev',
+            default => VersionParser::normalizeStability($stability),
+        };
     }
 
     /**
@@ -140,34 +161,12 @@ abstract class SemverUtil
      */
     private static function matchVersion(string $version, string $type): array
     {
-        $patchVersion = true;
+        $type = match ($type) {
+            'dev', 'snapshot' => 'dev',
+            default => \in_array($type, ['alpha', 'beta', 'RC'], true) ? $type : 'patch',
+        };
 
-        switch ($type) {
-            case 'dev':
-            case 'snapshot':
-                $type = 'dev';
-                $patchVersion = false;
-
-                break;
-
-            case 'a':
-                $type = 'alpha';
-
-                break;
-
-            case 'b':
-            case 'pre':
-                $type = 'beta';
-
-                break;
-
-            default:
-                if (!\in_array($type, ['alpha', 'beta', 'RC'], true)) {
-                    $type = 'patch';
-                }
-
-                break;
-        }
+        $patchVersion = !\in_array($type, ['dev'], true);
 
         $version .= $type;
 

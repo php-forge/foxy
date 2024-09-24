@@ -24,8 +24,6 @@ use Foxy\FoxyEvents;
 final class GetAssetsEvent extends AbstractSolveEvent
 {
     /**
-     * Constructor.
-     *
      * @param string $assetDir The directory of mock assets.
      * @param array $packages All installed Composer packages.
      * @param array $assets The map of asset package name and the asset package path.
