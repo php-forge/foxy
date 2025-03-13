@@ -48,7 +48,7 @@ final class ComposerFallback implements FallbackInterface
         protected IOInterface $io,
         protected Config $config,
         protected InputInterface $input,
-        Filesystem $fs = null,
+        Filesystem|null $fs = null,
         protected Installer|null $installer = null
     ) {
         $this->fs = $fs ?: new Filesystem();
