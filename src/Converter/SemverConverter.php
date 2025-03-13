@@ -20,7 +20,7 @@ namespace Foxy\Converter;
  */
 final class SemverConverter implements VersionConverterInterface
 {
-    public function convertVersion(string $version = null): string
+    public function convertVersion(string|null $version = null): string
     {
         if (\in_array($version, [null, '', 'latest'], true)) {
             return ('latest' === $version ? 'default || ' : '') . '*';

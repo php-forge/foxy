@@ -31,7 +31,7 @@ final class AssetFallback implements FallbackInterface
         protected IOInterface $io,
         protected Config $config,
         protected string $path,
-        Filesystem $fs = null
+        Filesystem|null $fs = null
     ) {
         $this->fs = $fs ?: new Filesystem();
     }

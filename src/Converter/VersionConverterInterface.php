@@ -27,5 +27,5 @@ interface VersionConverterInterface
      *
      * @return string The composer version
      */
-    public function convertVersion(string $version = null): string;
+    public function convertVersion(string|null $version = null): string;
 }

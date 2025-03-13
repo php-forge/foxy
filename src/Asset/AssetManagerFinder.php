@@ -52,7 +52,7 @@ final class AssetManagerFinder
      * @throws RuntimeException When the asset manager does not exist
      * @throws RuntimeException When the asset manager is not found
      */
-    public function findManager(string $manager = null): AssetManagerInterface
+    public function findManager(string|null $manager = null): AssetManagerInterface
     {
         if (null !== $manager) {
             if (isset($this->managers[$manager])) {

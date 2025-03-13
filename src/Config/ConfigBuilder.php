@@ -31,7 +31,7 @@ abstract class ConfigBuilder
      * @param array $defaults The default values.
      * @param IOInterface|null $io The composer input/output.
      */
-    public static function build(Composer $composer, array $defaults = [], IOInterface $io = null): Config
+    public static function build(Composer $composer, array $defaults = [], IOInterface|null $io = null): Config
     {
         $config = self::getConfigBase($composer, $io);
 
@@ -44,7 +44,7 @@ abstract class ConfigBuilder
      * @param Composer $composer The composer.
      * @param IOInterface|null $io The composer input/output.
      */
-    private static function getConfigBase(Composer $composer, IOInterface $io = null): array
+    private static function getConfigBase(Composer $composer, IOInterface|null $io = null): array
     {
         $globalPackageConfig = self::getGlobalConfig($composer, 'composer', $io);
         $globalConfig = self::getGlobalConfig($composer, 'config', $io);
@@ -63,7 +63,7 @@ abstract class ConfigBuilder
      * @param string $filename The filename.
      * @param IOInterface|null $io The composer input/output.
      */
-    private static function getGlobalConfig(Composer $composer, string $filename, IOInterface $io = null): array
+    private static function getGlobalConfig(Composer $composer, string $filename, IOInterface|null $io = null): array
     {
         $home = self::getComposerHome($composer);
         $file = new JsonFile($home . '/' . $filename . '.json');
