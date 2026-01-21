@@ -23,7 +23,7 @@ name: static analysis
 
 jobs:
   psalm:
-    uses: php-forge/actions/.github/workflows/psalm.yml@main
+    uses: php-forge/actions/.github/workflows/psalm.yml@9c6f6185e30ce76213b7d81b18124525abdedcb0
     with:
       os: >-
         ['ubuntu-latest']

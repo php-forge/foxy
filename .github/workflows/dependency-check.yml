@@ -29,5 +29,5 @@ jobs:
     with:
       os: >-
         ['ubuntu-latest']
-      php: >-
+      php-version: >-
         ['8.1']

@@ -7,6 +7,7 @@ Change Log
 - Bug #104: Add support for PHP 8.4 (@terabytesoftw)
 - Enh #105: Update dependencies in `composer.lock` (@terabytesoftw)
 - Enh #106: Update composer dependencies for compatibility with newer versions (@terabytesoftw)
+- Bug #107: Force 4-space indentation when updating `package.json` (@terabytesoftw)
 
 ## 0.1.2 June 10, 2024
 
