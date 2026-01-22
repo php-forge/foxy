@@ -163,6 +163,32 @@ final class JsonFileTest extends \PHPUnit\Framework\TestCase
         Assert::equalsWithoutLE($expected, $content);
     }
 
+    public function testWritePreservesNestedEmptyArraysWithoutSpaces(): void
+    {
+        $content = '{"name":"test","workspaces":[],"overrides":{"pkg":{"files":[]}},"dependencies":{}}';
+
+        $filename = './package.json';
+
+        file_put_contents($filename, $content);
+
+        $this->assertFileExists($filename);
+
+        $jsonFile = new JsonFile($filename);
+        $data = (array) $jsonFile->read();
+        $data['private'] = true;
+
+        $jsonFile->write($data);
+
+        $this->assertFileExists($filename);
+
+        $content = file_get_contents($filename);
+
+        $this->assertStringContainsString('"workspaces": []', $content);
+        $this->assertStringContainsString('"files": []', $content);
+        $this->assertStringContainsString('"dependencies": {}', $content);
+        $this->assertMatchesRegularExpression('/^ {4}"dependencies": \{\}/m', $content);
+    }
+
     public function testWriteForcesFourSpacesIndentWithExistingTwoSpaceFile(): void
     {
         $expected = <<<JSON

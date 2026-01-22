@@ -21,7 +21,7 @@ namespace Foxy\Json;
 final class JsonFormatter
 {
     public const DEFAULT_INDENT = 4;
-    public const ARRAY_KEYS_REGEX = '/["\']([\w\d_\-.]+)["\']:\s\[]/';
+    public const ARRAY_KEYS_REGEX = '/["\']([\w\d_\-.]+)["\']\s*:\s*\[\s*\]/';
     public const INDENT_REGEX = '/^[{\[][\r\n]([ ]+)["\']/';
 
     /**
@@ -136,8 +136,10 @@ final class JsonFormatter
 
         foreach ($matches as $match) {
             if (!\in_array($match[1], $arrayKeys, true)) {
-                $replace = \str_replace('[]', '{}', $match[0]);
-                $json = \str_replace($match[0], $replace, $json);
+                $replace = \preg_replace('/\[\s*\]/', '{}', $match[0]);
+                if (null !== $replace) {
+                    $json = \str_replace($match[0], $replace, $json);
+                }
             }
         }
 

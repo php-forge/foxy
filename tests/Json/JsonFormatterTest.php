@@ -30,7 +30,7 @@ final class JsonFormatterTest extends \PHPUnit\Framework\TestCase
         $expected = <<<JSON
         {
           "name": "test",
-          "contributors": {},
+          "contributors": [],
           "dependencies": {
             "@foo/bar": "^1.0.0"
           },
@@ -45,7 +45,7 @@ final class JsonFormatterTest extends \PHPUnit\Framework\TestCase
         ];
         $content = json_encode($data);
 
-        Assert::equalsWithoutLE($expected, JsonFormatter::format($content, [], 2));
+        Assert::equalsWithoutLE($expected, JsonFormatter::format($content, ['contributors'], 2));
     }
 
     public function testFormatWithEmptyContent(): void
@@ -63,6 +63,14 @@ final class JsonFormatterTest extends \PHPUnit\Framework\TestCase
         }
         JSON;
         $expected = ['contributors'];
+
+        $this->assertSame($expected, JsonFormatter::getArrayKeys($content));
+    }
+
+    public function testGetArrayKeysWithoutSpacesBeforeArray(): void
+    {
+        $content = '{"name":"test","workspaces":[]}';
+        $expected = ['workspaces'];
 
         $this->assertSame($expected, JsonFormatter::getArrayKeys($content));
     }
