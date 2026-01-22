@@ -69,7 +69,7 @@ abstract class AbstractAssetManager implements AssetManagerInterface
 
     public function getPackageJsonPath(): string
     {
-        return $this->getRootPackageDir() . DIRECTORY_SEPARATOR . $this->getPackageName();
+        return rtrim($this->getRootPackageDir(), '/\\') . DIRECTORY_SEPARATOR . $this->getPackageName();
     }
 
     public function hasLockFile(): bool
@@ -231,6 +231,12 @@ abstract class AbstractAssetManager implements AssetManagerInterface
         if (is_string($rootPackageDir) && '' !== $rootPackageDir) {
             $rootPackageDir = rtrim($rootPackageDir, '/\\');
 
+            if ('' === $rootPackageDir) {
+                $rootPackageDir = DIRECTORY_SEPARATOR;
+            } elseif (1 === \preg_match('/^[A-Za-z]:$/', $rootPackageDir)) {
+                $rootPackageDir .= DIRECTORY_SEPARATOR;
+            }
+
             if (!$this->isAbsolutePath($rootPackageDir)) {
                 $currentDir = getcwd();
 
@@ -255,12 +261,12 @@ abstract class AbstractAssetManager implements AssetManagerInterface
 
     protected function getLockFilePath(): string
     {
-        return $this->getRootPackageDir() . DIRECTORY_SEPARATOR . $this->getLockPackageName();
+        return rtrim($this->getRootPackageDir(), '/\\') . DIRECTORY_SEPARATOR . $this->getLockPackageName();
     }
 
     protected function getNodeModulesPath(): string
     {
-        return $this->getRootPackageDir() . DIRECTORY_SEPARATOR . ltrim(self::NODE_MODULES_PATH, './');
+        return rtrim($this->getRootPackageDir(), '/\\') . DIRECTORY_SEPARATOR . ltrim(self::NODE_MODULES_PATH, './');
     }
 
     /**
@@ -310,10 +316,6 @@ abstract class AbstractAssetManager implements AssetManagerInterface
 
     private function isAbsolutePath(string $path): bool
     {
-        if ('' === $path) {
-            return false;
-        }
-
         if ('/' === $path[0] || '\\' === $path[0]) {
             return true;
         }

@@ -24,6 +24,7 @@ use Foxy\Config\Config;
 use Foxy\Fallback\FallbackInterface;
 use Foxy\Tests\Fixtures\Util\ProcessExecutorMock;
 use Foxy\Tests\Fixtures\Util\ThrowingProcessExecutorMock;
+use PHPUnit\Framework\Attributes\RequiresOperatingSystem;
 use PHPUnit\Framework\MockObject\MockObject;
 use Xepozz\InternalMocker\MockerState;
 
@@ -107,12 +108,33 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
 
     public function testHasLockFileWithRootPackageDirAsRoot(): void
     {
-        $this->config = new Config([], ['root-package-json-dir' => '/']);
+        $this->config = new Config([], ['root-package-json-dir' => DIRECTORY_SEPARATOR]);
         $this->manager = $this->getManager();
 
         MockerState::addCondition('Foxy\\Asset', 'getcwd', [], $this->cwd);
 
+        $this->assertInstanceOf(AbstractAssetManager::class, $this->manager);
+        /** @var AbstractAssetManager $manager */
+        $manager = $this->manager;
+
+        $this->assertSame(
+            DIRECTORY_SEPARATOR . $manager->getPackageName(),
+            $manager->getPackageJsonPath()
+        );
         $this->assertFalse($this->manager->hasLockFile());
+    }
+
+    #[RequiresOperatingSystem('Windows')]
+    public function testGetPackageJsonPathWithWindowsRootPackageDir(): void
+    {
+        $this->config = new Config([], ['root-package-json-dir' => 'C:\\']);
+        $this->manager = $this->getManager();
+
+        $this->assertInstanceOf(AbstractAssetManager::class, $this->manager);
+        /** @var AbstractAssetManager $manager */
+        $manager = $this->manager;
+
+        $this->assertSame('C:\\package.json', $manager->getPackageJsonPath());
     }
 
     public function testIsInstalled(): void

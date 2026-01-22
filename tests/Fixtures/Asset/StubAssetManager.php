@@ -16,6 +16,9 @@ use RuntimeException;
 
 /**
  * Stub of AssetManagerInterface for tests.
+ *
+ * @copyright Copyright (C) 2026 Terabytesoftw.
+ * @license https://opensource.org/license/mit/ MIT License
  */
 final class StubAssetManager implements AssetManagerInterface
 {

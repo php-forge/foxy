@@ -16,7 +16,7 @@ namespace Foxy\Asset;
 use Composer\Util\Platform;
 
 /**
- * Pnpm Manager.
+ * Bun Manager.
  *
  * @author Wilmer Arambula (terabytesfotw@gmail.com)
  */
