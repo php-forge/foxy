@@ -139,6 +139,36 @@ final class FoxyTest extends \PHPUnit\Framework\TestCase
         $foxy->activate($this->composer, $this->io);
     }
 
+    public function testActivateBuildsAssetFallbackWithResolvedRootPackagePath(): void
+    {
+        $this->package
+            ->expects($this->any())
+            ->method('getConfig')
+            ->willReturn(['foxy' => ['manager' => 'npm', 'root-package-json-dir' => 'root-package']]);
+
+        $foxy = new Foxy();
+        $foxy->activate($this->composer, $this->io);
+
+        $foxyReflection = new \ReflectionClass($foxy);
+        $assetFallbackProperty = $foxyReflection->getProperty('assetFallback');
+        $assetFallbackProperty->setAccessible(true);
+        $assetFallback = $assetFallbackProperty->getValue($foxy);
+
+        $this->assertInstanceOf(\Foxy\Fallback\AssetFallback::class, $assetFallback);
+
+        $fallbackReflection = new \ReflectionClass($assetFallback);
+        $pathProperty = $fallbackReflection->getProperty('path');
+        $pathProperty->setAccessible(true);
+
+        $expectedPath = rtrim((string) \getcwd(), '/\\')
+            . DIRECTORY_SEPARATOR
+            . 'root-package'
+            . DIRECTORY_SEPARATOR
+            . 'package.json';
+
+        $this->assertSame($expectedPath, $pathProperty->getValue($assetFallback));
+    }
+
     public static function getSolveAssetsData(): array
     {
         return [['solve_event_install', false], ['solve_event_update', true]];

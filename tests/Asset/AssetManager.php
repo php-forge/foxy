@@ -27,10 +27,10 @@ use Foxy\Tests\Fixtures\Util\ThrowingProcessExecutorMock;
 use PHPUnit\Framework\MockObject\MockObject;
 use Xepozz\InternalMocker\MockerState;
 
-use const DIRECTORY_SEPARATOR;
-
 use function file_get_contents;
+
 use function file_put_contents;
+use const DIRECTORY_SEPARATOR;
 
 /**
  * Abstract class for asset manager tests.
@@ -433,6 +433,32 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
             $this->assertSame('Unable to get the current working directory.', $exception->getMessage());
             $this->assertSame($originalCwd, \getcwd());
         }
+    }
+
+    public function testHasLockFileWithRelativeRootPackageDirAndGetcwdFailure(): void
+    {
+        $this->config = new Config([], ['root-package-json-dir' => 'root-package']);
+        $this->manager = $this->getManager();
+
+        MockerState::addCondition('Foxy\\Asset', 'getcwd', [], false);
+
+        $this->expectException(\Foxy\Exception\RuntimeException::class);
+        $this->expectExceptionMessage('Unable to get the current working directory.');
+
+        $this->manager->hasLockFile();
+    }
+
+    public function testHasLockFileWithoutRootPackageDirAndGetcwdFailure(): void
+    {
+        $this->config = new Config([]);
+        $this->manager = $this->getManager();
+
+        MockerState::addCondition('Foxy\\Asset', 'getcwd', [], false);
+
+        $this->expectException(\Foxy\Exception\RuntimeException::class);
+        $this->expectExceptionMessage('Unable to get the current working directory.');
+
+        $this->manager->hasLockFile();
     }
 
     public function testRunWithChdirFailure(): void

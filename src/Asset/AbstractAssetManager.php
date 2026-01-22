@@ -26,14 +26,14 @@ use Foxy\Exception\RuntimeException;
 use Foxy\Fallback\FallbackInterface;
 use Foxy\Json\JsonFile;
 
-use const DIRECTORY_SEPARATOR;
-
 use function is_dir;
+
 use function is_string;
 use function ltrim;
 use function rtrim;
 use function sprintf;
 use function trim;
+use const DIRECTORY_SEPARATOR;
 
 /**
  * Abstract Manager.
@@ -263,19 +263,6 @@ abstract class AbstractAssetManager implements AssetManagerInterface
         return $this->getRootPackageDir() . DIRECTORY_SEPARATOR . ltrim(self::NODE_MODULES_PATH, './');
     }
 
-    private function isAbsolutePath(string $path): bool
-    {
-        if ('' === $path) {
-            return false;
-        }
-
-        if ('/' === $path[0] || '\\' === $path[0]) {
-            return true;
-        }
-
-        return (bool) \preg_match('/^[A-Za-z]:[\\\\\/]/', $path);
-    }
-
     /**
      * Build the command with binary and command options.
      *
@@ -320,4 +307,17 @@ abstract class AbstractAssetManager implements AssetManagerInterface
      * Get the command to update the asset dependencies.
      */
     abstract protected function getUpdateCommand(): string;
+
+    private function isAbsolutePath(string $path): bool
+    {
+        if ('' === $path) {
+            return false;
+        }
+
+        if ('/' === $path[0] || '\\' === $path[0]) {
+            return true;
+        }
+
+        return (bool) \preg_match('/^[A-Za-z]:[\\\\\/]/', $path);
+    }
 }
