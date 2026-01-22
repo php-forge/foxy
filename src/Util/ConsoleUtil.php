@@ -18,6 +18,8 @@ use Composer\IO\IOInterface;
 use Symfony\Component\Console\Input\ArgvInput;
 use Symfony\Component\Console\Input\InputInterface;
 
+use const PHP_VERSION_ID;
+
 /**
  * Helper for console.
  *
@@ -36,7 +38,11 @@ final class ConsoleUtil
 
         if ($ref->hasProperty('input')) {
             $prop = $ref->getProperty('input');
-            $prop->setAccessible(true);
+
+            if (PHP_VERSION_ID < 80500) {
+                $prop->setAccessible(true);
+            }
+
             $input = $prop->getValue($io);
 
             if ($input instanceof InputInterface) {

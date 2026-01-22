@@ -28,6 +28,8 @@ use Foxy\Solver\SolverInterface;
 use Foxy\Tests\Fixtures\Asset\StubAssetManager;
 use PHPUnit\Framework\MockObject\MockObject;
 
+use const PHP_VERSION_ID;
+
 final class FoxyTest extends \PHPUnit\Framework\TestCase
 {
     private Composer|MockObject $composer;
@@ -145,14 +147,21 @@ final class FoxyTest extends \PHPUnit\Framework\TestCase
 
         $foxyReflection = new \ReflectionClass($foxy);
         $assetFallbackProperty = $foxyReflection->getProperty('assetFallback');
-        $assetFallbackProperty->setAccessible(true);
+
+        if (PHP_VERSION_ID < 80500) {
+            $assetFallbackProperty->setAccessible(true);
+        }
+
         $assetFallback = $assetFallbackProperty->getValue($foxy);
 
         $this->assertInstanceOf(\Foxy\Fallback\AssetFallback::class, $assetFallback);
 
         $fallbackReflection = new \ReflectionClass($assetFallback);
         $pathProperty = $fallbackReflection->getProperty('path');
-        $pathProperty->setAccessible(true);
+
+        if (PHP_VERSION_ID < 80500) {
+            $pathProperty->setAccessible(true);
+        }
 
         $expectedPath = rtrim((string) \getcwd(), '/\\')
             . DIRECTORY_SEPARATOR
@@ -172,7 +181,11 @@ final class FoxyTest extends \PHPUnit\Framework\TestCase
 
         $foxyReflection = new \ReflectionClass(Foxy::class);
         $assetManagersProperty = $foxyReflection->getProperty('assetManagers');
-        $assetManagersProperty->setAccessible(true);
+
+        if (PHP_VERSION_ID < 80500) {
+            $assetManagersProperty->setAccessible(true);
+        }
+
         $originalAssetManagers = $assetManagersProperty->getValue();
         $assetManagersProperty->setValue(null, [StubAssetManager::class]);
 
@@ -181,12 +194,20 @@ final class FoxyTest extends \PHPUnit\Framework\TestCase
             $foxy->activate($this->composer, $this->io);
 
             $assetFallbackProperty = $foxyReflection->getProperty('assetFallback');
-            $assetFallbackProperty->setAccessible(true);
+
+            if (PHP_VERSION_ID < 80500) {
+                $assetFallbackProperty->setAccessible(true);
+            }
+
             $assetFallback = $assetFallbackProperty->getValue($foxy);
 
             $fallbackReflection = new \ReflectionClass($assetFallback);
+
             $pathProperty = $fallbackReflection->getProperty('path');
-            $pathProperty->setAccessible(true);
+
+            if (PHP_VERSION_ID < 80500) {
+                $pathProperty->setAccessible(true);
+            }
 
             $this->assertSame('stub-package.json', $pathProperty->getValue($assetFallback));
         } finally {
