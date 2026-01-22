@@ -26,6 +26,11 @@ use Foxy\Exception\RuntimeException;
 use Foxy\Fallback\FallbackInterface;
 use Foxy\Json\JsonFile;
 
+use function is_dir;
+use function is_string;
+use function sprintf;
+use function trim;
+
 /**
  * Abstract Manager.
  *
@@ -142,11 +147,12 @@ abstract class AbstractAssetManager implements AssetManagerInterface
         $changedDir = false;
 
         if (is_string($rootPackageDir) && !empty($rootPackageDir)) {
-            if (!is_dir($rootPackageDir)) {
+            if (is_dir($rootPackageDir) === false) {
                 throw new RuntimeException(sprintf('The root package directory "%s" doesn\'t exist.', $rootPackageDir));
             }
 
             $originalDir = getcwd();
+
             if (false === $originalDir) {
                 throw new RuntimeException('Unable to get the current working directory.');
             }
