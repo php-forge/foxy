@@ -61,7 +61,7 @@ installed Composer packages and run the configured manager during Composer insta
 
 Example (Yii2 app template):
 
-https://github.com/yiisoft/yii2-app-basic/tree/22
+[Yii2 app template](https://github.com/yiisoft/yii2-app-basic/tree/22)
 
 ```json
 {
