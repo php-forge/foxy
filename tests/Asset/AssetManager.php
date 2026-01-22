@@ -24,7 +24,7 @@ use Foxy\Config\Config;
 use Foxy\Fallback\FallbackInterface;
 use Foxy\Tests\Fixtures\Util\ProcessExecutorMock;
 use Foxy\Tests\Fixtures\Util\ThrowingProcessExecutorMock;
-use PHPUnit\Framework\Attributes\RequiresOperatingSystem;
+use PHPUnit\Framework\Attributes\RequiresOperatingSystemFamily;
 use PHPUnit\Framework\MockObject\MockObject;
 use Xepozz\InternalMocker\MockerState;
 
@@ -124,7 +124,7 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
         $this->assertFalse($this->manager->hasLockFile());
     }
 
-    #[RequiresOperatingSystem('Windows')]
+    #[RequiresOperatingSystemFamily('Windows')]
     public function testGetPackageJsonPathWithWindowsRootPackageDir(): void
     {
         $this->config = new Config([], ['root-package-json-dir' => 'C:\\']);
