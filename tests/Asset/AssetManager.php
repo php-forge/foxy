@@ -292,20 +292,24 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
 
     public function testSpecifyCustomDirectoryFromPackageJson(): void
     {
+        $rootPackageDir = $this->cwd . \DIRECTORY_SEPARATOR . 'root-package';
+        $this->sfs->mkdir($rootPackageDir);
+        $originalCwd = getcwd();
+
         $this->config = new Config(
             [],
-            ['run-asset-manager' => true, 'root-package-json-dir' => $this->cwd],
+            ['run-asset-manager' => true, 'root-package-json-dir' => $rootPackageDir],
         );
         $this->manager = $this->getManager();
 
-        $this->assertSame($this->cwd, $this->config->get('root-package-json-dir'));
+        $this->assertSame($rootPackageDir, $this->config->get('root-package-json-dir'));
         $this->assertSame(0, $this->getManager()->run());
+        $this->assertSame($originalCwd, getcwd());
     }
 
     public function testSpecifyCustomDirectoryFromPackageJsonException(): void
     {
-        $this->expectException(\Foxy\Exception\RuntimeException::class);
-        $this->expectExceptionMessage('The root package directory "path/to/invalid" doesn\'t exist.');
+        $originalCwd = getcwd();
 
         $this->config = new Config(
             [],
@@ -313,7 +317,13 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
         );
         $this->manager = $this->getManager();
 
-        $this->assertSame(0, $this->getManager()->run());
+        try {
+            $this->getManager()->run();
+            $this->fail('Expected a runtime exception for invalid root package directory.');
+        } catch (\Foxy\Exception\RuntimeException $exception) {
+            $this->assertSame('The root package directory "path/to/invalid" doesn\'t exist.', $exception->getMessage());
+            $this->assertSame($originalCwd, getcwd());
+        }
     }
 
     abstract protected function getManager(): AssetManagerInterface;

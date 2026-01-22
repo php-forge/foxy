@@ -138,34 +138,48 @@ abstract class AbstractAssetManager implements AssetManagerInterface
         }
 
         $rootPackageDir = $this->config->get('root-package-json-dir');
+        $originalDir = null;
+        $changedDir = false;
 
         if (is_string($rootPackageDir) && !empty($rootPackageDir)) {
             if (!is_dir($rootPackageDir)) {
                 throw new RuntimeException(sprintf('The root package directory "%s" doesn\'t exist.', $rootPackageDir));
             }
-            chdir($rootPackageDir);
+
+            $originalDir = getcwd();
+            $changedDir = chdir($rootPackageDir);
+
+            if (false === $originalDir) {
+                $originalDir = null;
+            }
         }
 
-        $updatable = $this->isUpdatable();
-        $info = sprintf('<info>%s %s dependencies</info>', $updatable ? 'Updating' : 'Installing', $this->getName());
-        $this->io->write($info);
+        try {
+            $updatable = $this->isUpdatable();
+            $info = sprintf('<info>%s %s dependencies</info>', $updatable ? 'Updating' : 'Installing', $this->getName());
+            $this->io->write($info);
 
-        $timeout = ProcessExecutor::getTimeout();
+            $timeout = ProcessExecutor::getTimeout();
 
-        /** @var int $managerTimeout */
-        $managerTimeout = $this->config->get('manager-timeout', PHP_INT_MAX);
-        ProcessExecutor::setTimeout($managerTimeout);
+            /** @var int $managerTimeout */
+            $managerTimeout = $this->config->get('manager-timeout', PHP_INT_MAX);
+            ProcessExecutor::setTimeout($managerTimeout);
 
-        $cmd = $updatable ? $this->getUpdateCommand() : $this->getInstallCommand();
-        $res = $this->executor->execute($cmd);
+            $cmd = $updatable ? $this->getUpdateCommand() : $this->getInstallCommand();
+            $res = $this->executor->execute($cmd);
 
-        ProcessExecutor::setTimeout($timeout);
+            ProcessExecutor::setTimeout($timeout);
 
-        if ($res > 0 && null !== $this->fallback) {
-            $this->fallback->restore();
+            if ($res > 0 && null !== $this->fallback) {
+                $this->fallback->restore();
+            }
+
+            return $res;
+        } finally {
+            if ($changedDir && null !== $originalDir) {
+                chdir($originalDir);
+            }
         }
-
-        return $res;
     }
 
     /**
