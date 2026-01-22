@@ -175,10 +175,12 @@ abstract class AbstractAssetManager implements AssetManagerInterface
             $managerTimeout = $this->config->get('manager-timeout', PHP_INT_MAX);
             ProcessExecutor::setTimeout($managerTimeout);
 
-            $cmd = $updatable ? $this->getUpdateCommand() : $this->getInstallCommand();
-            $res = $this->executor->execute($cmd);
-
-            ProcessExecutor::setTimeout($timeout);
+            try {
+                $cmd = $updatable ? $this->getUpdateCommand() : $this->getInstallCommand();
+                $res = $this->executor->execute($cmd);
+            } finally {
+                ProcessExecutor::setTimeout($timeout);
+            }
 
             if ($res > 0 && null !== $this->fallback) {
                 $this->fallback->restore();
@@ -187,7 +189,11 @@ abstract class AbstractAssetManager implements AssetManagerInterface
             return $res;
         } finally {
             if ($changedDir && null !== $originalDir) {
-                chdir($originalDir);
+                if (chdir($originalDir) === false) {
+                    throw new RuntimeException(
+                        sprintf('Unable to restore working directory to "%s".', $originalDir)
+                    );
+                }
             }
         }
     }
