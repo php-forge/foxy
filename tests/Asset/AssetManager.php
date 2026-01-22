@@ -105,6 +105,16 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
         $this->assertFalse($this->manager->hasLockFile());
     }
 
+    public function testHasLockFileWithRootPackageDirAsRoot(): void
+    {
+        $this->config = new Config([], ['root-package-json-dir' => '/']);
+        $this->manager = $this->getManager();
+
+        MockerState::addCondition('Foxy\\Asset', 'getcwd', [], $this->cwd);
+
+        $this->assertFalse($this->manager->hasLockFile());
+    }
+
     public function testIsInstalled(): void
     {
         $this->assertFalse($this->manager->isInstalled());
