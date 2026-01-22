@@ -13,7 +13,7 @@ Change Log
 - Bug #110: Preserve nested empty arrays when rewriting `package.json` (@terabytesoftw)
 - Bug #111: Throw `RuntimeException` class on asset/json `I/O` failures (@terabytesoftw)
 - Bug #112: Fix PHP `8.4` nullable type deprecation warnings in tests (@terabytesoftw)
-
+- Bug #113: Fix PHP `8.5` deprecation `setAccessible()` in `ReflectionProperty` class (@terabytesoftw)
 
 ## 0.1.2 June 10, 2024
 
