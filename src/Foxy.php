@@ -114,7 +114,7 @@ final class Foxy implements PluginInterface, EventSubscriberInterface
         $packageJsonPath = $this->assetManager instanceof AbstractAssetManager
             ? $this->assetManager->getPackageJsonPath()
             : $this->assetManager->getPackageName();
-            
+
         $this->assetFallback = new AssetFallback($io, $this->config, $packageJsonPath, $fs);
         $this->composerFallback = new ComposerFallback($composer, $io, $this->config, $input, $fs);
         $this->solver = new Solver($this->assetManager, $this->config, $fs, $this->composerFallback);
