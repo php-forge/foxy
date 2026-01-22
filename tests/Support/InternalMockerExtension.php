@@ -59,7 +59,7 @@ final class InternalMockerExtension implements Extension
 
         $mocker = new Mocker();
         $mocker->load($mocks);
-        
+
         MockerState::saveState();
     }
 }
