@@ -25,15 +25,9 @@ use Composer\Repository\RepositoryManager;
 use Composer\Script\Event;
 use Foxy\Foxy;
 use Foxy\Solver\SolverInterface;
+use Foxy\Tests\Fixtures\Asset\StubAssetManager;
 use PHPUnit\Framework\MockObject\MockObject;
 
-/**
- * Tests for foxy.
- *
- * @author François Pluchino <francois.pluchino@gmail.com>
- *
- * @internal
- */
 final class FoxyTest extends \PHPUnit\Framework\TestCase
 {
     private Composer|MockObject $composer;
@@ -137,6 +131,67 @@ final class FoxyTest extends \PHPUnit\Framework\TestCase
 
         $foxy = new Foxy();
         $foxy->activate($this->composer, $this->io);
+    }
+
+    public function testActivateBuildsAssetFallbackWithResolvedRootPackagePath(): void
+    {
+        $this->package
+            ->expects($this->any())
+            ->method('getConfig')
+            ->willReturn(['foxy' => ['manager' => 'npm', 'root-package-json-dir' => 'root-package']]);
+
+        $foxy = new Foxy();
+        $foxy->activate($this->composer, $this->io);
+
+        $foxyReflection = new \ReflectionClass($foxy);
+        $assetFallbackProperty = $foxyReflection->getProperty('assetFallback');
+        $assetFallbackProperty->setAccessible(true);
+        $assetFallback = $assetFallbackProperty->getValue($foxy);
+
+        $this->assertInstanceOf(\Foxy\Fallback\AssetFallback::class, $assetFallback);
+
+        $fallbackReflection = new \ReflectionClass($assetFallback);
+        $pathProperty = $fallbackReflection->getProperty('path');
+        $pathProperty->setAccessible(true);
+
+        $expectedPath = rtrim((string) \getcwd(), '/\\')
+            . DIRECTORY_SEPARATOR
+            . 'root-package'
+            . DIRECTORY_SEPARATOR
+            . 'package.json';
+
+        $this->assertSame($expectedPath, $pathProperty->getValue($assetFallback));
+    }
+
+    public function testActivateUsesPackageNameForNonAbstractAssetManager(): void
+    {
+        $this->package
+            ->expects($this->any())
+            ->method('getConfig')
+            ->willReturn(['foxy' => ['manager' => 'stub']]);
+
+        $foxyReflection = new \ReflectionClass(Foxy::class);
+        $assetManagersProperty = $foxyReflection->getProperty('assetManagers');
+        $assetManagersProperty->setAccessible(true);
+        $originalAssetManagers = $assetManagersProperty->getValue();
+        $assetManagersProperty->setValue(null, [StubAssetManager::class]);
+
+        try {
+            $foxy = new Foxy();
+            $foxy->activate($this->composer, $this->io);
+
+            $assetFallbackProperty = $foxyReflection->getProperty('assetFallback');
+            $assetFallbackProperty->setAccessible(true);
+            $assetFallback = $assetFallbackProperty->getValue($foxy);
+
+            $fallbackReflection = new \ReflectionClass($assetFallback);
+            $pathProperty = $fallbackReflection->getProperty('path');
+            $pathProperty->setAccessible(true);
+
+            $this->assertSame('stub-package.json', $pathProperty->getValue($assetFallback));
+        } finally {
+            $assetManagersProperty->setValue(null, $originalAssetManagers);
+        }
     }
 
     public static function getSolveAssetsData(): array

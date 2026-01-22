@@ -28,8 +28,12 @@ use Foxy\Json\JsonFile;
 
 use function is_dir;
 use function is_string;
+use function ltrim;
+use function rtrim;
 use function sprintf;
 use function trim;
+
+use const DIRECTORY_SEPARATOR;
 
 /**
  * Abstract Manager.
@@ -63,14 +67,19 @@ abstract class AbstractAssetManager implements AssetManagerInterface
         return 'package.json';
     }
 
+    public function getPackageJsonPath(): string
+    {
+        return rtrim($this->getRootPackageDir(), '/\\') . DIRECTORY_SEPARATOR . $this->getPackageName();
+    }
+
     public function hasLockFile(): bool
     {
-        return file_exists($this->getLockPackageName());
+        return file_exists($this->getLockFilePath());
     }
 
     public function isInstalled(): bool
     {
-        return is_dir(self::NODE_MODULES_PATH) && file_exists($this->getPackageName());
+        return is_dir($this->getNodeModulesPath()) && file_exists($this->getPackageJsonPath());
     }
 
     public function setFallback(FallbackInterface $fallback): static
@@ -126,7 +135,10 @@ abstract class AbstractAssetManager implements AssetManagerInterface
 
     public function addDependencies(RootPackageInterface $rootPackage, array $dependencies): AssetPackageInterface
     {
-        $assetPackage = new AssetPackage($rootPackage, new JsonFile($this->getPackageName(), null, $this->io));
+        $assetPackage = new AssetPackage(
+            $rootPackage,
+            new JsonFile($this->getPackageJsonPath(), null, $this->io)
+        );
         $assetPackage->removeUnusedDependencies($dependencies);
         $alreadyInstalledDependencies = $assetPackage->addNewDependencies($dependencies);
 
@@ -147,6 +159,8 @@ abstract class AbstractAssetManager implements AssetManagerInterface
         $changedDir = false;
 
         if (is_string($rootPackageDir) && !empty($rootPackageDir)) {
+            $rootPackageDir = $this->getRootPackageDir();
+
             if (is_dir($rootPackageDir) === false) {
                 throw new RuntimeException(sprintf('The root package directory "%s" doesn\'t exist.', $rootPackageDir));
             }
@@ -210,6 +224,51 @@ abstract class AbstractAssetManager implements AssetManagerInterface
         // do nothing by default
     }
 
+    protected function getRootPackageDir(): string
+    {
+        $rootPackageDir = $this->config->get('root-package-json-dir');
+
+        if (is_string($rootPackageDir) && '' !== $rootPackageDir) {
+            $rootPackageDir = rtrim($rootPackageDir, '/\\');
+
+            if ('' === $rootPackageDir) {
+                $rootPackageDir = DIRECTORY_SEPARATOR;
+            } elseif (1 === \preg_match('/^[A-Za-z]:$/', $rootPackageDir)) {
+                $rootPackageDir .= DIRECTORY_SEPARATOR;
+            }
+
+            if (!$this->isAbsolutePath($rootPackageDir)) {
+                $currentDir = getcwd();
+
+                if (false === $currentDir) {
+                    throw new RuntimeException('Unable to get the current working directory.');
+                }
+
+                $rootPackageDir = rtrim($currentDir, '/\\') . DIRECTORY_SEPARATOR . $rootPackageDir;
+            }
+
+            return $rootPackageDir;
+        }
+
+        $currentDir = getcwd();
+
+        if (false === $currentDir) {
+            throw new RuntimeException('Unable to get the current working directory.');
+        }
+
+        return $currentDir;
+    }
+
+    protected function getLockFilePath(): string
+    {
+        return rtrim($this->getRootPackageDir(), '/\\') . DIRECTORY_SEPARATOR . $this->getLockPackageName();
+    }
+
+    protected function getNodeModulesPath(): string
+    {
+        return rtrim($this->getRootPackageDir(), '/\\') . DIRECTORY_SEPARATOR . ltrim(self::NODE_MODULES_PATH, './');
+    }
+
     /**
      * Build the command with binary and command options.
      *
@@ -254,4 +313,13 @@ abstract class AbstractAssetManager implements AssetManagerInterface
      * Get the command to update the asset dependencies.
      */
     abstract protected function getUpdateCommand(): string;
+
+    private function isAbsolutePath(string $path): bool
+    {
+        if ('/' === $path[0] || '\\' === $path[0]) {
+            return true;
+        }
+
+        return (bool) \preg_match('/^[A-Za-z]:[\\\\\/]/', $path);
+    }
 }

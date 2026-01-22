@@ -34,7 +34,7 @@ final class YarnManager extends AbstractAssetManager
 
     public function isInstalled(): bool
     {
-        return parent::isInstalled() && file_exists($this->getLockPackageName());
+        return parent::isInstalled() && file_exists($this->getLockFilePath());
     }
 
     public function isValidForUpdate(): bool

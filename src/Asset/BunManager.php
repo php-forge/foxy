@@ -16,7 +16,7 @@ namespace Foxy\Asset;
 use Composer\Util\Platform;
 
 /**
- * Pnpm Manager.
+ * Bun Manager.
  *
  * @author Wilmer Arambula (terabytesfotw@gmail.com)
  */
@@ -34,7 +34,7 @@ final class BunManager extends AbstractAssetManager
 
     public function isInstalled(): bool
     {
-        return parent::isInstalled() && file_exists($this->getLockPackageName());
+        return parent::isInstalled() && file_exists($this->getLockFilePath());
     }
 
     protected function getVersionCommand(): string
