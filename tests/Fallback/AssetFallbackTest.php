@@ -16,8 +16,10 @@ namespace Foxy\Tests\Fallback;
 use Composer\IO\IOInterface;
 use Composer\Util\Filesystem;
 use Foxy\Config\Config;
+use Foxy\Exception\RuntimeException;
 use Foxy\Fallback\AssetFallback;
 use PHPUnit\Framework\MockObject\MockObject;
+use Xepozz\InternalMocker\MockerState;
 
 /**
  * Tests for composer fallback.
@@ -86,6 +88,21 @@ final class AssetFallbackTest extends \PHPUnit\Framework\TestCase
         $this->assertInstanceOf(AssetFallback::class, $this->assetFallback->save());
     }
 
+    public function testSaveThrowsWhenFileCannotBeRead(): void
+    {
+        $path = $this->cwd . '/package.json';
+
+        \file_put_contents($path, '{}');
+        $this->assertFileExists($path);
+
+        MockerState::addCondition('Foxy\\Fallback', 'file_get_contents', ['package.json', false, null, 0, null], false);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Unable to read fallback asset file "package.json".');
+
+        $this->assetFallback->save();
+    }
+
     public function testRestoreWithDisableOption(): void
     {
         $config = new Config(['fallback-asset' => false]);
@@ -127,6 +144,57 @@ final class AssetFallbackTest extends \PHPUnit\Framework\TestCase
             $this->assertSame($content, file_get_contents($path));
         } else {
             $this->assertFileDoesNotExist($path);
+        }
+    }
+
+    public function testRestoreThrowsWhenWriteFails(): void
+    {
+        $content = '{}';
+        $path = $this->cwd . '/package.json';
+
+        \file_put_contents($path, $content);
+
+        $this->io->expects($this->once())->method('write');
+
+        $this->fs->expects($this->once())->method('remove')->with('package.json');
+
+        $this->assetFallback->save();
+
+        MockerState::addCondition('Foxy\\Fallback', 'file_put_contents', ['package.json', $content, 0, null], false);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Unable to write fallback asset file "package.json".');
+
+        $this->assetFallback->restore();
+    }
+
+    public function testRestoreThrowsWhenRemoveFails(): void
+    {
+        $path = $this->cwd . '/package.json';
+        \file_put_contents($path, '{}');
+
+        $this->io->expects($this->once())->method('write');
+
+        $this->fs
+            ->expects($this->once())
+            ->method('remove')
+            ->with('package.json')
+            ->willThrowException(new \RuntimeException('Remove failed.'));
+
+        $this->assetFallback->save();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Unable to remove fallback asset file "package.json".');
+
+        try {
+            $this->assetFallback->restore();
+        } catch (RuntimeException $exception) {
+            $previous = $exception->getPrevious();
+
+            $this->assertInstanceOf(\RuntimeException::class, $previous);
+            $this->assertSame('Remove failed.', $previous->getMessage());
+
+            throw $exception;
         }
     }
 }

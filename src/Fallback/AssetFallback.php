@@ -16,6 +16,7 @@ namespace Foxy\Fallback;
 use Composer\IO\IOInterface;
 use Composer\Util\Filesystem;
 use Foxy\Config\Config;
+use Foxy\Exception\RuntimeException;
 
 /**
  * Asset fallback.
@@ -39,7 +40,13 @@ final class AssetFallback implements FallbackInterface
     public function save(): self
     {
         if (file_exists($this->path) && is_file($this->path)) {
-            $this->originalContent = file_get_contents($this->path);
+            $content = file_get_contents($this->path);
+
+            if (false === $content) {
+                throw new RuntimeException(sprintf('Unable to read fallback asset file "%s".', $this->path));
+            }
+
+            $this->originalContent = $content;
         }
 
         return $this;
@@ -52,10 +59,23 @@ final class AssetFallback implements FallbackInterface
         }
 
         $this->io->write('<info>Fallback to previous state for the Asset package</info>');
-        $this->fs->remove($this->path);
+
+        try {
+            $this->fs->remove($this->path);
+        } catch (\Throwable $exception) {
+            throw new RuntimeException(
+                sprintf('Unable to remove fallback asset file "%s".', $this->path),
+                0,
+                $exception
+            );
+        }
 
         if (null !== $this->originalContent) {
-            file_put_contents($this->path, $this->originalContent);
+            $result = file_put_contents($this->path, $this->originalContent);
+
+            if (false === $result) {
+                throw new RuntimeException(sprintf('Unable to write fallback asset file "%s".', $this->path));
+            }
         }
     }
 }

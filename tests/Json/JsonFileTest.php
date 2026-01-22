@@ -13,9 +13,11 @@ declare(strict_types=1);
 
 namespace Foxy\Tests\Json;
 
+use Foxy\Exception\RuntimeException;
 use Foxy\Json\JsonFile;
 use PHPForge\Support\Assert;
 use Symfony\Component\Filesystem\Filesystem;
+use Xepozz\InternalMocker\MockerState;
 
 /**
  * Tests for json file.
@@ -80,6 +82,23 @@ final class JsonFileTest extends \PHPUnit\Framework\TestCase
         $jsonFile = new JsonFile($filename);
 
         $this->assertSame($expected, $jsonFile->getArrayKeys());
+    }
+
+    public function testGetArrayKeysThrowsWhenFileCannotBeRead(): void
+    {
+        $filename = './package.json';
+
+        file_put_contents($filename, '{}');
+        $this->assertFileExists($filename);
+
+        MockerState::addCondition('Foxy\\Json', 'file_get_contents', [$filename, false, null, 0, null], false);
+
+        $jsonFile = new JsonFile($filename);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessageMatches('/Unable to read json file ".+package\.json"\./');
+
+        $jsonFile->getArrayKeys();
     }
 
     public function testGetIndentWithoutFile(): void
