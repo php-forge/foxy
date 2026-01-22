@@ -27,12 +27,12 @@ use Foxy\Fallback\FallbackInterface;
 use Foxy\Json\JsonFile;
 
 use function is_dir;
-
 use function is_string;
 use function ltrim;
 use function rtrim;
 use function sprintf;
 use function trim;
+
 use const DIRECTORY_SEPARATOR;
 
 /**

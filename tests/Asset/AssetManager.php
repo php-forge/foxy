@@ -28,8 +28,8 @@ use PHPUnit\Framework\MockObject\MockObject;
 use Xepozz\InternalMocker\MockerState;
 
 use function file_get_contents;
-
 use function file_put_contents;
+
 use const DIRECTORY_SEPARATOR;
 
 /**
