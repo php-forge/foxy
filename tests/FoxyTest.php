@@ -147,16 +147,19 @@ final class FoxyTest extends \PHPUnit\Framework\TestCase
 
         $foxyReflection = new \ReflectionClass($foxy);
         $assetFallbackProperty = $foxyReflection->getProperty('assetFallback');
-        if (\PHP_VERSION_ID < 80500) {
+
+        if (PHP_VERSION_ID < 80500) {
             $assetFallbackProperty->setAccessible(true);
         }
+
         $assetFallback = $assetFallbackProperty->getValue($foxy);
 
         $this->assertInstanceOf(\Foxy\Fallback\AssetFallback::class, $assetFallback);
 
         $fallbackReflection = new \ReflectionClass($assetFallback);
         $pathProperty = $fallbackReflection->getProperty('path');
-        if (\PHP_VERSION_ID < 80500) {
+
+        if (PHP_VERSION_ID < 80500) {
             $pathProperty->setAccessible(true);
         }
 
@@ -191,6 +194,7 @@ final class FoxyTest extends \PHPUnit\Framework\TestCase
             $foxy->activate($this->composer, $this->io);
 
             $assetFallbackProperty = $foxyReflection->getProperty('assetFallback');
+            
             if (PHP_VERSION_ID < 80500) {
                 $assetFallbackProperty->setAccessible(true);
             }
