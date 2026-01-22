@@ -1,26 +1,34 @@
-<p align="center"><a href="https://github.com/php-forge/foxy" target="_blank">
-    <img src="https://github.com/php-forge/foxy/blob/main/resources/foxy.svg" width="260" alt="Foxy">
-</a></p>
+<!-- markdownlint-disable MD041 -->
+<p align="center">
+    <a href="https://github.com/php-forge/support" target="_blank">
+        <img src="https://avatars.githubusercontent.com/u/103309199?s%25253D400%252526u%25253Dca3561c692f53ed7eb290d3bb226a2828741606f%252526v%25253D4" height="150px" alt="PHP Forge">
+    </a>
+    <h1 align="center">Foxy</h1>
+    <br>
+</p>
+<!-- markdownlint-enable MD041 -->
 
 <p align="center">
-    <a href="https://www.php.net/releases/8.1/en.php" target="_blank">
-        <img src="https://img.shields.io/badge/PHP-%3E%3D8.1-787CB5" alt="php-version">
-    </a>
     <a href="https://github.com/php-forge/foxy/actions/workflows/build.yml" target="_blank">
-        <img src="https://github.com/php-forge/foxy/actions/workflows/build.yml/badge.svg" alt="PHPUnit">
-    </a> 
-    <a href="https://codecov.io/gh/php-forge/foxy" target="_blank">
-        <img src="https://codecov.io/gh/php-forge/foxy/branch/main/graph/badge.svg?token=MF0XUGVLYC" alt="Codecov">
+        <img src="https://img.shields.io/github/actions/workflow/status/php-forge/foxy/build.yml?style=for-the-badge&label=PHPUnit&logo=github" alt="PHPUnit">
     </a>
-    <a href="https://github.com/yii2-extensions/asset-bootstrap5/actions/workflows/static.yml" target="_blank">
-        <img src="https://github.com/yii2-extensions/asset-bootstrap5/actions/workflows/static.yml/badge.svg" alt="PSalm">
-    </a>      
-    <a href="https://github.styleci.io/repos/745652761?branch=main" target="_blank">
-        <img src="https://github.styleci.io/repos/745652761/shield?branch=main" alt="StyleCI">
-    </a>  
+    <a href="https://github.com/php-forge/foxy/actions/workflows/ecs.yml" target="_blank">
+        <img src="https://img.shields.io/github/actions/workflow/status/php-forge/foxy/ecs.yml?style=for-the-badge&label=ECS&logo=github" alt="Easy Coding Standard">
+    </a>
+    <a href="https://github.com/php-forge/foxy/actions/workflows/dependency-check.yml" target="_blank">
+        <img src="https://img.shields.io/github/actions/workflow/status/php-forge/foxy/dependency-check.yml?style=for-the-badge&label=Dependency%20Check&logo=github" alt="Dependency Check">
+    </a>
 </p>
 
-Add to your `composer.json` file.
+<p align="center">
+    <strong>Foxy is a Composer plugin that aggregates asset dependencies from Composer packages into a single package.json and runs Bun, npm, Yarn, or pnpm while preserving the Composer state on failures.</strong>
+</p>
+
+## Installation
+
+```bash
+composer require php-forge/foxy:^0.1
+```
 
 Manager can be `bun`, `npm`, `yarn` or `pnpm`. For default, `npm` is used.
 
@@ -39,7 +47,7 @@ Manager can be `bun`, `npm`, `yarn` or `pnpm`. For default, `npm` is used.
 
 > **Important:**
 >
-> ⚠ This plugin is based on [Fxpio/Foxy](https://github.com/fxpio/foxy).
+> WARNING: This plugin is based on [Fxpio/Foxy](https://github.com/fxpio/foxy).
 > 
 > Updates:
 >  - PHP version to `8.1` or higher.
@@ -67,7 +75,7 @@ All features and tools are available:
 - [Scss/Sass](http://sass-lang.com)
 - [TypeScript](https://www.typescriptlang.org)
 - [Yarnrc](https://yarnpkg.com/en/docs/yarnrc)
-- [Webpack](https://webpack.js.org), ,
+- [Webpack](https://webpack.js.org)
 
 It is certain that each language has its own dependency management system, and that it is highly recommended to use each
 package manager. NPM, Yarn or PNpM works very well when the asset dependencies are managed only in the PHP project, but
@@ -106,8 +114,7 @@ installation process is left to Bun, NPM, Yarn or PNpM.
 Foxy restores the Composer lock file with all its PHP dependencies, as well as the asset dependencies definition file,
 in the previous state if Bun, NPM, Yarn or PNpM ends with an error.
 
-Features
---------
+## Features
 
 - Compatible with [Yii Assets](https://github.com/yiisoft/assets)
 - Compatible with [Symfony Webpack Encore](http://symfony.com/doc/current/frontend.html)
@@ -138,26 +145,35 @@ Features
   - `require`
   - `remove`
 
-Documentation
--------------
+## Documentation
 
 - [Guide](resources/doc/index.md)
+- [Usage](resources/doc/usage.md)
+- [Configuration](resources/doc/config.md)
+- [Events](resources/doc/events.md)
 - [FAQs](resources/doc/faqs.md)
+- [Development Guide](docs/development.md)
+- [Testing Guide](docs/testing.md)
 - [Release Notes](https://github.com/php-forge/foxy/releases)
 
-Installation
-------------
+## Package information
 
-Installation instructions are located in [the guide](resources/doc/index.md).
+[![PHP](https://img.shields.io/badge/%3E%3D8.1-777BB4.svg?style=for-the-badge&logo=php&logoColor=white)](https://www.php.net/releases/8.1/en.php)
+[![Latest Stable Version](https://img.shields.io/packagist/v/php-forge/foxy.svg?style=for-the-badge&logo=packagist&logoColor=white&label=Stable)](https://packagist.org/packages/php-forge/foxy)
+[![Total Downloads](https://img.shields.io/packagist/dt/php-forge/foxy.svg?style=for-the-badge&logo=composer&logoColor=white&label=Downloads)](https://packagist.org/packages/php-forge/foxy)
 
-License
--------
+## Quality code
+
+[![Codecov](https://img.shields.io/codecov/c/github/php-forge/foxy.svg?style=for-the-badge&logo=codecov&logoColor=white&label=Coverage)](https://codecov.io/gh/php-forge/foxy)
+[![Easy Coding Standard](https://img.shields.io/github/actions/workflow/status/php-forge/foxy/ecs.yml?style=for-the-badge&label=ECS&logo=github)](https://github.com/php-forge/foxy/actions/workflows/ecs.yml)
+[![Dependency Check](https://img.shields.io/github/actions/workflow/status/php-forge/foxy/dependency-check.yml?style=for-the-badge&label=Dependency%20Check&logo=github)](https://github.com/php-forge/foxy/actions/workflows/dependency-check.yml)
+
+## License
 
 Foxy is released under the MIT license. See the complete license in:
 
 [LICENSE](LICENSE)
 
-Reporting an issue or a feature request
----------------------------------------
+## Reporting an issue or a feature request
 
 Issues and feature requests are tracked in the [Github issue tracker](https://github.com/php-forge/foxy/issues).

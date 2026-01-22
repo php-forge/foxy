@@ -384,3 +384,9 @@ You can define the custom directory for `package.json` file with the option `roo
     }
 }
 ```
+
+> **Notes:**
+> - This path affects reading, writing, and merging the real `package.json` file, and the working directory for the asset manager.
+> - Relative paths are resolved from the current working directory. Absolute paths are supported.
+> - Filesystem roots such as `/` or `C:\` are preserved.
+> - `package.json` is always written with 4-space indentation and nested empty arrays are preserved during rewrites.
