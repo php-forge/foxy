@@ -132,10 +132,10 @@ final class JsonFileTest extends \PHPUnit\Framework\TestCase
     {
         $expected = <<<JSON
         {
-          "name": "test",
-          "contributors": [],
-          "dependencies": {},
-          "private": true
+            "name": "test",
+            "contributors": [],
+            "dependencies": {},
+            "private": true
         }
 
         JSON;
@@ -144,6 +144,37 @@ final class JsonFileTest extends \PHPUnit\Framework\TestCase
           "name": "test",
           "contributors": [],
           "dependencies": {}
+        }
+
+        JSON;
+
+        $filename = './package.json';
+        file_put_contents($filename, $content);
+        $this->assertFileExists($filename);
+
+        $jsonFile = new JsonFile($filename);
+        $data = (array) $jsonFile->read();
+        $data['private'] = true;
+        $jsonFile->write($data);
+
+        $this->assertFileExists($filename);
+        $content = file_get_contents($filename);
+
+        Assert::equalsWithoutLE($expected, $content);
+    }
+
+    public function testWriteForcesFourSpacesIndentWithExistingTwoSpaceFile(): void
+    {
+        $expected = <<<JSON
+        {
+            "name": "test",
+            "private": true
+        }
+
+        JSON;
+        $content = <<<'JSON'
+        {
+          "name": "test"
         }
 
         JSON;

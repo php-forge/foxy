@@ -70,15 +70,15 @@ final class JsonFile extends \Composer\Json\JsonFile
     public function write(array $hash, int $options = 448): void
     {
         self::$encodeArrayKeys = $this->getArrayKeys();
-        self::$encodeIndent = $this->getIndent();
+        self::$encodeIndent = JsonFormatter::DEFAULT_INDENT;
         parent::write($hash, $options);
         self::$encodeArrayKeys = [];
-        self::$encodeIndent = 4;
+        self::$encodeIndent = JsonFormatter::DEFAULT_INDENT;
     }
 
     public static function encode(mixed $data, int $options = 448, string $indent = self::INDENT_DEFAULT): string
     {
-        $result = parent::encode($data, $options, $indent);
+        $result = parent::encode($data, $options, self::INDENT_DEFAULT);
 
         return JsonFormatter::format($result, self::$encodeArrayKeys, self::$encodeIndent, false);
     }
