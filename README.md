@@ -43,7 +43,7 @@ Manager can be `bun`, `npm`, `yarn` or `pnpm`. For default, `npm` is used.
 {
     "require": {
         "php-forge/foxy": "^0.1"
-    },    
+    },
     "config": {
         "foxy": {
             "manager": "bun"
@@ -79,7 +79,7 @@ https://github.com/yiisoft/yii2-app-basic/tree/22
 ### Drupal layout (package.json under web/)
 
 In a typical Drupal proof-of-concept workflow, Composer stays at the repository root while frontend tooling and builds
-live under `web/`. 
+live under `web/`.
 
 Foxy lets you keep that layout while still aggregating asset dependencies and running npm in the correct directory, with
 Composer state preserved if the install fails.
