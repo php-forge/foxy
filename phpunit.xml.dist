@@ -11,6 +11,10 @@
   backupStaticProperties="false"
 >
 
+  <extensions>
+    <bootstrap class="Foxy\Tests\Support\InternalMockerExtension"/>
+  </extensions>
+
   <testsuites>
     <testsuite name="Foxy">
       <directory>./tests/</directory>

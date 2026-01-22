@@ -23,6 +23,7 @@ use Foxy\Config\Config;
 use Foxy\Fallback\FallbackInterface;
 use Foxy\Tests\Fixtures\Util\ProcessExecutorMock;
 use PHPUnit\Framework\MockObject\MockObject;
+use Xepozz\InternalMocker\MockerState;
 
 /**
  * Abstract class for asset manager tests.
@@ -323,6 +324,55 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
         } catch (\Foxy\Exception\RuntimeException $exception) {
             $this->assertSame('The root package directory "path/to/invalid" doesn\'t exist.', $exception->getMessage());
             $this->assertSame($originalCwd, getcwd());
+        }
+    }
+
+    public function testRunWithGetcwdFailure(): void
+    {
+        $rootPackageDir = $this->cwd . \DIRECTORY_SEPARATOR . 'root-package';
+        $this->sfs->mkdir($rootPackageDir);
+        $originalCwd = \getcwd();
+
+        $this->config = new Config(
+            [],
+            ['run-asset-manager' => true, 'root-package-json-dir' => $rootPackageDir],
+        );
+        $this->manager = $this->getManager();
+
+        MockerState::addCondition('Foxy\\Asset', 'getcwd', [], false);
+
+        try {
+            $this->getManager()->run();
+            $this->fail('Expected a runtime exception when getcwd fails.');
+        } catch (\Foxy\Exception\RuntimeException $exception) {
+            $this->assertSame('Unable to get the current working directory.', $exception->getMessage());
+            $this->assertSame($originalCwd, \getcwd());
+        }
+    }
+
+    public function testRunWithChdirFailure(): void
+    {
+        $rootPackageDir = $this->cwd . \DIRECTORY_SEPARATOR . 'root-package';
+        $this->sfs->mkdir($rootPackageDir);
+        $originalCwd = \getcwd();
+
+        $this->config = new Config(
+            [],
+            ['run-asset-manager' => true, 'root-package-json-dir' => $rootPackageDir],
+        );
+        $this->manager = $this->getManager();
+
+        MockerState::addCondition('Foxy\\Asset', 'chdir', [$rootPackageDir], false);
+
+        try {
+            $this->getManager()->run();
+            $this->fail('Expected a runtime exception when chdir fails.');
+        } catch (\Foxy\Exception\RuntimeException $exception) {
+            $this->assertSame(
+                sprintf('Unable to change working directory to "%s".', $rootPackageDir),
+                $exception->getMessage()
+            );
+            $this->assertSame($originalCwd, \getcwd());
         }
     }
 

@@ -147,11 +147,15 @@ abstract class AbstractAssetManager implements AssetManagerInterface
             }
 
             $originalDir = getcwd();
-            $changedDir = chdir($rootPackageDir);
-
             if (false === $originalDir) {
-                $originalDir = null;
+                throw new RuntimeException('Unable to get the current working directory.');
             }
+
+            if (chdir($rootPackageDir) === false) {
+                throw new RuntimeException(sprintf('Unable to change working directory to "%s".', $rootPackageDir));
+            }
+
+            $changedDir = true;
         }
 
         try {
