@@ -81,7 +81,7 @@ final class ConfigTest extends \PHPUnit\Framework\TestCase
         string $key,
         mixed $expected,
         mixed $default = null,
-        string $env = null,
+        string|null $env = null,
         array $defaults = []
     ): void {
         // add env variables
