@@ -24,6 +24,7 @@ use Composer\Script\Event;
 use Composer\Script\ScriptEvents;
 use Composer\Util\Filesystem;
 use Composer\Util\ProcessExecutor;
+use Foxy\Asset\AbstractAssetManager;
 use Foxy\Asset\AssetManagerFinder;
 use Foxy\Asset\AssetManagerInterface;
 use Foxy\Config\Config;
@@ -108,8 +109,13 @@ final class Foxy implements PluginInterface, EventSubscriberInterface
         $fs = new Filesystem($executor);
 
         $this->config = ConfigBuilder::build($composer, self::$defaultConfig, $io);
+
         $this->assetManager = $this->getAssetManager($io, $this->config, $executor, $fs);
-        $this->assetFallback = new AssetFallback($io, $this->config, $this->assetManager->getPackageName(), $fs);
+        $packageJsonPath = $this->assetManager instanceof AbstractAssetManager
+            ? $this->assetManager->getPackageJsonPath()
+            : $this->assetManager->getPackageName();
+            
+        $this->assetFallback = new AssetFallback($io, $this->config, $packageJsonPath, $fs);
         $this->composerFallback = new ComposerFallback($composer, $io, $this->config, $input, $fs);
         $this->solver = new Solver($this->assetManager, $this->config, $fs, $this->composerFallback);
 

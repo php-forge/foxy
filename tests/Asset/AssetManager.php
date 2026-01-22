@@ -27,6 +27,11 @@ use Foxy\Tests\Fixtures\Util\ThrowingProcessExecutorMock;
 use PHPUnit\Framework\MockObject\MockObject;
 use Xepozz\InternalMocker\MockerState;
 
+use const DIRECTORY_SEPARATOR;
+
+use function file_get_contents;
+use function file_put_contents;
+
 /**
  * Abstract class for asset manager tests.
  *
@@ -56,7 +61,7 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
         $this->fallback = $this->createMock(FallbackInterface::class);
         $this->manager = $this->getManager();
         $this->oldCwd = getcwd();
-        $this->cwd = sys_get_temp_dir() . \DIRECTORY_SEPARATOR . uniqid('foxy_asset_manager_test_', true);
+        $this->cwd = sys_get_temp_dir() . DIRECTORY_SEPARATOR . uniqid('foxy_asset_manager_test_', true);
         $this->sfs->mkdir($this->cwd);
 
         \chdir($this->cwd);
@@ -223,9 +228,9 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
         $this->sfs->mkdir($nodeModulePath);
         $this->assertFileExists($nodeModulePath);
 
-        $lockFilePath = $this->cwd . \DIRECTORY_SEPARATOR . $this->manager->getLockPackageName();
+        $lockFilePath = $this->cwd . DIRECTORY_SEPARATOR . $this->manager->getLockPackageName();
 
-        \file_put_contents($lockFilePath, '{}');
+        file_put_contents($lockFilePath, '{}');
 
         $this->assertFileExists($lockFilePath);
         $this->assertTrue($this->manager->isInstalled());
@@ -235,6 +240,54 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
 
         $this->assertInstanceOf(\Foxy\Asset\AssetPackageInterface::class, $assetPackage);
         $this->assertEquals($expectedPackage, $assetPackage->getPackage());
+    }
+
+    public function testAddDependenciesUsesRootPackageJsonDir(): void
+    {
+        $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'root-package';
+
+        $this->sfs->mkdir($rootPackageDir);
+
+        $this->config = new Config([], ['root-package-json-dir' => $rootPackageDir]);
+
+        $this->manager = $this->getManager();
+
+        $rootPackagePath = $rootPackageDir . DIRECTORY_SEPARATOR . $this->manager->getPackageName();
+        $cwdPackagePath = $this->cwd . DIRECTORY_SEPARATOR . $this->manager->getPackageName();
+
+        $rootPackageContent = "{\n    \"dependencies\": {\n        \"@composer-asset/foo--bar\": \"file:./path/foo/bar\"\n    }\n}\n";
+        $cwdPackageContent = "{\n    \"name\": \"cwd-package\"\n}\n";
+
+        file_put_contents($rootPackagePath, $rootPackageContent);
+        file_put_contents($cwdPackagePath, $cwdPackageContent);
+
+        $dependencies = [
+            '@composer-asset/foo--bar' => 'path/foo/bar/package.json',
+            '@composer-asset/new--dependency' => 'path/new/dependency/package.json',
+        ];
+
+        /** @var MockObject|RootPackageInterface $rootPackage */
+        $rootPackage = $this->createMock(RootPackageInterface::class);
+
+        $rootPackage->expects($this->any())->method('getLicense')->willReturn([]);
+        $this->manager->addDependencies($rootPackage, $dependencies);
+
+        $this->assertSame($cwdPackageContent, file_get_contents($cwdPackagePath));
+
+        $updatedContent = (string) file_get_contents($rootPackagePath);
+
+        $this->assertStringContainsString(
+            '"@composer-asset/new--dependency": "file:./path/new/dependency"',
+            $updatedContent
+        );
+        $this->assertMatchesRegularExpression(
+            '/\n {4}"dependencies": \{/',
+            $updatedContent,
+        );
+        $this->assertMatchesRegularExpression(
+            '/\n {8}"@composer-asset\/new--dependency": "file:\.\/path\/new\/dependency"/',
+            $updatedContent
+        );
     }
 
     public function testRunWithDisableOption(): void
@@ -264,16 +317,16 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
         } else {
             $expectedCommand = $this->getValidUpdateCommand();
 
-            \file_put_contents($this->cwd . \DIRECTORY_SEPARATOR . $this->manager->getPackageName(), '{}');
+            file_put_contents($this->cwd . DIRECTORY_SEPARATOR . $this->manager->getPackageName(), '{}');
 
             $nodeModulePath = $this->cwd . ltrim(AbstractAssetManager::NODE_MODULES_PATH, '.');
 
             $this->sfs->mkdir($nodeModulePath);
             $this->assertFileExists($nodeModulePath);
 
-            $lockFilePath = $this->cwd . \DIRECTORY_SEPARATOR . $this->manager->getLockPackageName();
+            $lockFilePath = $this->cwd . DIRECTORY_SEPARATOR . $this->manager->getLockPackageName();
 
-            \file_put_contents($lockFilePath, '{}');
+            file_put_contents($lockFilePath, '{}');
 
             $this->assertFileExists($lockFilePath);
             $this->assertTrue($this->manager->isInstalled());
@@ -321,7 +374,7 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
 
     public function testSpecifyCustomDirectoryFromPackageJson(): void
     {
-        $rootPackageDir = $this->cwd . \DIRECTORY_SEPARATOR . 'root-package';
+        $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'root-package';
         $this->sfs->mkdir($rootPackageDir);
         $originalCwd = getcwd();
 
@@ -339,6 +392,7 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
     public function testSpecifyCustomDirectoryFromPackageJsonException(): void
     {
         $originalCwd = getcwd();
+        $expectedPath = $this->cwd . DIRECTORY_SEPARATOR . 'path/to/invalid';
 
         $this->config = new Config(
             [],
@@ -350,14 +404,17 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
             $this->getManager()->run();
             $this->fail('Expected a runtime exception for invalid root package directory.');
         } catch (\Foxy\Exception\RuntimeException $exception) {
-            $this->assertSame('The root package directory "path/to/invalid" doesn\'t exist.', $exception->getMessage());
+            $this->assertSame(
+                sprintf('The root package directory "%s" doesn\'t exist.', $expectedPath),
+                $exception->getMessage()
+            );
             $this->assertSame($originalCwd, getcwd());
         }
     }
 
     public function testRunWithGetcwdFailure(): void
     {
-        $rootPackageDir = $this->cwd . \DIRECTORY_SEPARATOR . 'root-package';
+        $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'root-package';
         $this->sfs->mkdir($rootPackageDir);
         $originalCwd = \getcwd();
 
@@ -380,7 +437,7 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
 
     public function testRunWithChdirFailure(): void
     {
-        $rootPackageDir = $this->cwd . \DIRECTORY_SEPARATOR . 'root-package';
+        $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'root-package';
         $this->sfs->mkdir($rootPackageDir);
         $originalCwd = \getcwd();
 
@@ -406,7 +463,7 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
 
     public function testRunWithChdirRestoreFailure(): void
     {
-        $rootPackageDir = $this->cwd . \DIRECTORY_SEPARATOR . 'root-package';
+        $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'root-package';
         $this->sfs->mkdir($rootPackageDir);
         $originalCwd = \getcwd();
 
