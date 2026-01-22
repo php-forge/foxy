@@ -194,7 +194,7 @@ final class FoxyTest extends \PHPUnit\Framework\TestCase
             $foxy->activate($this->composer, $this->io);
 
             $assetFallbackProperty = $foxyReflection->getProperty('assetFallback');
-            
+
             if (PHP_VERSION_ID < 80500) {
                 $assetFallbackProperty->setAccessible(true);
             }
