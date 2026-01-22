@@ -1,0 +1,74 @@
+<svg fill="none" viewBox="0 0 600 560" width="100%" height="560" xmlns="http://www.w3.org/2000/svg">
+    <foreignObject width="100%" height="100%">
+        <div xmlns="http://www.w3.org/1999/xhtml">
+            <style>
+                .container {
+                    display: grid;
+                    grid-template-columns: 1fr;
+                    gap: 16px;
+                    padding: 16px;
+                }
+                .alert-box {
+                    border-left: 4px solid #1f883d;
+                    padding: 12px;
+                    margin-bottom: 12px;
+                    border-radius: 6px;
+                    background: rgba(31, 136, 61, 0.1);
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                    width: 100%;
+                    box-sizing: border-box;
+                }
+                .alert-title {
+                    margin: 0 0 8px 0;
+                    font-weight: 600;
+                    font-size: 14px;
+                }
+                .alert-content {
+                    margin: 0;
+                    line-height: 1.4;
+                    font-size: 12px;
+                }
+
+                /* Light mode */
+                @media (prefers-color-scheme: light) {
+                    .alert-title { color: #000000; }
+                    .alert-content { color: #333333; }
+                    .alert-box { background: rgba(31, 136, 61, 0.1); }
+                }
+
+                /* Dark mode */
+                @media (prefers-color-scheme: dark) {
+                    .alert-title { color: #ffffff; }
+                    .alert-content { color: #ffffff; }
+                    .alert-box { background: rgba(31, 136, 61, 0.2); }
+                }
+            </style>
+            <div class="container">
+                <div class="alert-box">
+                    <p class="alert-title"><strong>Defensive I/O</strong></p>
+                    <p class="alert-content">Explicit <code>RuntimeException</code> on read/write/remove failures</p>
+                </div>
+                <div class="alert-box">
+                    <p class="alert-title"><strong>Multi-manager</strong></p>
+                    <p class="alert-content">Bun - npm - Yarn - pnpm</p>
+                </div>
+                <div class="alert-box">
+                    <p class="alert-title"><strong>No CWD leaks</strong></p>
+                    <p class="alert-content">CWD restored after runs - safe chdir handling</p>
+                </div>
+                <div class="alert-box">
+                    <p class="alert-title"><strong>Root-aware package.json</strong></p>
+                    <p class="alert-content">root-package-json-dir - explicit paths - consistent merges</p>
+                </div>
+                <div class="alert-box">
+                    <p class="alert-title"><strong>Safe rollback</strong></p>
+                    <p class="alert-content">Restore <code>package.json</code> and Composer state on failures</p>
+                </div>
+                <div class="alert-box">
+                    <p class="alert-title"><strong>Stable JSON rewrites</strong></p>
+                    <p class="alert-content">4-space indent - nested empty arrays preserved</p>
+                </div>
+            </div>
+        </div>
+    </foreignObject>
+</svg>
