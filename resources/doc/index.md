@@ -13,7 +13,7 @@ Getting started
 
 Foxy is a Composer plug-in that aggregates npm-packages from Composer packages.
 
-This makes it possible (and automates the process of) installing and updating npm-packages that ship with your Composer packages, leveraging the native (`npm` or `yarn`) package manager to do the heavy lifting.
+This makes it possible (and automates the process of) installing and updating npm-packages that ship with your Composer packages, leveraging the native (`bun`, `npm`, `yarn`, or `pnpm`) package manager to do the heavy lifting.
 
 For this approach to work well, you should think of an npm-package in a Composer package not just as an "artifact", but as an actual npm-package *embedded* in your Composer package.
 
@@ -23,20 +23,17 @@ Note that, for npm-packages with no version number, Foxy will default to the Com
 
 ## Required dependencies
 
-- [Nodejs](https://nodejs.org)
-- [NPM](https://www.npmjs.com) or [Yarn](https://yarnpkg.com)
-- [Git](https://git-scm.com)
+- One of: [Bun](https://bun.sh/), [npm](https://www.npmjs.com), [Yarn](https://yarnpkg.com), or [pnpm](https://pnpm.io)
+- [Node.js](https://nodejs.org) (required for npm, Yarn, and pnpm)
+- [Git](https://git-scm.com) (required for git-based dependencies)
 
 ## Installation
 
-See the [Release Notes](https://github.com/fxpio/foxy/releases)
-to know the Composer version required.
-
 ```shell
-composer require "foxy/foxy:^1.0.0"
+composer require "php-forge/foxy:^0.1"
 ```
 
-Composer will install the plugin to your project's `vendor/foxy` directory.
+Composer will install the plugin to your project's `vendor/php-forge/foxy` directory.
 
 ## Next step
 

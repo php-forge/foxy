@@ -66,3 +66,12 @@ you can use the extra option `extra.foxy` in your `composer.json` file:
 >
 > Like for the activation with the Foxy dependencies, you must add Foxy in the required dependencies
 > to the `composer.json` file of your project.
+
+## Behavior and guarantees
+
+- `package.json` writes always use 4-space indentation.
+- `root-package-json-dir` controls real `package.json` read, write, and merge operations and the working directory used to run the asset manager.
+- `root-package-json-dir` supports relative and absolute paths, and filesystem roots such as `/` or `C:\` are preserved.
+- The working directory is restored after running the asset manager; no working directory leaks occur.
+- Nested empty arrays in `package.json` are preserved during rewrites.
+- I/O failures during read or write operations throw a `RuntimeException`.
