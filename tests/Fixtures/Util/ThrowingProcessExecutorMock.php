@@ -23,7 +23,7 @@ use Composer\Util\ProcessExecutor;
  */
 final class ThrowingProcessExecutorMock extends ProcessExecutor
 {
-    public function execute($command, &$output = null, ?string $cwd = null): int
+    public function execute($command, &$output = null, string|null $cwd = null): int
     {
         throw new \RuntimeException('Process execution failed.');
     }

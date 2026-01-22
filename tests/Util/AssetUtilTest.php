@@ -310,7 +310,7 @@ final class AssetUtilTest extends \PHPUnit\Framework\TestCase
         string $packageVersion,
         string|null $assetVersion,
         string $expectedAssetVersion,
-        string $branchAlias = null
+        string|null $branchAlias = null
     ): void {
         $packageName = '@composer-asset/foo--bar';
 

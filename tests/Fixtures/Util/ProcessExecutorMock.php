@@ -32,7 +32,7 @@ if (version_compare(Composer::VERSION, '2.3.0', '<')) {
 } else {
     class ProcessExecutorMock extends AbstractProcessExecutorMock
     {
-        public function execute($command, &$output = null, ?string $cwd = null): int
+        public function execute($command, &$output = null, string|null $cwd = null): int
         {
             return $this->doExecute($command, $output, $cwd);
         }

@@ -37,7 +37,7 @@ abstract class AbstractProcessExecutorMock extends ProcessExecutor
      */
     private $position = 0;
 
-    public function doExecute($command, &$output = null, ?string $cwd = null): int
+    public function doExecute($command, &$output = null, string|null $cwd = null): int
     {
         $expected = $this->expectedValues[$this->position] ?? [0, $output];
 
