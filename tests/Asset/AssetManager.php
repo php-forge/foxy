@@ -17,12 +17,15 @@ use Composer\IO\IOInterface;
 use Composer\Json\JsonFile;
 use Composer\Package\RootPackageInterface;
 use Composer\Util\Filesystem;
+use Composer\Util\ProcessExecutor;
 use Foxy\Asset\AbstractAssetManager;
 use Foxy\Asset\AssetManagerInterface;
 use Foxy\Config\Config;
 use Foxy\Fallback\FallbackInterface;
 use Foxy\Tests\Fixtures\Util\ProcessExecutorMock;
+use Foxy\Tests\Fixtures\Util\ThrowingProcessExecutorMock;
 use PHPUnit\Framework\MockObject\MockObject;
+use Xepozz\InternalMocker\MockerState;
 
 /**
  * Abstract class for asset manager tests.
@@ -33,7 +36,7 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
 {
     protected Config|null $config = null;
     protected IOInterface|null $io = null;
-    protected ProcessExecutorMock|null $executor = null;
+    protected ProcessExecutorMock|ThrowingProcessExecutorMock|null $executor = null;
     protected Filesystem|MockObject|null $fs = null;
     protected \Symfony\Component\Filesystem\Filesystem|null $sfs = null;
     protected FallbackInterface|MockObject|null $fallback = null;
@@ -290,22 +293,52 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
         $this->assertSame('ASSET MANAGER OUTPUT', $this->executor->getLastOutput());
     }
 
+    public function testRunRestoresTimeoutWhenExecutorThrows(): void
+    {
+        $originalTimeout = ProcessExecutor::getTimeout();
+        $expectedTimeout = 42;
+        $managerTimeout = 900;
+
+        ProcessExecutor::setTimeout($expectedTimeout);
+
+        try {
+            $this->executor = new ThrowingProcessExecutorMock($this->io);
+            $this->config = new Config([], ['run-asset-manager' => true, 'manager-timeout' => $managerTimeout]);
+            $this->manager = $this->getManager();
+
+            try {
+                $this->manager->run();
+                $this->fail('Expected a runtime exception when execute fails.');
+            } catch (\RuntimeException $exception) {
+                $this->assertSame('Process execution failed.', $exception->getMessage());
+            }
+
+            $this->assertSame($expectedTimeout, ProcessExecutor::getTimeout());
+        } finally {
+            ProcessExecutor::setTimeout($originalTimeout);
+        }
+    }
+
     public function testSpecifyCustomDirectoryFromPackageJson(): void
     {
+        $rootPackageDir = $this->cwd . \DIRECTORY_SEPARATOR . 'root-package';
+        $this->sfs->mkdir($rootPackageDir);
+        $originalCwd = getcwd();
+
         $this->config = new Config(
             [],
-            ['run-asset-manager' => true, 'root-package-json-dir' => $this->cwd],
+            ['run-asset-manager' => true, 'root-package-json-dir' => $rootPackageDir],
         );
         $this->manager = $this->getManager();
 
-        $this->assertSame($this->cwd, $this->config->get('root-package-json-dir'));
+        $this->assertSame($rootPackageDir, $this->config->get('root-package-json-dir'));
         $this->assertSame(0, $this->getManager()->run());
+        $this->assertSame($originalCwd, getcwd());
     }
 
     public function testSpecifyCustomDirectoryFromPackageJsonException(): void
     {
-        $this->expectException(\Foxy\Exception\RuntimeException::class);
-        $this->expectExceptionMessage('The root package directory "path/to/invalid" doesn\'t exist.');
+        $originalCwd = getcwd();
 
         $this->config = new Config(
             [],
@@ -313,7 +346,91 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
         );
         $this->manager = $this->getManager();
 
-        $this->assertSame(0, $this->getManager()->run());
+        try {
+            $this->getManager()->run();
+            $this->fail('Expected a runtime exception for invalid root package directory.');
+        } catch (\Foxy\Exception\RuntimeException $exception) {
+            $this->assertSame('The root package directory "path/to/invalid" doesn\'t exist.', $exception->getMessage());
+            $this->assertSame($originalCwd, getcwd());
+        }
+    }
+
+    public function testRunWithGetcwdFailure(): void
+    {
+        $rootPackageDir = $this->cwd . \DIRECTORY_SEPARATOR . 'root-package';
+        $this->sfs->mkdir($rootPackageDir);
+        $originalCwd = \getcwd();
+
+        $this->config = new Config(
+            [],
+            ['run-asset-manager' => true, 'root-package-json-dir' => $rootPackageDir],
+        );
+        $this->manager = $this->getManager();
+
+        MockerState::addCondition('Foxy\\Asset', 'getcwd', [], false);
+
+        try {
+            $this->getManager()->run();
+            $this->fail('Expected a runtime exception when getcwd fails.');
+        } catch (\Foxy\Exception\RuntimeException $exception) {
+            $this->assertSame('Unable to get the current working directory.', $exception->getMessage());
+            $this->assertSame($originalCwd, \getcwd());
+        }
+    }
+
+    public function testRunWithChdirFailure(): void
+    {
+        $rootPackageDir = $this->cwd . \DIRECTORY_SEPARATOR . 'root-package';
+        $this->sfs->mkdir($rootPackageDir);
+        $originalCwd = \getcwd();
+
+        $this->config = new Config(
+            [],
+            ['run-asset-manager' => true, 'root-package-json-dir' => $rootPackageDir],
+        );
+        $this->manager = $this->getManager();
+
+        MockerState::addCondition('Foxy\\Asset', 'chdir', [$rootPackageDir], false);
+
+        try {
+            $this->getManager()->run();
+            $this->fail('Expected a runtime exception when chdir fails.');
+        } catch (\Foxy\Exception\RuntimeException $exception) {
+            $this->assertSame(
+                sprintf('Unable to change working directory to "%s".', $rootPackageDir),
+                $exception->getMessage()
+            );
+            $this->assertSame($originalCwd, \getcwd());
+        }
+    }
+
+    public function testRunWithChdirRestoreFailure(): void
+    {
+        $rootPackageDir = $this->cwd . \DIRECTORY_SEPARATOR . 'root-package';
+        $this->sfs->mkdir($rootPackageDir);
+        $originalCwd = \getcwd();
+
+        $this->config = new Config(
+            [],
+            ['run-asset-manager' => true, 'root-package-json-dir' => $rootPackageDir],
+        );
+        $this->manager = $this->getManager();
+
+        MockerState::addCondition('Foxy\\Asset', 'chdir', [$rootPackageDir], true);
+        MockerState::addCondition('Foxy\\Asset', 'chdir', [$originalCwd], false);
+
+        $this->executor->addExpectedValues(0, 'ASSET MANAGER OUTPUT');
+
+        try {
+            $this->manager->run();
+            $this->fail('Expected a runtime exception when restoring chdir fails.');
+        } catch (\Foxy\Exception\RuntimeException $exception) {
+            $this->assertSame(
+                sprintf('Unable to restore working directory to "%s".', $originalCwd),
+                $exception->getMessage()
+            );
+            $this->assertSame($originalCwd, \getcwd());
+        }
     }
 
     abstract protected function getManager(): AssetManagerInterface;

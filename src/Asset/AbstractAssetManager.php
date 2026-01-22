@@ -26,6 +26,11 @@ use Foxy\Exception\RuntimeException;
 use Foxy\Fallback\FallbackInterface;
 use Foxy\Json\JsonFile;
 
+use function is_dir;
+use function is_string;
+use function sprintf;
+use function trim;
+
 /**
  * Abstract Manager.
  *
@@ -138,34 +143,59 @@ abstract class AbstractAssetManager implements AssetManagerInterface
         }
 
         $rootPackageDir = $this->config->get('root-package-json-dir');
+        $originalDir = null;
+        $changedDir = false;
 
         if (is_string($rootPackageDir) && !empty($rootPackageDir)) {
-            if (!is_dir($rootPackageDir)) {
+            if (is_dir($rootPackageDir) === false) {
                 throw new RuntimeException(sprintf('The root package directory "%s" doesn\'t exist.', $rootPackageDir));
             }
-            chdir($rootPackageDir);
+
+            $originalDir = getcwd();
+
+            if (false === $originalDir) {
+                throw new RuntimeException('Unable to get the current working directory.');
+            }
+
+            if (chdir($rootPackageDir) === false) {
+                throw new RuntimeException(sprintf('Unable to change working directory to "%s".', $rootPackageDir));
+            }
+
+            $changedDir = true;
         }
 
-        $updatable = $this->isUpdatable();
-        $info = sprintf('<info>%s %s dependencies</info>', $updatable ? 'Updating' : 'Installing', $this->getName());
-        $this->io->write($info);
+        try {
+            $updatable = $this->isUpdatable();
+            $info = sprintf('<info>%s %s dependencies</info>', $updatable ? 'Updating' : 'Installing', $this->getName());
+            $this->io->write($info);
 
-        $timeout = ProcessExecutor::getTimeout();
+            $timeout = ProcessExecutor::getTimeout();
 
-        /** @var int $managerTimeout */
-        $managerTimeout = $this->config->get('manager-timeout', PHP_INT_MAX);
-        ProcessExecutor::setTimeout($managerTimeout);
+            /** @var int $managerTimeout */
+            $managerTimeout = $this->config->get('manager-timeout', PHP_INT_MAX);
+            ProcessExecutor::setTimeout($managerTimeout);
 
-        $cmd = $updatable ? $this->getUpdateCommand() : $this->getInstallCommand();
-        $res = $this->executor->execute($cmd);
+            try {
+                $cmd = $updatable ? $this->getUpdateCommand() : $this->getInstallCommand();
+                $res = $this->executor->execute($cmd);
+            } finally {
+                ProcessExecutor::setTimeout($timeout);
+            }
 
-        ProcessExecutor::setTimeout($timeout);
+            if ($res > 0 && null !== $this->fallback) {
+                $this->fallback->restore();
+            }
 
-        if ($res > 0 && null !== $this->fallback) {
-            $this->fallback->restore();
+            return $res;
+        } finally {
+            if ($changedDir && null !== $originalDir) {
+                if (chdir($originalDir) === false) {
+                    throw new RuntimeException(
+                        sprintf('Unable to restore working directory to "%s".', $originalDir)
+                    );
+                }
+            }
         }
-
-        return $res;
     }
 
     /**

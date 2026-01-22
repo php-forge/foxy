@@ -25,7 +25,8 @@
         "php-forge/support": "^0.1",
         "phpunit/phpunit": "^10.5",
         "symplify/easy-coding-standard": "^12.5",
-        "vimeo/psalm": "^5.26.1|^6.4.1"
+        "vimeo/psalm": "^5.26.1|^6.4.1",
+        "xepozz/internal-mocker": "^1.4"
     },
     "config": {
         "preferred-install": {

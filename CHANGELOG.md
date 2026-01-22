@@ -8,6 +8,7 @@ Change Log
 - Enh #105: Update dependencies in `composer.lock` (@terabytesoftw)
 - Enh #106: Update composer dependencies for compatibility with newer versions (@terabytesoftw)
 - Bug #107: Force 4-space indentation when updating `package.json` (@terabytesoftw)
+- Bug #108: Restore working directory after running the asset manager (@terabytesoftw)
 
 ## 0.1.2 June 10, 2024
 
