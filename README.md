@@ -31,7 +31,7 @@
     <img src="./docs/svgs/features-mobile.svg" alt="Feature Overview" style="width: 100%;">
 </picture>
 
-### Installation
+## Installation
 
 ```bash
 composer require php-forge/foxy:^0.1
@@ -52,7 +52,31 @@ Manager can be `bun`, `npm`, `yarn` or `pnpm`. For default, `npm` is used.
 }
 ```
 
-### Quick start
+## Quick start
+
+### Standard PHP project (Yii2)
+
+In a standard PHP application, keep a `package.json` file at the project root. Foxy will merge asset dependencies from
+installed Composer packages and run the configured manager during Composer install and update.
+
+Example (Yii2 app template):
+
+https://github.com/yiisoft/yii2-app-basic/tree/22
+
+```json
+{
+    "require": {
+        "php-forge/foxy": "^0.1"
+    },
+    "config": {
+        "foxy": {
+            "manager": "npm"
+        }
+    }
+}
+```
+
+### Drupal layout (package.json under web/)
 
 In a typical Drupal proof-of-concept workflow, Composer stays at the repository root while frontend tooling and builds
 live under `web/`. 
@@ -99,12 +123,12 @@ Composer state preserved if the install fails.
 [![Easy Coding Standard](https://img.shields.io/github/actions/workflow/status/php-forge/foxy/ecs.yml?style=for-the-badge&label=ECS&logo=github)](https://github.com/php-forge/foxy/actions/workflows/ecs.yml)
 [![Dependency Check](https://img.shields.io/github/actions/workflow/status/php-forge/foxy/dependency-check.yml?style=for-the-badge&label=Dependency%20Check&logo=github)](https://github.com/php-forge/foxy/actions/workflows/dependency-check.yml)
 
+## Our social networks
+
+[![Follow on X](https://img.shields.io/badge/-Follow%20on%20X-1DA1F2.svg?style=for-the-badge&logo=x&logoColor=white&labelColor=000000)](https://x.com/Terabytesoftw)
+
 ## License
 
 Foxy is released under the MIT license. See the complete license in:
 
 [LICENSE](LICENSE)
-
-## Reporting an issue or a feature request
-
-Issues and feature requests are tracked in the [Github issue tracker](https://github.com/php-forge/foxy/issues).
