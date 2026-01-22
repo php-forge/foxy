@@ -10,6 +10,7 @@ Change Log
 - Bug #107: Force 4-space indentation when updating `package.json` (@terabytesoftw)
 - Bug #108: Restore working directory after running the asset manager (@terabytesoftw)
 - Bug #109: Respect `root-package-json-dir` for `package.json` read/write (@terabytesoftw)
+- Bug #110: Preserve nested empty arrays when rewriting `package.json` (@terabytesoftw)
 
 ## 0.1.2 June 10, 2024
 
