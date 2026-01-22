@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace Foxy\Json;
 
+use Foxy\Exception\RuntimeException;
+
 /**
  * The JSON file.
  *
@@ -88,7 +90,16 @@ final class JsonFile extends \Composer\Json\JsonFile
      */
     private function parseOriginalContent(): void
     {
-        $content = $this->exists() ? file_get_contents($this->getPath()) : '';
+        $content = '';
+
+        if ($this->exists()) {
+            $path = $this->getPath();
+            $content = file_get_contents($path);
+
+            if (false === $content) {
+                throw new RuntimeException(sprintf('Unable to read json file "%s".', $path));
+            }
+        }
         $this->arrayKeys = JsonFormatter::getArrayKeys($content);
         $this->indent = JsonFormatter::getIndent($content);
     }

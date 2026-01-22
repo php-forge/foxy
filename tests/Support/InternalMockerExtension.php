@@ -55,9 +55,32 @@ final class InternalMockerExtension implements Extension
                 'namespace' => 'Foxy\\Asset',
                 'name' => 'chdir',
             ],
+            [
+                'namespace' => 'Foxy\\Json',
+                'name' => 'file_get_contents',
+            ],
+            [
+                'namespace' => 'Foxy\\Fallback',
+                'name' => 'file_get_contents',
+            ],
+            [
+                'namespace' => 'Foxy\\Fallback',
+                'name' => 'file_put_contents',
+            ],
+            [
+                'namespace' => 'Foxy\\Fallback',
+                'name' => 'file_exists',
+            ],
+            [
+                'namespace' => 'Foxy\\Fallback',
+                'name' => 'is_file',
+            ],
         ];
 
-        $mocker = new Mocker();
+        $mocksPath = __DIR__ . '/../../.phpunit.cache/internal-mocker/mocks.php';
+        $stubPath = __DIR__ . '/internal-mocker-stubs.php';
+
+        $mocker = new Mocker($mocksPath, $stubPath);
         $mocker->load($mocks);
 
         MockerState::saveState();

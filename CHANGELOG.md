@@ -11,6 +11,7 @@ Change Log
 - Bug #108: Restore working directory after running the asset manager (@terabytesoftw)
 - Bug #109: Respect `root-package-json-dir` for `package.json` read/write (@terabytesoftw)
 - Bug #110: Preserve nested empty arrays when rewriting `package.json` (@terabytesoftw)
+- Bug #111: Throw `RuntimeException` class on asset/json `I/O` failures (@terabytesoftw)
 
 ## 0.1.2 June 10, 2024
 
