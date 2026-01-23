@@ -17,7 +17,7 @@
     </a>
     <a href="https://github.com/php-forge/foxy/actions/workflows/ecs.yml" target="_blank">
         <img src="https://img.shields.io/github/actions/workflow/status/php-forge/foxy/ecs.yml?style=for-the-badge&label=ECS&logo=github" alt="Easy Coding Standard">
-    </a>    
+    </a>
     <a href="https://github.com/php-forge/foxy/actions/workflows/dependency-check.yml" target="_blank">
         <img src="https://img.shields.io/github/actions/workflow/status/php-forge/foxy/dependency-check.yml?style=for-the-badge&label=Dependency%20Check&logo=github" alt="Dependency Check">
     </a>

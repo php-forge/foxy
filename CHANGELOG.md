@@ -15,7 +15,7 @@
 - Bug #113: Fix PHP `8.4` nullable type deprecation warnings in tests (@terabytesoftw)
 - Bug #114: Fix PHP `8.5` deprecation of `setAccessible()` in `ReflectionProperty` class (`@terabytesoftw`)
 - Bug #115: Update CI workflows and apply automated refactors (@terabytesoftw)
-- Bug #116: Update `LICENSE and` and `composer.json` (@terabytesoftw)
+- Bug #116: Update `LICENSE` and `composer.json` (@terabytesoftw)
 
 ## 0.1.2 June 10, 2024
 
