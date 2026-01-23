@@ -1,5 +1,4 @@
-Events
-======
+# Events
 
 Foxy triggers events with the event dispatcher system of Composer allowing you to extend Foxy's
 capabilities. To do this, you must create a Composer plugin requiring Foxy in addition to the

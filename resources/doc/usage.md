@@ -1,10 +1,10 @@
-Usage
-=====
+# Usage
 
 To use Foxy, whether for a PHP library or a PHP project, you must add the Foxy dependency in
 the `require` section of the Composer file.
 
 **composer.json:**
+
 ```json
 {
     "require": {
@@ -16,11 +16,12 @@ the `require` section of the Composer file.
 And create the `package.json` file to add your asset dependencies.
 
 **package.json:**
+
 ```json
 {
-   "dependencies": {
-       "@foo/bar": "latest"
-   }
+    "dependencies": {
+        "@foo/bar": "latest"
+    }
 }
 ```
 
@@ -35,6 +36,7 @@ In the case if you use Foxy in a PHP library, you can render Foxy optional by ad
 the `require-dev` section of the Composer file.
 
 **composer.json:**
+
 ```json
 {
     "require-dev": {
@@ -54,6 +56,7 @@ However, if you want enable the Foxy for your library, but without required depe
 you can use the extra option `extra.foxy` in your `composer.json` file:
 
 **composer.json:**
+
 ```json
 {
     "extra": {

@@ -1,13 +1,10 @@
-FAQs
-====
+# FAQs
 
-What version required of Composer?
-----------------------------------
+## What version required of Composer?
 
 See the documentation: [Installation](index.md#installation).
 
-Why this plugin?
-----------------
+## Why this plugin?
 
 It is certain that each language has its own dependency management system, and that it is highly recommended to use
 each package manager. NPM or Yarn works very well when the asset dependencies are managed only in the PHP project,
@@ -25,8 +22,7 @@ Foxy focuses solely on automation of the validation, addition, updating and dele
 the definition file of the asset package, while restoring the project state, as well as PHP dependencies if
 NPM or Yarn terminates with an error.
 
-What is the difference between Foxy and Fxp Composer Asset Plugin?
-------------------------------------------------------------------
+## What is the difference between Foxy and Fxp Composer Asset Plugin?
 
 When [Fxp Composer Asset Plugin](https://github.com/fxpio/composer-asset-plugin) has been created,
 it lacked some important functionality to NPM and Bower as a true lock file, the access to
@@ -55,8 +51,7 @@ of the plugin installed globally, and another version installed in the project -
 install the plugin in the project, but will only use the plugin installed globally - the Fxp Composer Asset
 Plugin was become Foxy.
 
-How does the plugin work?
--------------------------
+## How does the plugin work?
 
 Foxy creates the mocks of Composer packages for NPM in local directory, containing only the `package.json`
 file from the PHP library, and adding the package path to the `package.json` file of the project.
@@ -88,8 +83,7 @@ For more details, the plugin work in this order:
 11. Restoring the `package.json` file with the previous dependencies if the asset manager terminates with an error
 12. Restoring the `composer.lock` file and all PHP dependencies if the asset manager terminates with an error
 
-Is Foxy useful if my asset dependencies are defined only in my project?
------------------------------------------------------------------------
+## Is Foxy useful if my asset dependencies are defined only in my project?
 
 Foxy is mainly focused on automating of the asset management of the PHP libraries, avoiding potentially conflicting
 manual management.
@@ -99,17 +93,15 @@ and NPM or Yarn, you can use Foxy even if all of your asset dependencies are onl
 of your project. However, the value added by Foxy in this configuration will be low, and will be limited to the
 management of the fallback of the PHP dependencies if there is an error of the asset manager.
 
-NPM/Yarn does not find the mock of the Composer dependencies
-------------------------------------------------------------
+## NPM/Yarn does not find the mock of the Composer dependencies
 
 The advantage of Foxy, is that it allows you to keep the workflows of each tool. However, Foxy creates PHP
 package mocks for NPM, and in this case, Composer must be launched before NPM or Yarn. After, nothing prevents
 you to using all available commands of your favorite asset manager.
 
-Why Foxy does nothing with the '--dry-run' option?
---------------------------------------------------
+## Why Foxy does nothing with the '--dry-run' option?
 
-Foxy can work with Composer's `--dry-run` option, but chose to do nothing.  Given that the PHP dependencies
+Foxy can work with Composer's `--dry-run` option, but chose to do nothing. Given that the PHP dependencies
 are not installed, updated or deleted, Foxy can not update the `package.json` file, and so, NPM can not
 check the new constraints, if any. To sum up, this amounts to running the commands
 `composer update --dry-run` followed by `npm update --dry-run`.
@@ -118,7 +110,6 @@ However, with the Foxy's fallbacks, this behavior is automatically reproduced, b
 dependencies, and restoring the `package.json` file, the `composer.lock` file, and all the PHP dependencies
 if the asset manager finishes with an error.
 
-How to increase the PHP memory limit?
--------------------------------------
+## How to increase the PHP memory limit?
 
 See the official documentation of Composer: [Memory limits errors](https://getcomposer.org/doc/articles/troubleshooting.md#memory-limit-errors).

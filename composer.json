@@ -1,7 +1,17 @@
 {
     "name": "php-forge/foxy",
     "description": "Fast, reliable, and secure Bun/NPM/Yarn/pnpm bridge for Composer",
-    "keywords": ["bun", "npm", "yarn", "composer", "bridge", "dependency manager", "package", "asset", "nodejs"],
+    "keywords": [
+        "bun",
+        "npm",
+        "yarn",
+        "composer",
+        "bridge",
+        "dependency manager",
+        "package",
+        "asset",
+        "nodejs"
+    ],
     "homepage": "https://github.com/fxpio/foxy",
     "type": "composer-plugin",
     "license": "MIT",
