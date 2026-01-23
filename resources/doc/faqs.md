@@ -34,7 +34,7 @@ disadvantages to this approach:
 1. The plugin must be installed in global mode
 2. Nodejs must be used more and more to compile some libraries
 3. The use of VCS Repositories coupled with the SAT Solver architecture of Composer is much less efficient than npm,
-   despite the optimizations of the plugin to avoid the imports
+despite the optimizations of the plugin to avoid the imports
 
 Now, Bower has been depreciated, npm has a true lockfile (since 5.x), as well as the possibility
 of using the private repositories, Yarn arrived with his big performances, and more and more JavaScript
@@ -71,13 +71,13 @@ For more details, the plugin work in this order:
 3. Installing/updating of the PHP dependencies by Composer
 4. Retrieving the entire list of installed packages
 5. Retains only PHP dependencies with the `foxy/foxy` dependency in the `require` or `require-dev` section of the
-   `composer.json` file and with the presence of the `package.json` file
+`composer.json` file and with the presence of the `package.json` file
 6. Checking the lockfile of asset manager
 7. Comparing the difference between the installed asset dependencies and the new asset dependencies, to determine
    whether the dependency must be installed, updated, or removed
 8. Creating, updating, or deleting of the mock asset libraries in local directory, containing only the
-   `package.json` file of the PHP library, with a formatted name as:
-   `@composer-asset/<php-package-vendor>--<php-package-name>`
+`package.json` file of the PHP library, with a formatted name as:
+`@composer-asset/<php-package-vendor>--<php-package-name>`
 9. Adding, updating, or deleting the mock asset library in the `package.json` file of the project
 10. Running the install or update command of asset manager
 11. Restoring the `package.json` file with the previous dependencies if the asset manager terminates with an error
