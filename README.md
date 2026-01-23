@@ -12,6 +12,9 @@
     <a href="https://github.com/php-forge/foxy/actions/workflows/build.yml" target="_blank">
         <img src="https://img.shields.io/github/actions/workflow/status/php-forge/foxy/build.yml?style=for-the-badge&label=PHPUnit&logo=github" alt="PHPUnit">
     </a>
+    <a href="https://dashboard.stryker-mutator.io/reports/github.com/php-forge/foxy/main" target="_blank">
+        <img src="https://img.shields.io/endpoint?style=for-the-badge&url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fphp-forge%2Ffoxy%2Fmain" alt="Mutation Testing">
+    </a>
     <a href="https://github.com/php-forge/foxy/actions/workflows/ecs.yml" target="_blank">
         <img src="https://img.shields.io/github/actions/workflow/status/php-forge/foxy/ecs.yml?style=for-the-badge&label=ECS&logo=github" alt="Easy Coding Standard">
     </a>
@@ -120,7 +123,8 @@ Composer state preserved if the install fails.
 ## Quality code
 
 [![Codecov](https://img.shields.io/codecov/c/github/php-forge/foxy.svg?style=for-the-badge&logo=codecov&logoColor=white&label=Coverage)](https://codecov.io/gh/php-forge/foxy)
-[![Easy Coding Standard](https://img.shields.io/github/actions/workflow/status/php-forge/foxy/ecs.yml?style=for-the-badge&label=ECS&logo=github)](https://github.com/php-forge/foxy/actions/workflows/ecs.yml)
+[![PHPStan Level Max](https://img.shields.io/badge/PHPStan-Level%202-4F5D95.svg?style=for-the-badge&logo=github&logoColor=white)](https://github.com/php-forge/foxy/actions/workflows/static.yml)
+[![Super-Linter](https://img.shields.io/github/actions/workflow/status/php-forge/foxy/linter.yml?style=for-the-badge&label=Super-Linter&logo=github)](https://github.com/php-forge/foxy/actions/workflows/linter.yml)
 [![Dependency Check](https://img.shields.io/github/actions/workflow/status/php-forge/foxy/dependency-check.yml?style=for-the-badge&label=Dependency%20Check&logo=github)](https://github.com/php-forge/foxy/actions/workflows/dependency-check.yml)
 
 ## Our social networks
@@ -129,6 +133,4 @@ Composer state preserved if the install fails.
 
 ## License
 
-Foxy is released under the MIT license. See the complete license in:
-
-[LICENSE](LICENSE)
+[![License](https://img.shields.io/badge/License-BSD--3--Clause-brightgreen.svg?style=for-the-badge&logo=opensourceinitiative&logoColor=white&labelColor=555555)](LICENSE)
