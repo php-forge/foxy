@@ -14,7 +14,7 @@
     ],
     "homepage": "https://github.com/fxpio/foxy",
     "type": "composer-plugin",
-    "license": "MIT",
+    "license": "BSD-3-Clause",
     "funding": [
         {
             "type": "github",
