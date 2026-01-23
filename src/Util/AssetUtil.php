@@ -49,6 +49,7 @@ final class AssetUtil
 
         return $packageValue;
     }
+
     /**
      * Get the name for the asset dependency.
      *

@@ -75,6 +75,7 @@ final class PackageUtil
 
         return $lockData;
     }
+
     /**
      * Load all packages in the lock data of locker.
      *

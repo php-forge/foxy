@@ -50,6 +50,7 @@ final class PackageUtilTest extends TestCase
         self::assertArrayHasKey('aliases', $convertedAliases);
         self::assertEquals($convertedAliases['aliases'], $expectedAliases);
     }
+
     public function testLoadLockPackages(): void
     {
         $lockData = [

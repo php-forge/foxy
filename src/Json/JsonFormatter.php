@@ -39,6 +39,7 @@ final class JsonFormatter
      * @param bool $formatJson Check if the JSON must be formatted.
      *
      * @psalm-param string[] $arrayKeys The list of keys to be retained with an array representation if they are empty.
+     *
      * @throws JsonException
      */
     public static function format(

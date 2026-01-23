@@ -26,7 +26,9 @@ class Config
      * @param array $config The config.
      * @param array $defaults The default values.
      */
-    public function __construct(private readonly array $config, private readonly array $defaults = []) {}
+    public function __construct(private readonly array $config, private readonly array $defaults = [])
+    {
+    }
 
     /**
      * Get the config value.

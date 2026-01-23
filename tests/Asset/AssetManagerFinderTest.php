@@ -75,6 +75,7 @@ final class AssetManagerFinderTest extends TestCase
 
         $amf->findManager('bar');
     }
+
     public function testFindManagerWithValidManager(): void
     {
         $am = $this->createMock(AssetManagerInterface::class);

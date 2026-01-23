@@ -152,6 +152,7 @@ final class AssetUtilTest extends TestCase
 
     /**
      * @dataProvider getExtraData
+     *
      * @throws JsonException
      */
     public function testGetPathWithExtraActivation(bool $withExtra, bool $fileExists = false): void
@@ -216,6 +217,7 @@ final class AssetUtilTest extends TestCase
      *
      * @param Link[] $requires
      * @param Link[] $devRequires
+     *
      * @throws JsonException
      */
     public function testGetPathWithRequiredFoxy(array $requires, array $devRequires, bool $fileExists = false): void

@@ -37,6 +37,7 @@ final class ProcessExecutorMockTest extends TestCase
         self::assertSame('TEST', $output);
         self::assertSame('TEST 2', $output2);
     }
+
     public function testExecuteWithoutExpectedValues(): void
     {
         $executor = new ProcessExecutorMock();

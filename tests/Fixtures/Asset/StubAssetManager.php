@@ -19,7 +19,8 @@ final class StubAssetManager implements AssetManagerInterface
         Config $config,
         ProcessExecutor $executor,
         Filesystem $fs,
-    ) {}
+    ) {
+    }
 
     public function addDependencies(RootPackageInterface $rootPackage, array $dependencies): AssetPackageInterface
     {
@@ -81,5 +82,7 @@ final class StubAssetManager implements AssetManagerInterface
         return $this;
     }
 
-    public function validate(): void {}
+    public function validate(): void
+    {
+    }
 }

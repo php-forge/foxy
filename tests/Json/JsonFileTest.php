@@ -205,7 +205,7 @@ final class JsonFileTest extends TestCase
 
         $jsonFile = new JsonFile($filename);
 
-        $data =  $jsonFile->read();
+        $data = $jsonFile->read();
 
         $data['private'] = true;
 

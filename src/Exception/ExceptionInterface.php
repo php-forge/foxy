@@ -4,4 +4,6 @@ declare(strict_types=1);
 
 namespace Foxy\Exception;
 
-interface ExceptionInterface {}
+interface ExceptionInterface
+{
+}
