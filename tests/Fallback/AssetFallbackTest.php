@@ -76,7 +76,7 @@ final class AssetFallbackTest extends TestCase
             ->expects(self::once())
             ->method('remove')
             ->with('package.json')
-            ->willThrowException(new \RuntimeException('Remove failed.'));
+            ->willThrowException(new RuntimeException('Remove failed.'));
 
         $this->assetFallback->save();
 

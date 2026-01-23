@@ -48,7 +48,7 @@ final class PackageUtilTest extends TestCase
         $convertedAliases = PackageUtil::convertLockAlias($lockData);
 
         self::assertArrayHasKey('aliases', $convertedAliases);
-        self::assertEquals($convertedAliases['aliases'], $expectedAliases);
+        self::assertEquals($expectedAliases, $convertedAliases['aliases']);
     }
 
     public function testLoadLockPackages(): void
@@ -75,8 +75,8 @@ final class PackageUtilTest extends TestCase
 
         self::assertArrayHasKey('packages', $lockDataLoaded);
         self::assertArrayHasKey('packages-dev', $lockDataLoaded);
-        self::assertEquals($lockDataLoaded['packages'], $expectedPackages);
-        self::assertEquals($lockDataLoaded['packages-dev'], $expectedDevPackages);
+        self::assertEquals($expectedPackages, $lockDataLoaded['packages']);
+        self::assertEquals($expectedDevPackages, $lockDataLoaded['packages-dev']);
     }
 
     public function testLoadLockPackagesWithoutPackages(): void

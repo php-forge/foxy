@@ -13,10 +13,10 @@ use Exception;
 use Foxy\Asset\AssetManagerInterface;
 use Foxy\Config\Config;
 use Foxy\Event\{GetAssetsEvent, PostSolveEvent, PreSolveEvent};
+use Foxy\Exception\RuntimeException;
 use Foxy\Fallback\FallbackInterface;
 use Foxy\FoxyEvents;
 use Foxy\Util\AssetUtil;
-use RuntimeException;
 
 use function basename;
 use function copy;

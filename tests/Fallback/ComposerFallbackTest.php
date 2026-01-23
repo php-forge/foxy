@@ -78,7 +78,7 @@ final class ComposerFallbackTest extends TestCase
         $this->input
             ->expects(self::any())
             ->method('getOption')
-            ->willReturnCallback(fn($option): ?bool => 'verbose' === $option ? false : null);
+            ->willReturnCallback(fn($option): bool|null => 'verbose' === $option ? false : null);
 
         $ed = $this->createMock(EventDispatcher::class);
 

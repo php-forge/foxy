@@ -91,9 +91,4 @@ return ECSConfig::configure()
             OrderedTraitsFixer::class,
             SingleQuoteFixer::class,
         ]
-    )
-    ->withSkip(
-        [
-            NullableTypeDeclarationFixer::class,
-        ]
     );

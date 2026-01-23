@@ -166,7 +166,7 @@ class Config
      */
     private function getDefaultValue(string $key, mixed $default = null): mixed
     {
-        $value = null === $default &&  array_key_exists($key, $this->defaults)
+        $value = null === $default && array_key_exists($key, $this->defaults)
             ? $this->defaults[$key]
             : $default;
 
