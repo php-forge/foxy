@@ -38,6 +38,7 @@ return ECSConfig::configure()
                 'construct',
                 'destruct',
                 'magic',
+                'method_public_abstract',
                 'method_protected_abstract',
                 'method_public',
                 'method_protected',

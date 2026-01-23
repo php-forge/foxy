@@ -135,6 +135,8 @@ final class ComposerFallbackTest extends TestCase
 
     /**
      * @dataProvider getSaveData
+     *
+     * @throws JsonException
      */
     public function testSave(bool $withLockFile): void
     {
@@ -149,7 +151,10 @@ final class ComposerFallbackTest extends TestCase
         file_put_contents($this->cwd . '/composer.json', '{}');
 
         if ($withLockFile) {
-            file_put_contents($this->cwd . '/composer.lock', json_encode(['content-hash' => 'HASH_VALUE']));
+            file_put_contents(
+                "{$this->cwd}/composer.lock",
+                json_encode(['content-hash' => 'HASH_VALUE'], JSON_THROW_ON_ERROR),
+            );
         }
 
         self::assertInstanceOf(ComposerFallback::class, $this->composerFallback->save());

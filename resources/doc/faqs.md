@@ -1,6 +1,6 @@
 # FAQs
 
-## What version required of Composer?
+## What version of Composer is required?
 
 See the documentation: [Installation](index.md#installation).
 
@@ -70,18 +70,17 @@ For more details, the plugin work in this order:
 2. Saving the status of project
 3. Installing/updating of the PHP dependencies by Composer
 4. Retrieving the entire list of installed packages
-5. Retains only PHP dependencies with the `foxy/foxy` dependency in the `require` or `require-dev` section of the
-   `composer.json` file and with the presence of the `package.json` file
-6. Checking the lockfile of asset manager
-7. Comparing the difference between the installed asset dependencies and the new asset dependencies, to determine
+5. Retains only PHP dependencies that include `foxy/foxy` dependency in `require` or `require-dev` and that contain a
+   `package.json` file
+6. Comparing the difference between the installed asset dependencies and the new asset dependencies, to determine
    whether the dependency must be installed, updated, or removed
-8. Creating, updating, or deleting of the mock asset libraries in local directory, containing only the
+7. Creating, updating, or deleting of the mock asset libraries in local directory, containing only the
    `package.json` file of the PHP library, with a formatted name as:
    `@composer-asset/<php-package-vendor>--<php-package-name>`
-9. Adding, updating, or deleting the mock asset library in the `package.json` file of the project
-10. Running the install or update command of asset manager
-11. Restoring the `package.json` file with the previous dependencies if the asset manager terminates with an error
-12. Restoring the `composer.lock` file and all PHP dependencies if the asset manager terminates with an error
+8. Adding, updating, or deleting the mock asset library in the `package.json` file of the project
+9. Running the install or update command of asset manager
+10. Restoring the `package.json` file with the previous dependencies if the asset manager terminates with an error
+11. Restoring the `composer.lock` file and all PHP dependencies if the asset manager terminates with an error
 
 ## Is Foxy useful if my asset dependencies are defined only in my project?
 
@@ -101,8 +100,8 @@ you to using all available commands of your favorite asset manager.
 
 ## Why Foxy does nothing with the '--dry-run' option?
 
-Foxy can work with Composer's `--dry-run` option, but chose to do nothing. Given that the PHP dependencies
-are not installed, updated or deleted, Foxy can not update the `package.json` file, and so, npm can not
+Foxy can work with Composer's `--dry-run` option, but chooses to do nothing. Given that the PHP dependencies
+are not installed, updated or deleted, Foxy cannot update the `package.json` file, and so, npm can not
 check the new constraints, if any. To sum up, this amounts to running the commands
 `composer update --dry-run` followed by `npm update --dry-run`.
 
