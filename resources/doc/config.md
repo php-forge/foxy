@@ -283,9 +283,9 @@ You can enable or disable the fallback of the asset package file with the option
 }
 ```
 
-### Enable/disable the fallback for the Composer lock file and its dependencies
+### Enable/disable the fallback for the Composer lockfile and its dependencies
 
-You can enable or disable the fallback of the Composer lock file and its dependencies with the option
+You can enable or disable the fallback of the Composer lockfile and its dependencies with the option
 `config.foxy.fallback-composer` [`boolean`, default: `true`].
 
 **Example:**
@@ -342,7 +342,7 @@ You can define the custom path of the mock package of PHP library with the optio
 ### Enable/disable manually the PHP packages with an asset package definition
 
 By default, Foxy looks in the `composer.json` file of the PHP dependencies, if the mock package needs
-to be added into NPM or Yarn. However, some public PHP package already uses the `package.json` file
+to be added into npm or Yarn. However, some public PHP package already uses the `package.json` file
 to handle their asset dependencies, but Foxy is not enabled for this package. In this case, you can
 manually enable the PHP packages to be scanned in your project.
 
