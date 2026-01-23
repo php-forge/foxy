@@ -40,7 +40,7 @@ Now, Bower has been depreciated, npm has a true lockfile (since 5.x), as well as
 of using the private repositories, Yarn arrived with his big performances, and more and more JavaScript
 library requires a compilation because they use Babel, TypeScript, Sass, Less, etc...
 
-Node.js filling its gaps, and becoming more and more required, a plugin could finally perform the reverse operation,
+Node.js filling its gaps, and becoming increasingly required, a plugin could finally perform the reverse operation,
 retaining the benefits of Fxp Composer Asset Plugin and npm. So, conversely, Foxy creates package mocks for npm
 in local directory, containing only the `package.json` file from the PHP library, and adding the path of the
 mock package to the project's `package.json` file. The entire validation and installation process is left
