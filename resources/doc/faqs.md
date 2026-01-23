@@ -32,7 +32,7 @@ Composer lockfile to manage the asset dependencies of the PHP libraries. However
 disadvantages to this approach:
 
 1. The plugin must be installed in global mode
-2. Nodejs must be used more and more to compile some libraries
+2. Node.js must be used more and more to compile some libraries
 3. The use of VCS Repositories coupled with the SAT Solver architecture of Composer is much less efficient than npm,
    despite the optimizations of the plugin to avoid the imports
 
