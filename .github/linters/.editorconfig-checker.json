@@ -1,6 +1,7 @@
 {
     "Exclude": [
         "phpstan-baseline.neon",
+        "resources/doc/faqs.md",
         "tests/Json/JsonFileTest.php",
         "tests/Json/JsonFormatterTest.php"
     ]
