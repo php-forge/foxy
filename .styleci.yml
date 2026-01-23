@@ -17,9 +17,10 @@ enabled:
   - combine_nested_dirname
   - declare_strict_types
   - dir_constant
-  - fully_qualified_strict_types
+  - empty_loop_body_braces
   - function_to_constant
   - hash_to_slash_comment
+  - integer_literal_case
   - is_null
   - logical_operators
   - magic_constant_casing
@@ -56,7 +57,6 @@ enabled:
   - phpdoc_order
   - phpdoc_property
   - phpdoc_scalar
-  - phpdoc_separation
   - phpdoc_singular_inheritdoc
   - phpdoc_trim
   - phpdoc_trim_consecutive_blank_line_separation
@@ -78,9 +78,10 @@ enabled:
   - trailing_comma_in_multiline_array
   - unalign_double_arrow
   - unalign_equals
-  - empty_loop_body_braces
-  - integer_literal_case
   - union_type_without_spaces
 
 disabled:
   - function_declaration
+  - new_with_parentheses
+  - psr12_braces
+  - psr12_class_definition

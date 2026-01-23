@@ -35,8 +35,7 @@ final class Solver implements SolverInterface
         private readonly Config $config,
         private readonly Filesystem $fs,
         private readonly FallbackInterface|null $composerFallback = null,
-    ) {
-    }
+    ) {}
 
     public function setUpdatable($updatable): self
     {
