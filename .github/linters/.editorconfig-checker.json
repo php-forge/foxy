@@ -3,5 +3,5 @@
         "phpstan-baseline.neon",
         "tests/Json/JsonFileTest.php",
         "tests/Json/JsonFormatterTest.php"
-  ]
+    ]
 }
