@@ -15,10 +15,14 @@ use Foxy\Fallback\FallbackInterface;
 final class StubAssetManager implements AssetManagerInterface
 {
     public function __construct(
-        IOInterface $io,
-        Config $config,
-        ProcessExecutor $executor,
-        Filesystem $fs,
+        /** @phpstan-ignore-next-line */
+        private readonly IOInterface $io,
+        /** @phpstan-ignore-next-line */
+        private readonly Config $config,
+        /** @phpstan-ignore-next-line */
+        private readonly ProcessExecutor $executor,
+        /** @phpstan-ignore-next-line */
+        private readonly Filesystem $fs,
     ) {}
 
     public function addDependencies(RootPackageInterface $rootPackage, array $dependencies): AssetPackageInterface

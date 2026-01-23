@@ -66,11 +66,12 @@ final class ConsoleUtil
                 break;
         }
 
-        if ($input->getOption('prefer-source') || $input->getOption('prefer-dist')) {
-            /** @var bool $preferSource */
-            $preferSource = $input->getOption('prefer-source');
-            /** @var bool $preferDist */
-            $preferDist = $input->getOption('prefer-dist');
+        $preferSourceOption = $input->getOption('prefer-source');
+        $preferDistOption = $input->getOption('prefer-dist');
+
+        if (($preferSourceOption !== false && $preferSourceOption !== null) || ($preferDistOption !== false && $preferDistOption !== null)) {
+            $preferSource = (bool) $preferSourceOption;
+            $preferDist = (bool) $preferDistOption;
         }
 
         return [$preferSource, $preferDist];

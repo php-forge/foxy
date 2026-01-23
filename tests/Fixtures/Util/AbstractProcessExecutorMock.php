@@ -18,7 +18,7 @@ abstract class AbstractProcessExecutorMock extends ProcessExecutor
 
     /**
      * @param int $returnedCode The returned code
-     * @param null $output       The output
+     * @param string|null $output The output
      */
     public function addExpectedValues(int $returnedCode = 0, $output = null): static
     {

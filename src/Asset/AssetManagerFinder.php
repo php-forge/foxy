@@ -21,9 +21,7 @@ final class AssetManagerFinder
     public function __construct(array $managers = [])
     {
         foreach ($managers as $manager) {
-            if ($manager instanceof AssetManagerInterface) {
-                $this->addManager($manager);
-            }
+            $this->addManager($manager);
         }
     }
 

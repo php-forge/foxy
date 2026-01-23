@@ -123,7 +123,9 @@ final class Foxy implements PluginInterface, EventSubscriberInterface
             $this->assetFallback->save();
             $this->composerFallback->save();
 
-            if ($this->config->get('enabled')) {
+            $enabled = $this->config->get('enabled');
+
+            if ($enabled === true || $enabled === 1 || $enabled === '1') {
                 $this->assetManager->validate();
             }
         }

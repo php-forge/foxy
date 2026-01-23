@@ -36,7 +36,6 @@ final class ConsoleUtilTest extends TestCase
 
     public function testGetInputWithoutValidInput(): void
     {
-        /** @var IOInterface $io */
         $io = $this->createMock(IOInterface::class);
 
         self::assertInstanceOf(ArgvInput::class, ConsoleUtil::getInput($io));

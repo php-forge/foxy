@@ -38,7 +38,7 @@ final class ComposerFallback implements FallbackInterface
         Filesystem|null $fs = null,
         private readonly Installer|null $installer = null,
     ) {
-        $this->fs = $fs ?: new Filesystem();
+        $this->fs = $fs ?? new Filesystem();
     }
 
     /**
@@ -46,7 +46,9 @@ final class ComposerFallback implements FallbackInterface
      */
     public function restore(): void
     {
-        if (!$this->config->get('fallback-composer')) {
+        $fallbackComposer = $this->config->get('fallback-composer');
+
+        if ($fallbackComposer !== true && $fallbackComposer !== 1 && $fallbackComposer !== '1') {
             return;
         }
 
@@ -65,7 +67,6 @@ final class ComposerFallback implements FallbackInterface
 
     public function save(): self
     {
-        $rm = $this->composer->getRepositoryManager();
         $im = $this->composer->getInstallationManager();
         $composerFile = Factory::getComposerFile();
         $locker = LockerUtil::getLocker($this->io, $im, $composerFile);
@@ -120,7 +121,7 @@ final class ComposerFallback implements FallbackInterface
 
         $isLocked = $this->composer->getLocker()->isLocked();
         $lockData = $isLocked ? $this->composer->getLocker()->getLockData() : null;
-        $hasPackage = is_array($lockData) && isset($lockData['packages']) && !empty($lockData['packages']);
+        $hasPackage = is_array($lockData) && isset($lockData['packages']) && $lockData['packages'] !== [];
 
         return $isLocked && $hasPackage;
     }
@@ -133,30 +134,53 @@ final class ComposerFallback implements FallbackInterface
     private function restorePreviousLockFile(): void
     {
         $config = $this->composer->getConfig();
+
         [$preferSource, $preferDist] = ConsoleUtil::getPreferredInstallOptions($config, $this->input);
-        $optimize = $this->input->getOption('optimize-autoloader') || $config->get('optimize-autoloader');
-        $authoritative = $this->input->getOption('classmap-authoritative') || $config->get('classmap-authoritative');
-        $apcu = $this->input->getOption('apcu-autoloader') || $config->get('apcu-autoloader');
-        $dispatcher = $this->composer->getEventDispatcher();
-        /** @var bool $verbose */
-        $verbose = $this->input->getOption('verbose');
+
+        $isOptionTrue = static function (mixed $value): bool {
+            return $value === true || $value === 1 || $value === '1';
+        };
+
+        $optimize = $isOptionTrue($this->input->getOption('optimize-autoloader'))
+            || $isOptionTrue($config->get('optimize-autoloader'));
+        $authoritative = $isOptionTrue($this->input->getOption('classmap-authoritative'))
+            || $isOptionTrue($config->get('classmap-authoritative'));
+        $apcu = $isOptionTrue($this->input->getOption('apcu-autoloader'))
+            || $isOptionTrue($config->get('apcu-autoloader'));
+
+        $verbose = (bool) $this->input->getOption('verbose');
+        $devMode = $isOptionTrue($this->input->getOption('no-dev')) === false;
+        $dumpAutoloader = $isOptionTrue($this->input->getOption('no-autoloader')) === false;
 
         $installer = $this->getInstaller()
             ->setVerbose($verbose)
             ->setPreferSource($preferSource)
             ->setPreferDist($preferDist)
-            ->setDevMode(!$this->input->getOption('no-dev'))
-            ->setDumpAutoloader(!$this->input->getOption('no-autoloader'))
+            ->setDevMode($devMode)
+            ->setDumpAutoloader($dumpAutoloader)
             ->setOptimizeAutoloader($optimize)
             ->setClassMapAuthoritative($authoritative)
             ->setApcuAutoloader($apcu);
 
-        $ignorePlatformReqs = $this->input->getOption('ignore-platform-reqs') ?: ($this->input->getOption('ignore-platform-req') ?: false);
+        $ignorePlatformReqs = false;
+
+        $reqsOption = $this->input->getOption('ignore-platform-reqs');
+
+        if ($reqsOption !== null && $reqsOption !== false) {
+            $ignorePlatformReqs = $reqsOption;
+        } else {
+            $reqOption = $this->input->getOption('ignore-platform-req');
+
+            if ($reqOption !== null && $reqOption !== false) {
+                $ignorePlatformReqs = $reqOption;
+            }
+        }
+
         $installer->setPlatformRequirementFilter(PlatformRequirementFilterFactory::fromBoolOrList($ignorePlatformReqs));
+        $runScripts = $isOptionTrue($this->input->getOption('no-scripts')) === false;
+        $dispatcher = $this->composer->getEventDispatcher();
         $dispatcher->setRunScripts(false);
-
         $installer->run();
-
-        $dispatcher->setRunScripts(!$this->input->getOption('no-scripts'));
+        $dispatcher->setRunScripts($runScripts);
     }
 }
