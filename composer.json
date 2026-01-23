@@ -21,7 +21,7 @@
         "symfony/console": "^6.0|^7.0"
     },
     "require-dev": {
-        "infection/infection": "^0.28|^0.32",
+        "infection/infection": "^0.27|^0.32",
         "maglnet/composer-require-checker": "^4.7",
         "php-forge/support": "^0.3",
         "phpstan/extension-installer": "^1.4",
@@ -30,7 +30,6 @@
         "phpunit/phpunit": "^10.5",
         "rector/rector": "^2.2",
         "symplify/easy-coding-standard": "^13.0",
-        "vimeo/psalm": "^5.26.1|^6.4.1",
         "xepozz/internal-mocker": "^1.4"
     },
     "config": {

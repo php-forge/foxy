@@ -106,10 +106,6 @@ final class JsonFormatter
 
         $array = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
 
-        if (!is_array($array)) {
-            return $json;
-        }
-
         if ($unescapeUnicode) {
             array_walk_recursive($array, static function (mixed &$item): void {
                 if (is_string($item)) {
