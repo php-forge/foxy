@@ -76,7 +76,7 @@ For more details, the plugin work in this order:
 7. Comparing the difference between the installed asset dependencies and the new asset dependencies, to determine
 whether the dependency must be installed, updated, or removed
 8. Creating, updating, or deleting of the mock asset libraries in local directory, containing only the
-`package.json` file of the PHP library, with a formatted name as: 
+`package.json` file of the PHP library, with a formatted name as:
 `@composer-asset/<php-package-vendor>--<php-package-name>`
 9. Adding, updating, or deleting the mock asset library in the `package.json` file of the project
 10. Running the install or update command of asset manager
