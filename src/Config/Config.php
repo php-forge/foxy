@@ -2,24 +2,22 @@
 
 declare(strict_types=1);
 
-/*
- * This file is part of the Foxy package.
- *
- * (c) François Pluchino <francois.pluchino@gmail.com>
- *
- * For the full copyright and license information, please view the LICENSE
- * file that was distributed with this source code.
- */
-
 namespace Foxy\Config;
 
 use Foxy\Exception\RuntimeException;
 
-/**
- * Helper of package config.
- *
- * @author François Pluchino <francois.pluchino@gmail.com>
- */
+use function array_key_exists;
+use function ctype_digit;
+use function in_array;
+use function is_array;
+use function json_decode;
+use function json_last_error;
+use function sprintf;
+use function str_replace;
+use function str_starts_with;
+use function strtoupper;
+use function trim;
+
 class Config
 {
     private array $cacheEnv = [];
@@ -28,24 +26,7 @@ class Config
      * @param array $config The config.
      * @param array $defaults The default values.
      */
-    public function __construct(private array $config, private array $defaults = [])
-    {
-        $this->config = $config;
-        $this->defaults = $defaults;
-    }
-
-    /**
-     * Get the array config value.
-     *
-     * @param string $key The config key.
-     * @param array $default The default value.
-     */
-    public function getArray(string $key, array $default = []): array
-    {
-        $value = $this->get($key, null);
-
-        return is_array($value) ? $value : $default;
-    }
+    public function __construct(private readonly array $config, private readonly array $defaults = []) {}
 
     /**
      * Get the config value.
@@ -55,7 +36,7 @@ class Config
      */
     public function get(string $key, mixed $default = null): mixed
     {
-        if (\array_key_exists($key, $this->cacheEnv)) {
+        if (array_key_exists($key, $this->cacheEnv)) {
             return $this->cacheEnv[$key];
         }
 
@@ -68,9 +49,32 @@ class Config
 
         $defaultValue = $this->getDefaultValue($key, $default);
 
-        return \array_key_exists($key, $this->config)
+        return array_key_exists($key, $this->config)
             ? $this->getByManager($key, $this->config[$key], $defaultValue)
             : $defaultValue;
+    }
+
+    /**
+     * Get the array config value.
+     *
+     * @param string $key The config key.
+     * @param array $default The default value.
+     */
+    public function getArray(string $key, array $default = []): array
+    {
+        $value = $this->get($key);
+
+        return is_array($value) ? $value : $default;
+    }
+
+    /**
+     * Convert the value of environment variable into a boolean.
+     *
+     * @param string $value The value of environment variable.
+     */
+    private function convertBoolean(string $value): bool
+    {
+        return in_array($value, ['true', '1', 'yes', 'y'], true);
     }
 
     /**
@@ -105,55 +109,13 @@ class Config
     }
 
     /**
-     * Check if the value of environment variable is a boolean.
-     *
-     * @param string $value The value of environment variable.
-     */
-    private function isBoolean(string $value): bool
-    {
-        $value = strtolower($value);
-
-        return \in_array($value, ['true', 'false', '1', '0', 'yes', 'no', 'y', 'n'], true);
-    }
-
-    /**
-     * Convert the value of environment variable into a boolean.
-     *
-     * @param string $value The value of environment variable.
-     */
-    private function convertBoolean(string $value): bool
-    {
-        return \in_array($value, ['true', '1', 'yes', 'y'], true);
-    }
-
-    /**
-     * Check if the value of environment variable is a integer.
-     *
-     * @param string $value The value of environment variable.
-     */
-    private function isInteger(string $value): bool
-    {
-        return ctype_digit(trim($value, '-'));
-    }
-
-    /**
-     * Convert the value of environment variable into a integer.
+     * Convert the value of environment variable into an integer.
      *
      * @param string $value The value of environment variable.
      */
     private function convertInteger(string $value): int
     {
         return (int) $value;
-    }
-
-    /**
-     * Check if the value of environment variable is a string JSON.
-     *
-     * @param string $value The value of environment variable.
-     */
-    private function isJson(string $value): bool
-    {
-        return str_starts_with($value, '{') || str_starts_with($value, '[');
     }
 
     /**
@@ -168,26 +130,11 @@ class Config
 
         if (json_last_error()) {
             throw new RuntimeException(
-                sprintf('The "%s" environment variable isn\'t a valid JSON', $environmentVariable)
+                sprintf('The "%s" environment variable isn\'t a valid JSON', $environmentVariable),
             );
         }
 
         return is_array($value) ? $value : [];
-    }
-
-    /**
-     * Get the configured default value or custom default value.
-     *
-     * @param string $key The config key.
-     * @param mixed $default The default value.
-     */
-    private function getDefaultValue(string $key, mixed $default = null): mixed
-    {
-        $value = null === $default && \array_key_exists($key, $this->defaults)
-            ? $this->defaults[$key]
-            : $default;
-
-        return $this->getByManager($key, $value, $default);
     }
 
     /**
@@ -199,15 +146,62 @@ class Config
      */
     private function getByManager(string $key, mixed $value, mixed $default = null): mixed
     {
-        if (str_starts_with($key, 'manager-') && \is_array($value)) {
+        if (str_starts_with($key, 'manager-') && is_array($value)) {
             /** @var int|string $manager */
             $manager = $this->get('manager', '');
 
-            $value = \array_key_exists($manager, $value)
+            $value = array_key_exists($manager, $value)
                 ? $value[$manager]
                 : $default;
         }
 
         return $value;
+    }
+
+    /**
+     * Get the configured default value or custom default value.
+     *
+     * @param string $key The config key.
+     * @param mixed $default The default value.
+     */
+    private function getDefaultValue(string $key, mixed $default = null): mixed
+    {
+        $value = null === $default && array_key_exists($key, $this->defaults)
+            ? $this->defaults[$key]
+            : $default;
+
+        return $this->getByManager($key, $value, $default);
+    }
+
+    /**
+     * Check if the value of environment variable is a boolean.
+     *
+     * @param string $value The value of environment variable.
+     */
+    private function isBoolean(string $value): bool
+    {
+        $value = strtolower($value);
+
+        return in_array($value, ['true', 'false', '1', '0', 'yes', 'no', 'y', 'n'], true);
+    }
+
+    /**
+     * Check if the value of environment variable is an integer.
+     *
+     * @param string $value The value of environment variable.
+     */
+    private function isInteger(string $value): bool
+    {
+        return ctype_digit(trim($value, '-'));
+    }
+
+    /**
+     * Check if the value of environment variable is a string JSON.
+     *
+     * @param string $value The value of environment variable.
+     */
+    private function isJson(string $value): bool
+    {
+        return str_starts_with($value, '{') || str_starts_with($value, '[');
     }
 }

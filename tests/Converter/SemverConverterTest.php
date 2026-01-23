@@ -2,53 +2,17 @@
 
 declare(strict_types=1);
 
-/*
- * This file is part of the Foxy package.
- *
- * (c) François Pluchino <francois.pluchino@gmail.com>
- *
- * For the full copyright and license information, please view the LICENSE
- * file that was distributed with this source code.
- */
-
 namespace Foxy\Tests\Converter;
 
-use Foxy\Converter\SemverConverter;
-use Foxy\Converter\VersionConverterInterface;
+use Foxy\Converter\{SemverConverter, VersionConverterInterface};
 use PHPUnit\Framework\TestCase;
 
-/**
- * Tests for the conversion of Semver syntax to composer syntax.
- *
- * @author François Pluchino <francois.pluchino@gmail.com>
- *
- * @internal
- */
+use function ctype_alpha;
+use function in_array;
+
 final class SemverConverterTest extends TestCase
 {
     private VersionConverterInterface|null $converter = null;
-
-    protected function setUp(): void
-    {
-        $this->converter = new SemverConverter();
-    }
-
-    protected function tearDown(): void
-    {
-        $this->converter = null;
-    }
-
-    /**
-     * @dataProvider getTestVersions
-     */
-    public function testConverter(string|null $semver, string $composer): void
-    {
-        $this->assertEquals($composer, $this->converter->convertVersion($semver));
-
-        if (!\ctype_alpha((string) $semver) && !\in_array($semver, [null, ''], true)) {
-            $this->assertEquals('v' . $composer, $this->converter->convertVersion('v' . $semver));
-        }
-    }
 
     public static function getTestVersions(): array
     {
@@ -99,5 +63,33 @@ final class SemverConverterTest extends TestCase
             [null, '*'],
             ['', '*'],
         ];
+    }
+
+    /**
+     * @dataProvider getTestVersions
+     */
+    public function testConverter(string|null $semver, string $composer): void
+    {
+        self::assertSame(
+            $composer,
+            $this->converter->convertVersion($semver),
+        );
+
+        if (!ctype_alpha((string) $semver) && !in_array($semver, [null, ''], true)) {
+            self::assertSame(
+                'v' . $composer,
+                $this->converter->convertVersion('v' . $semver),
+            );
+        }
+    }
+
+    protected function setUp(): void
+    {
+        $this->converter = new SemverConverter();
+    }
+
+    protected function tearDown(): void
+    {
+        $this->converter = null;
     }
 }

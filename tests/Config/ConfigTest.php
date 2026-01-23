@@ -2,47 +2,35 @@
 
 declare(strict_types=1);
 
-/*
- * This file is part of the Foxy package.
- *
- * (c) François Pluchino <francois.pluchino@gmail.com>
- *
- * For the full copyright and license information, please view the LICENSE
- * file that was distributed with this source code.
- */
-
 namespace Foxy\Tests\Config;
 
-use Composer\Composer;
-use Composer\Config;
+use Composer\{Composer, Config};
 use Composer\IO\IOInterface;
 use Composer\Package\RootPackageInterface;
+use Exception;
 use Foxy\Config\ConfigBuilder;
+use Foxy\Exception\RuntimeException;
 use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\TestCase;
+use Seld\JsonLint\ParsingException;
 
-/**
- * Tests for config.
- *
- * @author François Pluchino <francois.pluchino@gmail.com>
- *
- * @internal
- */
-final class ConfigTest extends \PHPUnit\Framework\TestCase
+use function getenv;
+use function putenv;
+use function sprintf;
+use function str_starts_with;
+use function strpos;
+use function substr;
+
+final class ConfigTest extends TestCase
 {
     private Composer|MockObject|null $composer = null;
     private Config|MockObject|null $composerConfig = null;
     private IOInterface|MockObject|null $io = null;
     private MockObject|RootPackageInterface|null $package = null;
 
-    protected function setUp(): void
+    public static function getDataForGetArrayConfig(): array
     {
-        $this->composer = $this->createMock(Composer::class);
-        $this->composerConfig = $this->createMock(Config::class);
-        $this->io = $this->createMock(IOInterface::class);
-        $this->package = $this->createMock(RootPackageInterface::class);
-
-        $this->composer->expects($this->any())->method('getPackage')->willReturn($this->package);
-        $this->composer->expects($this->any())->method('getConfig')->willReturn($this->composerConfig);
+        return [['foo', [], []], ['foo', [42], [42]], ['foo', [42], [], ['foo' => [42]]]];
     }
 
     public static function getDataForGetConfig(): array
@@ -69,6 +57,26 @@ final class ConfigTest extends \PHPUnit\Framework\TestCase
     }
 
     /**
+     * @dataProvider getDataForGetArrayConfig
+     *
+     * @param string $key The key.
+     * @param array $expected The expected value.
+     * @param array $default The default value.
+     * @param array $defaults The configured default values.
+     *
+     * @throws ParsingException
+     */
+    public function testGetArrayConfig(string $key, array $expected, array $default, array $defaults = []): void
+    {
+        $config = ConfigBuilder::build($this->composer, $defaults, $this->io);
+
+        self::assertSame(
+            $expected,
+            $config->getArray($key, $default),
+        );
+    }
+
+    /**
      * @dataProvider getDataForGetConfig
      *
      * @param string $key The key.
@@ -76,17 +84,19 @@ final class ConfigTest extends \PHPUnit\Framework\TestCase
      * @param mixed $default The default value.
      * @param string|null $env The env variable.
      * @param array $defaults The configured default values.
+     *
+     * @throws ParsingException
      */
     public function testGetConfig(
         string $key,
         mixed $expected,
         mixed $default = null,
         string|null $env = null,
-        array $defaults = []
+        array $defaults = [],
     ): void {
         // add env variables
         if (null !== $env) {
-            \putenv($env);
+            putenv($env);
         }
 
         $globalLogComposer = true;
@@ -94,11 +104,11 @@ final class ConfigTest extends \PHPUnit\Framework\TestCase
 
         $globalPath = realpath(__DIR__ . '/../Fixtures/package/global');
 
-        $this->composerConfig->expects($this->any())->method('has')->with('home')->willReturn(true);
-        $this->composerConfig->expects($this->any())->method('get')->with('home')->willReturn($globalPath);
+        $this->composerConfig->expects(self::any())->method('has')->with('home')->willReturn(true);
+        $this->composerConfig->expects(self::any())->method('get')->with('home')->willReturn($globalPath);
 
         $this->package
-            ->expects($this->any())
+            ->expects(self::any())
             ->method('getConfig')
             ->willReturn(
                 [
@@ -118,25 +128,25 @@ final class ConfigTest extends \PHPUnit\Framework\TestCase
                 ],
             );
 
-        if (\str_starts_with($key, 'global-')) {
-            $this->io->expects($this->atLeast(2))->method('isDebug')->willReturn(true);
+        if (str_starts_with($key, 'global-')) {
+            $this->io->expects(self::atLeast(2))->method('isDebug')->willReturn(true);
 
             $globalLogComposer = false;
             $globalLogConfig = false;
 
             $this->io
-                ->expects($this->atLeastOnce())
+                ->expects(self::atLeastOnce())
                 ->method('writeError')
                 ->willReturnCallback(
                     static function ($message) use ($globalPath, &$globalLogComposer, &$globalLogConfig): void {
-                        if (\sprintf('Loading Foxy config in file %s/composer.json', $globalPath)) {
+                        if (sprintf('Loading Foxy config in file %s/composer.json', $globalPath)) {
                             $globalLogComposer = true;
                         }
 
-                        if (\sprintf('Loading Foxy config in file %s/config.json', $globalPath)) {
+                        if (sprintf('Loading Foxy config in file %s/config.json', $globalPath)) {
                             $globalLogConfig = true;
                         }
-                    }
+                    },
                 );
         }
 
@@ -145,63 +155,70 @@ final class ConfigTest extends \PHPUnit\Framework\TestCase
 
         // remove env variables
         if (null !== $env) {
-            $envKey = \substr($env, 0, \strpos($env, '='));
+            $envKey = substr($env, 0, strpos($env, '='));
+            putenv($envKey);
 
-            \putenv($envKey);
-
-            $this->assertFalse(\getenv($envKey));
+            self::assertFalse(
+                getenv($envKey),
+            );
         }
 
-        $this->assertTrue($globalLogComposer);
-        $this->assertTrue($globalLogConfig);
-        $this->assertSame($expected, $value);
-        // test cache
-        $this->assertSame($expected, $config->get($key, $default));
-    }
-
-    public static function getDataForGetArrayConfig(): array
-    {
-        return [['foo', [], []], ['foo', [42], [42]], ['foo', [42], [], ['foo' => [42]]]];
+        self::assertTrue(
+            $globalLogComposer,
+        );
+        self::assertTrue(
+            $globalLogConfig,
+        );
+        self::assertSame(
+            $expected,
+            $value,
+        );
+        self::assertSame(
+            $expected,
+            $config->get($key, $default),
+        );
     }
 
     /**
-     * @dataProvider getDataForGetArrayConfig
-     *
-     * @param string $key The key.
-     * @param array $expected The expected value.
-     * @param array $default  The default value.
-     * @param array $defaults The configured default values.
+     * @throws Exception|ParsingException
      */
-    public function testGetArrayConfig(string $key, array $expected, array $default, array $defaults = []): void
-    {
-        $config = ConfigBuilder::build($this->composer, $defaults, $this->io);
-
-        $this->assertSame($expected, $config->getArray($key, $default));
-    }
-
     public function testGetEnvConfigWithInvalidJson(): void
     {
-        $this->expectException(\Foxy\Exception\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('The "FOXY__ENV_JSON" environment variable isn\'t a valid JSON');
 
-        \putenv('FOXY__ENV_JSON="{"foo"}"');
+        putenv('FOXY__ENV_JSON="{"foo"}"');
 
         $config = ConfigBuilder::build($this->composer, [], $this->io);
         $ex = null;
 
         try {
             $config->get('env-json');
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $ex = $e;
         }
 
-        \putenv('FOXY__ENV_JSON');
-        $this->assertFalse(\getenv('FOXY__ENV_JSON'));
+        putenv('FOXY__ENV_JSON');
+
+        self::assertFalse(
+            getenv('FOXY__ENV_JSON'),
+        );
 
         if (null === $ex) {
-            throw new \Exception('The expected exception was not thrown');
+            throw new Exception('The expected exception was not thrown');
         }
 
         throw $ex;
+    }
+
+    protected function setUp(): void
+    {
+        $this->composer = $this->createMock(Composer::class);
+        $this->composerConfig = $this->createMock(Config::class);
+        $this->io = $this->createMock(IOInterface::class);
+        $this->package = $this->createMock(RootPackageInterface::class);
+
+        $this->composer->expects(self::any())->method('getPackage')->willReturn($this->package);
+        $this->composer->expects(self::any())->method('getConfig')->willReturn($this->composerConfig);
     }
 }

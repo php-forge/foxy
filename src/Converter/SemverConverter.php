@@ -2,33 +2,26 @@
 
 declare(strict_types=1);
 
-/*
- * This file is part of the Foxy package.
- *
- * (c) François Pluchino <francois.pluchino@gmail.com>
- *
- * For the full copyright and license information, please view the LICENSE
- * file that was distributed with this source code.
- */
-
 namespace Foxy\Converter;
 
-/**
- * Converter for Semver syntax version to composer syntax version.
- *
- * @author François Pluchino <francois.pluchino@gmail.com>
- */
+use function in_array;
+use function preg_match;
+use function str_replace;
+use function str_starts_with;
+use function strlen;
+use function substr;
+
 final class SemverConverter implements VersionConverterInterface
 {
     public function convertVersion(string|null $version = null): string
     {
-        if (\in_array($version, [null, '', 'latest'], true)) {
+        if (in_array($version, [null, '', 'latest'], true)) {
             return ('latest' === $version ? 'default || ' : '') . '*';
         }
 
         $version = str_replace('–', '-', $version);
-        $prefix = preg_match('/^[a-z]/', $version) && !str_starts_with($version, 'dev-') ? substr($version, 0, 1) : '';
-        $version = substr($version, \strlen($prefix));
+        $prefix = preg_match('/^[a-z]/', $version) && !str_starts_with($version, 'dev-') ? $version[0] : '';
+        $version = substr($version, strlen($prefix));
         $version = SemverUtil::convertVersionMetadata($version);
         $version = SemverUtil::convertDateVersion($version);
 

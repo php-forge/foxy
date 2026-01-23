@@ -10,12 +10,12 @@ on:
 
   push: *ignore-paths
 
-name: ecs
+name: static analysis
 
 permissions:
   contents: read
   pull-requests: write
 
 jobs:
-  easy-coding-standard:
-    uses: yii2-framework/actions/.github/workflows/ecs.yml@main
+  phpstan:
+    uses: yii2-framework/actions/.github/workflows/phpstan.yml@main

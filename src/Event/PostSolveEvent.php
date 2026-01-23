@@ -2,25 +2,11 @@
 
 declare(strict_types=1);
 
-/*
- * This file is part of the Foxy package.
- *
- * (c) François Pluchino <francois.pluchino@gmail.com>
- *
- * For the full copyright and license information, please view the LICENSE
- * file that was distributed with this source code.
- */
-
 namespace Foxy\Event;
 
 use Composer\Package\PackageInterface;
 use Foxy\FoxyEvents;
 
-/**
- * Post solve event.
- *
- * @author François Pluchino <francois.pluchino@gmail.com>
- */
 final class PostSolveEvent extends AbstractSolveEvent
 {
     /**
@@ -30,7 +16,7 @@ final class PostSolveEvent extends AbstractSolveEvent
      *
      * @psalm-param PackageInterface[] $packages All installed Composer packages.
      */
-    public function __construct($assetDir, array $packages, private readonly int $runResult)
+    public function __construct(string $assetDir, array $packages, private readonly int $runResult)
     {
         parent::__construct(FoxyEvents::POST_SOLVE, $assetDir, $packages);
     }

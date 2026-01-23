@@ -1,5 +1,4 @@
-Configuration
-=============
+# Configuration
 
 ## Manipulate the configuration
 
@@ -49,6 +48,7 @@ The accepted value types are:
 - JSON array or object
 
 **Example:**
+
 ```json
 {
     "config": {
@@ -62,6 +62,7 @@ The accepted value types are:
 Can be overridden by `FOXY__ENABLED="false"` environment variable.
 
 **Example:**
+
 ```json
 {
     "config": {
@@ -91,6 +92,7 @@ All keys starting with the prefix `manager-` can accept a unique value, but it w
 a map containing the value for each manager defined by her name.
 
 **Example:**
+
 ```json
 {
     "config": {
@@ -116,6 +118,7 @@ a map containing the value for each manager defined by her name.
 You can enable or disable the plugin with the option `config.foxy.enabled` [`boolean`, default: `true`].
 
 **Example:**
+
 ```json
 {
     "config": {
@@ -137,8 +140,8 @@ You can choose the asset manager with the option `config.foxy.manager` [`string`
 - `pnpm`
 - `yarn`
 
-
 **Example:**
+
 ```json
 {
     "config": {
@@ -155,6 +158,7 @@ You can validate the version of the asset manager with the option
 `config.foxy.manager-version` [`string`, default: `null`].
 
 **Example:**
+
 ```json
 {
     "config": {
@@ -171,6 +175,7 @@ You can define the custom path of the binary of the asset manager with the optio
 `config.foxy.manager-bin` [`string`, default: `null`].
 
 **Example:**
+
 ```json
 {
     "config": {
@@ -187,6 +192,7 @@ You can add custom options for the asset manager binary for the install and upda
 option `config.foxy.manager-options` [`string`, default: `null`].
 
 **Example:**
+
 ```json
 {
     "config": {
@@ -208,6 +214,7 @@ You can add custom options for the asset manager binary for the install command 
 option `config.foxy.manager-install-options` [`string`, default: `null`].
 
 **Example:**
+
 ```json
 {
     "config": {
@@ -230,6 +237,7 @@ You can add custom options for the asset manager binary for the update command w
 option `config.foxy.manager-update-options` [`string`, default: `null`].
 
 **Example:**
+
 ```json
 {
     "config": {
@@ -247,6 +255,7 @@ You can define the execution timeout of the asset manager with the
 option `config.foxy.manager-timeout` [`int`, default: `PHP_INT_MAX`].
 
 **Example:**
+
 ```json
 {
     "config": {
@@ -263,6 +272,7 @@ You can enable or disable the fallback of the asset package file with the option
 `config.foxy.fallback-asset` [`boolean`, default: `true`].
 
 **Example:**
+
 ```json
 {
     "config": {
@@ -273,12 +283,13 @@ You can enable or disable the fallback of the asset package file with the option
 }
 ```
 
-### Enable/disable the fallback for the Composer lock file and its dependencies
+### Enable/disable the fallback for the Composer lockfile and its dependencies
 
-You can enable or disable the fallback of the Composer lock file and its dependencies with the option
+You can enable or disable the fallback of the Composer lockfile and its dependencies with the option
 `config.foxy.fallback-composer` [`boolean`, default: `true`].
 
 **Example:**
+
 ```json
 {
     "config": {
@@ -295,6 +306,7 @@ You can enable or disable the running of the asset manager with the option
 `config.foxy.run-asset-manager` [`boolean`, default: `true`].
 
 **Example:**
+
 ```json
 {
     "config": {
@@ -316,6 +328,7 @@ You can define the custom path of the mock package of PHP library with the optio
 `config.foxy.composer-asset-dir` [`string`, default: `null`].
 
 **Example:**
+
 ```json
 {
     "config": {
@@ -329,7 +342,7 @@ You can define the custom path of the mock package of PHP library with the optio
 ### Enable/disable manually the PHP packages with an asset package definition
 
 By default, Foxy looks in the `composer.json` file of the PHP dependencies, if the mock package needs
-to be added into NPM or Yarn. However, some public PHP package already uses the `package.json` file
+to be added into npm or Yarn. However, some public PHP package already uses the `package.json` file
 to handle their asset dependencies, but Foxy is not enabled for this package. In this case, you can
 manually enable the PHP packages to be scanned in your project.
 
@@ -340,6 +353,7 @@ You can define the patterns to enable or disable the packages with the option
 `config.foxy.enable-packages` [`array`, default: `array()`].
 
 **Example:**
+
 ```json
 {
     "config": {
@@ -357,14 +371,12 @@ You can define the patterns to enable or disable the packages with the option
 If you do not deactivate any packages, you can use a simple array.
 
 **Example:**
+
 ```json
 {
     "config": {
         "foxy": {
-            "enable-packages": [
-                "/^bar\/*/",
-                "foo/*"
-            ]
+            "enable-packages": ["/^bar\/*/", "foo/*"]
         }
     }
 }
@@ -375,6 +387,7 @@ If you do not deactivate any packages, you can use a simple array.
 You can define the custom directory for `package.json` file with the option `root-package-json-dir` [`string`, default: `null`].
 
 **Example:**
+
 ```json
 {
     "config": {
@@ -386,6 +399,7 @@ You can define the custom directory for `package.json` file with the option `roo
 ```
 
 > **Notes:**
+>
 > - This path affects reading, writing, and merging the real `package.json` file, and the working directory for the asset manager.
 > - Relative paths are resolved from the current working directory. Absolute paths are supported.
 > - Filesystem roots such as `/` or `C:\` are preserved.

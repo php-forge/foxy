@@ -2,23 +2,12 @@
 
 declare(strict_types=1);
 
-/*
- * This file is part of the Foxy package.
- *
- * (c) François Pluchino <francois.pluchino@gmail.com>
- *
- * For the full copyright and license information, please view the LICENSE
- * file that was distributed with this source code.
- */
-
 namespace Foxy\Util;
 
 use Composer\Config;
 use Composer\IO\IOInterface;
-use Symfony\Component\Console\Input\ArgvInput;
-use Symfony\Component\Console\Input\InputInterface;
-
-use const PHP_VERSION_ID;
+use ReflectionClass;
+use Symfony\Component\Console\Input\{ArgvInput, InputInterface};
 
 /**
  * Helper for console.
@@ -34,15 +23,10 @@ final class ConsoleUtil
      */
     public static function getInput(IOInterface $io): InputInterface
     {
-        $ref = new \ReflectionClass($io);
+        $ref = new ReflectionClass($io);
 
         if ($ref->hasProperty('input')) {
             $prop = $ref->getProperty('input');
-
-            if (PHP_VERSION_ID < 80500) {
-                $prop->setAccessible(true);
-            }
-
             $input = $prop->getValue($io);
 
             if ($input instanceof InputInterface) {

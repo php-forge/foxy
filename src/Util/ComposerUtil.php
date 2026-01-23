@@ -2,26 +2,12 @@
 
 declare(strict_types=1);
 
-/*
- * This file is part of the Foxy package.
- *
- * (c) François Pluchino <francois.pluchino@gmail.com>
- *
- * For the full copyright and license information, please view the LICENSE
- * file that was distributed with this source code.
- */
-
 namespace Foxy\Util;
 
 use Composer\Installer\InstallerEvents;
 use Composer\Semver\Semver;
 use Foxy\Exception\RuntimeException;
 
-/**
- * Helper for Composer.
- *
- * @author François Pluchino <francois.pluchino@gmail.com>
- */
 final class ComposerUtil
 {
     /**

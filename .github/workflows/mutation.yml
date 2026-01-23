@@ -1,0 +1,26 @@
+---
+on:
+  pull_request: &ignore-paths
+    paths-ignore:
+      - ".gitattributes"
+      - ".gitignore"
+      - "CHANGELOG.md"
+      - "docs/**"
+      - "README.md"
+
+  push: *ignore-paths
+
+name: mutation test
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  mutation:
+    uses: yii2-framework/actions/.github/workflows/infection.yml@v1
+    with:
+      before-hook: composer require infection/infection --dev --no-progress --no-suggest --prefer-dist
+      phpstan: true
+    secrets:
+      STRYKER_DASHBOARD_API_KEY: ${{ secrets.STRYKER_DASHBOARD_API_KEY }}

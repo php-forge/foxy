@@ -2,89 +2,28 @@
 
 declare(strict_types=1);
 
-/*
- * This file is part of the Foxy package.
- *
- * (c) François Pluchino <francois.pluchino@gmail.com>
- *
- * For the full copyright and license information, please view the LICENSE
- * file that was distributed with this source code.
- */
-
 namespace Foxy\Tests\Asset;
 
 use Composer\Json\JsonFile;
 use Composer\Package\RootPackageInterface;
+use Exception;
 use Foxy\Asset\AssetPackage;
+use JsonException;
 use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\TestCase;
+use Seld\JsonLint\ParsingException;
 use Symfony\Component\Filesystem\Filesystem;
 
-/**
- * Asset package tests.
- *
- * @author François Pluchino <francois.pluchino@gmail.com>
- *
- * @internal
- */
-final class AssetPackageTest extends \PHPUnit\Framework\TestCase
+use function file_put_contents;
+
+use const DIRECTORY_SEPARATOR;
+
+final class AssetPackageTest extends TestCase
 {
     protected string|null $cwd = '';
-    protected Filesystem|null $sfs = null;
-    protected MockObject|RootPackageInterface|null $rootPackage = null;
     protected JsonFile|MockObject|null $jsonFile = null;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->cwd = sys_get_temp_dir() . \DIRECTORY_SEPARATOR . uniqid('foxy_asset_package_test_', true);
-        $this->sfs = new Filesystem();
-        $this->rootPackage = $this->createMock(RootPackageInterface::class);
-        $this->jsonFile = $this->getMockBuilder(JsonFile::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['exists', 'getPath', 'read', 'write'])
-            ->getMock()
-        ;
-
-        $this->rootPackage->expects($this->any())->method('getLicense')->willReturn([]);
-
-        $this->sfs->mkdir($this->cwd);
-    }
-
-    protected function tearDown(): void
-    {
-        parent::tearDown();
-
-        $this->sfs->remove($this->cwd);
-        $this->jsonFile = null;
-        $this->rootPackage = null;
-        $this->sfs = null;
-        $this->cwd = null;
-    }
-
-    public function testGetPackageWithExistingFile(): void
-    {
-        $package = ['name' => '@foo/bar'];
-        $contentString = json_encode($package);
-        $this->addPackageFile($package, $contentString);
-
-        $assetPackage = new AssetPackage($this->rootPackage, $this->jsonFile);
-
-        $this->assertSame($package, $assetPackage->getPackage());
-    }
-
-    public function testWrite(): void
-    {
-        $package = ['name' => '@foo/bar'];
-
-        $this->jsonFile->expects($this->once())->method('exists')->willReturn(false);
-        $this->jsonFile->expects($this->once())->method('write')->with($package);
-
-        $assetPackage = new AssetPackage($this->rootPackage, $this->jsonFile);
-
-        $assetPackage->setPackage($package);
-        $assetPackage->write();
-    }
+    protected MockObject|RootPackageInterface|null $rootPackage = null;
+    protected Filesystem|null $sfs = null;
 
     public static function getDataRequiredKeys(): array
     {
@@ -124,42 +63,8 @@ final class AssetPackageTest extends \PHPUnit\Framework\TestCase
     }
 
     /**
-     * @dataProvider getDataRequiredKeys
+     * @throws JsonException|ParsingException
      */
-    public function testInjectionOfRequiredKeys(array $expected, array $package, string $license): void
-    {
-        $this->addPackageFile($package);
-
-        $this->rootPackage = $this->createMock(RootPackageInterface::class);
-
-        $this->rootPackage->expects($this->any())->method('getLicense')->willReturn([$license]);
-
-        $assetPackage = new AssetPackage($this->rootPackage, $this->jsonFile);
-
-        $this->assertEquals($expected, $assetPackage->getPackage());
-    }
-
-    public function testGetInstalledDependencies(): void
-    {
-        $expected = [
-            '@composer-asset/foo--bar' => 'file:./path/foo/bar',
-            '@composer-asset/baz--bar' => 'file:./path/baz/bar',
-        ];
-        $package = [
-            'dependencies' => [
-                '@composer-asset/foo--bar' => 'file:./path/foo/bar',
-                '@bar/foo' => '^1.0.0',
-                '@composer-asset/baz--bar' => 'file:./path/baz/bar',
-            ],
-        ];
-
-        $this->addPackageFile($package);
-
-        $assetPackage = new AssetPackage($this->rootPackage, $this->jsonFile);
-
-        $this->assertEquals($expected, $assetPackage->getInstalledDependencies());
-    }
-
     public function testAddNewDependencies(): void
     {
         $expected = [
@@ -170,8 +75,10 @@ final class AssetPackageTest extends \PHPUnit\Framework\TestCase
                 '@composer-asset/new--dependency' => 'file:./path/new/dependency',
             ],
         ];
-        $expectedExisting = ['@composer-asset/foo--bar', '@composer-asset/baz--bar'];
-
+        $expectedExisting = [
+            '@composer-asset/foo--bar',
+            '@composer-asset/baz--bar',
+        ];
         $package = [
             'dependencies' => [
                 '@composer-asset/foo--bar' => 'file:./path/foo/bar',
@@ -190,10 +97,89 @@ final class AssetPackageTest extends \PHPUnit\Framework\TestCase
         $assetPackage = new AssetPackage($this->rootPackage, $this->jsonFile);
         $existing = $assetPackage->addNewDependencies($dependencies);
 
-        $this->assertSame($expected, $assetPackage->getPackage());
-        $this->assertSame($expectedExisting, $existing);
+        self::assertSame(
+            $expected,
+            $assetPackage->getPackage(),
+        );
+        self::assertSame(
+            $expectedExisting,
+            $existing,
+        );
     }
 
+    /**
+     * @throws ParsingException
+     * @throws JsonException
+     */
+    public function testGetInstalledDependencies(): void
+    {
+        $expected = [
+            '@composer-asset/foo--bar' => 'file:./path/foo/bar',
+            '@composer-asset/baz--bar' => 'file:./path/baz/bar',
+        ];
+        $package = [
+            'dependencies' => [
+                '@composer-asset/foo--bar' => 'file:./path/foo/bar',
+                '@bar/foo' => '^1.0.0',
+                '@composer-asset/baz--bar' => 'file:./path/baz/bar',
+            ],
+        ];
+
+        $this->addPackageFile($package);
+
+        $assetPackage = new AssetPackage($this->rootPackage, $this->jsonFile);
+
+        self::assertSame(
+            $expected,
+            $assetPackage->getInstalledDependencies(),
+        );
+    }
+
+    /**
+     * @throws ParsingException
+     * @throws JsonException
+     */
+    public function testGetPackageWithExistingFile(): void
+    {
+        $package = ['name' => '@foo/bar'];
+
+        $contentString = json_encode($package, JSON_THROW_ON_ERROR);
+
+        $this->addPackageFile($package, $contentString);
+
+        $assetPackage = new AssetPackage($this->rootPackage, $this->jsonFile);
+
+        self::assertSame(
+            $package,
+            $assetPackage->getPackage(),
+        );
+    }
+
+    /**
+     * @dataProvider getDataRequiredKeys
+     *
+     * @throws JsonException|ParsingException
+     */
+    public function testInjectionOfRequiredKeys(array $expected, array $package, string $license): void
+    {
+        $this->addPackageFile($package);
+
+        $this->rootPackage = $this->createMock(RootPackageInterface::class);
+
+        $this->rootPackage->expects(self::any())->method('getLicense')->willReturn([$license]);
+
+        $assetPackage = new AssetPackage($this->rootPackage, $this->jsonFile);
+
+        self::assertSame(
+            $expected,
+            $assetPackage->getPackage(),
+        );
+    }
+
+    /**
+     * @throws ParsingException
+     * @throws JsonException
+     */
     public function testRemoveUnusedDependencies(): void
     {
         $expected = [
@@ -215,9 +201,29 @@ final class AssetPackageTest extends \PHPUnit\Framework\TestCase
         $this->addPackageFile($package);
 
         $assetPackage = new AssetPackage($this->rootPackage, $this->jsonFile);
+
         $assetPackage->removeUnusedDependencies($dependencies);
 
-        $this->assertEquals($expected, $assetPackage->getPackage());
+        self::assertSame(
+            $expected,
+            $assetPackage->getPackage(),
+        );
+    }
+
+    /**
+     * @throws Exception|ParsingException
+     */
+    public function testWrite(): void
+    {
+        $package = ['name' => '@foo/bar'];
+
+        $this->jsonFile->expects(self::once())->method('exists')->willReturn(false);
+        $this->jsonFile->expects(self::once())->method('write')->with($package);
+
+        $assetPackage = new AssetPackage($this->rootPackage, $this->jsonFile);
+
+        $assetPackage->setPackage($package);
+        $assetPackage->write();
     }
 
     /**
@@ -225,16 +231,49 @@ final class AssetPackageTest extends \PHPUnit\Framework\TestCase
      *
      * @param array $package The package.
      * @param string|null $contentString The string content of package.
+     *
+     * @throws JsonException
      */
-    protected function addPackageFile(array $package, $contentString = null): void
+    protected function addPackageFile(array $package, string|null $contentString = null): void
     {
         $filename = $this->cwd . '/package.json';
-        $contentString ??= json_encode($package);
+        $contentString ??= json_encode($package, JSON_THROW_ON_ERROR);
 
-        $this->jsonFile->expects($this->any())->method('exists')->willReturn(true);
-        $this->jsonFile->expects($this->any())->method('getPath')->willReturn($filename);
-        $this->jsonFile->expects($this->any())->method('read')->willReturn($package);
+        $this->jsonFile->expects(self::any())->method('exists')->willReturn(true);
+        $this->jsonFile->expects(self::any())->method('getPath')->willReturn($filename);
+        $this->jsonFile->expects(self::any())->method('read')->willReturn($package);
 
-        \file_put_contents($filename, $contentString);
+        file_put_contents($filename, $contentString);
+    }
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->cwd = sys_get_temp_dir() . DIRECTORY_SEPARATOR . uniqid('foxy_asset_package_test_', true);
+
+        $this->sfs = new Filesystem();
+
+        $this->rootPackage = $this->createMock(RootPackageInterface::class);
+        $this->jsonFile = $this
+            ->getMockBuilder(JsonFile::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['exists', 'getPath', 'read', 'write'])
+            ->getMock()
+        ;
+        $this->rootPackage->expects(self::any())->method('getLicense')->willReturn([]);
+
+        $this->sfs->mkdir($this->cwd);
+    }
+
+    protected function tearDown(): void
+    {
+        parent::tearDown();
+
+        $this->sfs->remove($this->cwd);
+        $this->jsonFile = null;
+        $this->rootPackage = null;
+        $this->sfs = null;
+        $this->cwd = null;
     }
 }

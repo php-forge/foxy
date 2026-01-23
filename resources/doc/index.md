@@ -1,5 +1,4 @@
-Getting started
-===============
+# Getting started
 
 1. [Introduction](index.md#introduction)
 2. [Required dependencies](index.md#required-dependencies)
@@ -15,9 +14,9 @@ Foxy is a Composer plug-in that aggregates npm-packages from Composer packages.
 
 This makes it possible (and automates the process of) installing and updating npm-packages that ship with your Composer packages, leveraging the native (`bun`, `npm`, `yarn`, or `pnpm`) package manager to do the heavy lifting.
 
-For this approach to work well, you should think of an npm-package in a Composer package not just as an "artifact", but as an actual npm-package *embedded* in your Composer package.
+For this approach to work well, you should think of an npm-package in a Composer package not just as an "artifact", but as an actual npm-package _embedded_ in your Composer package.
 
-Importantly, you should name it and *version* it, independently of your Composer version number - like you would normally do with a stand-alone npm-package.
+Importantly, you should name it and _version_ it, independently of your Composer version number - like you would normally do with a stand-alone npm-package.
 
 Note that, for npm-packages with no version number, Foxy will default to the Composer version, as a fallback only: versioning your npm-package explicitly is much safer in terms of correctly versioning breaking/non-breaking changes to any client-side APIs exposed by the embedded npm-package.
 

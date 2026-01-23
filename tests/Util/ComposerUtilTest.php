@@ -2,27 +2,13 @@
 
 declare(strict_types=1);
 
-/*
- * This file is part of the Foxy package.
- *
- * (c) François Pluchino <francois.pluchino@gmail.com>
- *
- * For the full copyright and license information, please view the LICENSE
- * file that was distributed with this source code.
- */
-
 namespace Foxy\Tests\Util;
 
+use Foxy\Exception\RuntimeException;
 use Foxy\Util\ComposerUtil;
+use PHPUnit\Framework\TestCase;
 
-/**
- * Tests for composer util.
- *
- * @author François Pluchino <francois.pluchino@gmail.com>
- *
- * @internal
- */
-final class ComposerUtilTest extends \PHPUnit\Framework\TestCase
+final class ComposerUtilTest extends TestCase
 {
     public static function getValidateVersionData(): array
     {
@@ -45,11 +31,11 @@ final class ComposerUtilTest extends \PHPUnit\Framework\TestCase
     public function testValidateVersion(string $composerVersion, string $requiredVersion, bool $valid): void
     {
         if ($valid) {
-            $this->assertTrue(true, 'Composer\'s version is valid');
+            self::assertTrue(true, 'Composer\'s version is valid');
         } else {
-            $this->expectException(\Foxy\Exception\RuntimeException::class);
+            $this->expectException(RuntimeException::class);
             $this->expectExceptionMessageMatches(
-                '/Foxy requires the Composer\'s minimum version "([\d\.^|, ]+)", current version is "([\d\.]+)"/'
+                '/Foxy requires the Composer\'s minimum version "([\d\.^|, ]+)", current version is "([\d\.]+)"/',
             );
         }
 

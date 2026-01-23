@@ -1,33 +1,21 @@
+---
 on:
-  pull_request:
+  pull_request: &ignore-paths
     paths-ignore:
-      - 'docs/**'
-      - 'README.md'
-      - 'CHANGELOG.md'
-      - '.gitignore'
-      - '.gitattributes'
-      - 'infection.json.dist'
-      - 'phpunit.xml.dist'
-      - 'psalm.xml'
+      - ".gitattributes"
+      - ".gitignore"
+      - "CHANGELOG.md"
+      - "docs/**"
+      - "README.md"
 
-  push:
-    paths-ignore:
-      - 'docs/**'
-      - 'README.md'
-      - 'CHANGELOG.md'
-      - '.gitignore'
-      - '.gitattributes'
-      - 'infection.json.dist'
-      - 'phpunit.xml.dist'
-      - 'psalm.xml'
+  push: *ignore-paths
 
-name: dependency-check
+name: Composer require checker
+
+permissions:
+  contents: read
+  pull-requests: write
 
 jobs:
   composer-require-checker:
-    uses: php-forge/actions/.github/workflows/composer-require-checker.yml@main
-    with:
-      os: >-
-        ['ubuntu-latest']
-      php-version: >-
-        ['8.1']
+    uses: yii2-framework/actions/.github/workflows/composer-require-checker.yml@main

@@ -2,200 +2,69 @@
 
 declare(strict_types=1);
 
-/*
- * This file is part of the Foxy package.
- *
- * (c) François Pluchino <francois.pluchino@gmail.com>
- *
- * For the full copyright and license information, please view the LICENSE
- * file that was distributed with this source code.
- */
-
 namespace Foxy\Tests\Asset;
 
 use Composer\IO\IOInterface;
 use Composer\Json\JsonFile;
 use Composer\Package\RootPackageInterface;
-use Composer\Util\Filesystem;
-use Composer\Util\ProcessExecutor;
-use Foxy\Asset\AbstractAssetManager;
-use Foxy\Asset\AssetManagerInterface;
+use Composer\Util\{Filesystem, ProcessExecutor};
+use Foxy\Asset\{AbstractAssetManager, AssetManagerInterface, AssetPackageInterface};
 use Foxy\Config\Config;
+use Foxy\Exception\RuntimeException;
 use Foxy\Fallback\FallbackInterface;
-use Foxy\Tests\Fixtures\Util\ProcessExecutorMock;
-use Foxy\Tests\Fixtures\Util\ThrowingProcessExecutorMock;
+use Foxy\Tests\Fixtures\Util\{ProcessExecutorMock, ThrowingProcessExecutorMock};
 use PHPUnit\Framework\Attributes\RequiresOperatingSystemFamily;
-use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\{Exception, MockObject};
+use PHPUnit\Framework\TestCase;
 use Xepozz\InternalMocker\MockerState;
 
+use function chdir;
 use function file_get_contents;
 use function file_put_contents;
+use function getcwd;
 
 use const DIRECTORY_SEPARATOR;
 
-/**
- * Abstract class for asset manager tests.
- *
- * @author François Pluchino <francois.pluchino@gmail.com>
- */
-abstract class AssetManager extends \PHPUnit\Framework\TestCase
+abstract class AssetManager extends TestCase
 {
     protected Config|null $config = null;
-    protected IOInterface|null $io = null;
-    protected ProcessExecutorMock|ThrowingProcessExecutorMock|null $executor = null;
-    protected Filesystem|MockObject|null $fs = null;
-    protected \Symfony\Component\Filesystem\Filesystem|null $sfs = null;
-    protected FallbackInterface|MockObject|null $fallback = null;
-    protected AssetManagerInterface|null $manager = null;
-    protected string|null $oldCwd = '';
+
     protected string|null $cwd = '';
 
-    protected function setUp(): void
+    protected ProcessExecutorMock|ThrowingProcessExecutorMock|null $executor = null;
+
+    protected FallbackInterface|MockObject|null $fallback = null;
+
+    protected Filesystem|MockObject|null $fs = null;
+
+    protected IOInterface|null $io = null;
+
+    protected AssetManagerInterface|null $manager = null;
+
+    protected string|null $oldCwd = '';
+
+    protected \Symfony\Component\Filesystem\Filesystem|null $sfs = null;
+
+    abstract protected function getManager(): AssetManagerInterface;
+
+    abstract protected function getValidInstallCommand(): string;
+
+    abstract protected function getValidLockPackageName(): string;
+
+    abstract protected function getValidName(): string;
+
+    abstract protected function getValidUpdateCommand(): string;
+
+    abstract protected function getValidVersionCommand(): string;
+
+    public static function getRunData(): array
     {
-        parent::setUp();
-
-        $this->config = new Config([]);
-        $this->io = $this->createMock(IOInterface::class);
-        $this->executor = new ProcessExecutorMock($this->io);
-        $this->fs = $this->createMock(Filesystem::class);
-        $this->sfs = new \Symfony\Component\Filesystem\Filesystem();
-        $this->fallback = $this->createMock(FallbackInterface::class);
-        $this->manager = $this->getManager();
-        $this->oldCwd = getcwd();
-        $this->cwd = sys_get_temp_dir() . DIRECTORY_SEPARATOR . uniqid('foxy_asset_manager_test_', true);
-        $this->sfs->mkdir($this->cwd);
-
-        \chdir($this->cwd);
+        return [[0, 'install'], [0, 'update'], [1, 'install'], [1, 'update']];
     }
 
-    protected function tearDown(): void
-    {
-        parent::tearDown();
-
-        \chdir($this->oldCwd);
-
-        $this->sfs->remove($this->cwd);
-        $this->config = null;
-        $this->io = null;
-        $this->executor = null;
-        $this->fs = null;
-        $this->sfs = null;
-        $this->fallback = null;
-        $this->manager = null;
-        $this->oldCwd = null;
-        $this->cwd = null;
-    }
-
-    public function testGetName(): void
-    {
-        $this->assertSame($this->getValidName(), $this->manager->getName());
-    }
-
-    public function testGetLockPackageName(): void
-    {
-        $this->assertSame($this->getValidLockPackageName(), $this->manager->getLockPackageName());
-    }
-
-    public function testGetPackageName(): void
-    {
-        $this->assertSame('package.json', $this->manager->getPackageName());
-    }
-
-    public function testHasLockFile(): void
-    {
-        $this->assertFalse($this->manager->hasLockFile());
-    }
-
-    public function testHasLockFileWithRootPackageDirAsRoot(): void
-    {
-        $this->config = new Config([], ['root-package-json-dir' => DIRECTORY_SEPARATOR]);
-        $this->manager = $this->getManager();
-
-        MockerState::addCondition('Foxy\\Asset', 'getcwd', [], $this->cwd);
-
-        $this->assertInstanceOf(AbstractAssetManager::class, $this->manager);
-        /** @var AbstractAssetManager $manager */
-        $manager = $this->manager;
-
-        $this->assertSame(
-            DIRECTORY_SEPARATOR . $manager->getPackageName(),
-            $manager->getPackageJsonPath()
-        );
-        $this->assertFalse($this->manager->hasLockFile());
-    }
-
-    #[RequiresOperatingSystemFamily('Windows')]
-    public function testGetPackageJsonPathWithWindowsRootPackageDir(): void
-    {
-        $this->config = new Config([], ['root-package-json-dir' => 'C:\\']);
-        $this->manager = $this->getManager();
-
-        $this->assertInstanceOf(AbstractAssetManager::class, $this->manager);
-        /** @var AbstractAssetManager $manager */
-        $manager = $this->manager;
-
-        $this->assertSame('C:\\package.json', $manager->getPackageJsonPath());
-    }
-
-    public function testIsInstalled(): void
-    {
-        $this->assertFalse($this->manager->isInstalled());
-    }
-
-    public function testIsUpdatable(): void
-    {
-        $this->assertFalse($this->manager->isUpdatable());
-    }
-
-    public function testSetUpdatable(): void
-    {
-        $res = $this->manager->setUpdatable(false);
-
-        $this->assertInstanceOf(AssetManagerInterface::class, $res);
-    }
-
-    public function testValidateWithoutInstalledManager(): void
-    {
-        $this->expectException(\Foxy\Exception\RuntimeException::class);
-        $this->expectExceptionMessageMatches('/The binary of "(\w+)" must be installed/');
-
-        $this->manager->validate();
-    }
-
-    public function testValidateWithInstalledManagerAndWithoutValidVersion(): void
-    {
-        $this->expectException(\Foxy\Exception\RuntimeException::class);
-        $this->expectExceptionMessageMatches(
-            '/The installed (\w+) version "42.0.0" doesn\'t match with the constraint version ">=50.0"/'
-        );
-
-        $this->config = new Config([], ['manager-version' => '>=50.0']);
-        $this->manager = $this->getManager();
-
-        $this->executor->addExpectedValues(0, '42.0.0');
-
-        $this->manager->validate();
-    }
-
-    public function testValidateWithInstalledManagerAndWithValidVersion(): void
-    {
-        $this->config = new Config([], ['manager-version' => '>=41.0']);
-        $this->manager = $this->getManager();
-
-        $this->executor->addExpectedValues(0, '42.0.0');
-
-        $this->manager->validate();
-        $this->assertSame('>=41.0', $this->config->get('manager-version'));
-    }
-
-    public function testValidateWithInstalledManagerAndWithoutValidationVersion(): void
-    {
-        $this->executor->addExpectedValues(0, '42.0.0');
-
-        $this->manager->validate();
-        $this->assertNull($this->config->get('manager-version'));
-    }
-
+    /**
+     * @throws Exception
+     */
     public function testAddDependenciesForInstallCommand(): void
     {
         $expectedPackage = [
@@ -209,21 +78,31 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
             '@composer-asset/new--dependency' => 'path/new/dependency/package.json',
         ];
 
-        /** @var MockObject|RootPackageInterface $rootPackage */
         $rootPackage = $this->createMock(RootPackageInterface::class);
+        $rootPackage->expects(self::any())->method('getLicense')->willReturn([]);
 
-        $rootPackage->expects($this->any())->method('getLicense')->willReturn([]);
-
-        $this->assertFalse($this->manager->isInstalled());
-        $this->assertFalse($this->manager->isUpdatable());
+        self::assertFalse(
+            $this->manager->isInstalled(),
+        );
+        self::assertFalse(
+            $this->manager->isUpdatable(),
+        );
 
         $assetPackage = $this->manager->addDependencies($rootPackage, $allDependencies);
 
-        $this->assertInstanceOf(\Foxy\Asset\AssetPackageInterface::class, $assetPackage);
-
-        $this->assertEquals($expectedPackage, $assetPackage->getPackage());
+        self::assertInstanceOf(
+            AssetPackageInterface::class,
+            $assetPackage,
+        );
+        self::assertSame(
+            $expectedPackage,
+            $assetPackage->getPackage(),
+        );
     }
 
+    /**
+     * @throws Exception
+     */
     public function testAddDependenciesForUpdateCommand(): void
     {
         $this->actionForTestAddDependenciesForUpdateCommand();
@@ -247,33 +126,52 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
 
         $jsonFile = new JsonFile($this->cwd . '/package.json');
 
-        /** @var MockObject|RootPackageInterface $rootPackage */
         $rootPackage = $this->createMock(RootPackageInterface::class);
-
-        $rootPackage->expects($this->any())->method('getLicense')->willReturn([]);
+        $rootPackage->expects(self::any())->method('getLicense')->willReturn([]);
 
         $nodeModulePath = $this->cwd . ltrim(AbstractAssetManager::NODE_MODULES_PATH, '.');
 
         $jsonFile->write($package);
 
-        $this->assertFileExists($jsonFile->getPath());
+        self::assertFileExists(
+            $jsonFile->getPath(),
+        );
+
         $this->sfs->mkdir($nodeModulePath);
-        $this->assertFileExists($nodeModulePath);
+
+        self::assertFileExists(
+            $nodeModulePath,
+        );
 
         $lockFilePath = $this->cwd . DIRECTORY_SEPARATOR . $this->manager->getLockPackageName();
 
         file_put_contents($lockFilePath, '{}');
 
-        $this->assertFileExists($lockFilePath);
-        $this->assertTrue($this->manager->isInstalled());
-        $this->assertTrue($this->manager->isUpdatable());
+        self::assertFileExists(
+            $lockFilePath,
+        );
+        self::assertTrue(
+            $this->manager->isInstalled(),
+        );
+        self::assertTrue(
+            $this->manager->isUpdatable(),
+        );
 
         $assetPackage = $this->manager->addDependencies($rootPackage, $allDependencies);
 
-        $this->assertInstanceOf(\Foxy\Asset\AssetPackageInterface::class, $assetPackage);
-        $this->assertEquals($expectedPackage, $assetPackage->getPackage());
+        self::assertInstanceOf(
+            AssetPackageInterface::class,
+            $assetPackage,
+        );
+        self::assertSame(
+            $expectedPackage,
+            $assetPackage->getPackage(),
+        );
     }
 
+    /**
+     * @throws Exception
+     */
     public function testAddDependenciesUsesRootPackageJsonDir(): void
     {
         $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'root-package';
@@ -298,40 +196,142 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
             '@composer-asset/new--dependency' => 'path/new/dependency/package.json',
         ];
 
-        /** @var MockObject|RootPackageInterface $rootPackage */
         $rootPackage = $this->createMock(RootPackageInterface::class);
+        $rootPackage->expects(self::any())->method('getLicense')->willReturn([]);
 
-        $rootPackage->expects($this->any())->method('getLicense')->willReturn([]);
         $this->manager->addDependencies($rootPackage, $dependencies);
 
-        $this->assertSame($cwdPackageContent, file_get_contents($cwdPackagePath));
+        self::assertSame(
+            $cwdPackageContent,
+            file_get_contents($cwdPackagePath),
+        );
 
         $updatedContent = (string) file_get_contents($rootPackagePath);
 
-        $this->assertStringContainsString(
+        self::assertStringContainsString(
             '"@composer-asset/new--dependency": "file:./path/new/dependency"',
-            $updatedContent
+            $updatedContent,
         );
-        $this->assertMatchesRegularExpression(
+        self::assertMatchesRegularExpression(
             '/\n {4}"dependencies": \{/',
             $updatedContent,
         );
-        $this->assertMatchesRegularExpression(
+        self::assertMatchesRegularExpression(
             '/\n {8}"@composer-asset\/new--dependency": "file:\.\/path\/new\/dependency"/',
-            $updatedContent
+            $updatedContent,
         );
     }
 
-    public function testRunWithDisableOption(): void
+    public function testGetLockPackageName(): void
     {
-        $this->config = new Config([], ['run-asset-manager' => false]);
-
-        $this->assertSame(0, $this->getManager()->run());
+        self::assertSame(
+            $this->getValidLockPackageName(),
+            $this->manager->getLockPackageName(),
+        );
     }
 
-    public static function getRunData(): array
+    public function testGetName(): void
     {
-        return [[0, 'install'], [0, 'update'], [1, 'install'], [1, 'update']];
+        self::assertSame(
+            $this->getValidName(),
+            $this->manager->getName(),
+        );
+    }
+
+    #[RequiresOperatingSystemFamily('Windows')]
+    public function testGetPackageJsonPathWithWindowsRootPackageDir(): void
+    {
+        $this->config = new Config([], ['root-package-json-dir' => 'C:\\']);
+        $this->manager = $this->getManager();
+
+        self::assertInstanceOf(
+            AbstractAssetManager::class,
+            $this->manager,
+        );
+
+        /** @var AbstractAssetManager $manager */
+        $manager = $this->manager;
+
+        self::assertSame(
+            'C:\\package.json',
+            $manager->getPackageJsonPath(),
+        );
+    }
+
+    public function testGetPackageName(): void
+    {
+        self::assertSame(
+            'package.json',
+            $this->manager->getPackageName(),
+        );
+    }
+
+    public function testHasLockFile(): void
+    {
+        self::assertFalse(
+            $this->manager->hasLockFile(),
+        );
+    }
+
+    public function testHasLockFileWithoutRootPackageDirAndGetcwdFailure(): void
+    {
+        $this->config = new Config([]);
+        $this->manager = $this->getManager();
+
+        MockerState::addCondition('Foxy\\Asset', 'getcwd', [], false);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Unable to get the current working directory.');
+
+        $this->manager->hasLockFile();
+    }
+
+    public function testHasLockFileWithRelativeRootPackageDirAndGetcwdFailure(): void
+    {
+        $this->config = new Config([], ['root-package-json-dir' => 'root-package']);
+        $this->manager = $this->getManager();
+
+        MockerState::addCondition('Foxy\\Asset', 'getcwd', [], false);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Unable to get the current working directory.');
+
+        $this->manager->hasLockFile();
+    }
+
+    public function testHasLockFileWithRootPackageDirAsRoot(): void
+    {
+        $this->config = new Config([], ['root-package-json-dir' => DIRECTORY_SEPARATOR]);
+        $this->manager = $this->getManager();
+
+        MockerState::addCondition('Foxy\\Asset', 'getcwd', [], $this->cwd);
+
+        self::assertInstanceOf(AbstractAssetManager::class, $this->manager);
+
+        /** @var AbstractAssetManager $manager */
+        $manager = $this->manager;
+
+        self::assertSame(
+            DIRECTORY_SEPARATOR . $manager->getPackageName(),
+            $manager->getPackageJsonPath(),
+        );
+        self::assertFalse(
+            $this->manager->hasLockFile(),
+        );
+    }
+
+    public function testIsInstalled(): void
+    {
+        self::assertFalse(
+            $this->manager->isInstalled(),
+        );
+    }
+
+    public function testIsUpdatable(): void
+    {
+        self::assertFalse(
+            $this->manager->isUpdatable(),
+        );
     }
 
     /**
@@ -354,28 +354,46 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
             $nodeModulePath = $this->cwd . ltrim(AbstractAssetManager::NODE_MODULES_PATH, '.');
 
             $this->sfs->mkdir($nodeModulePath);
-            $this->assertFileExists($nodeModulePath);
+
+            self::assertFileExists(
+                $nodeModulePath,
+            );
 
             $lockFilePath = $this->cwd . DIRECTORY_SEPARATOR . $this->manager->getLockPackageName();
 
             file_put_contents($lockFilePath, '{}');
 
-            $this->assertFileExists($lockFilePath);
-            $this->assertTrue($this->manager->isInstalled());
-            $this->assertTrue($this->manager->isUpdatable());
+            self::assertFileExists(
+                $lockFilePath,
+            );
+            self::assertTrue(
+                $this->manager->isInstalled(),
+            );
+            self::assertTrue(
+                $this->manager->isUpdatable(),
+            );
         }
 
         if (0 === $expectedRes) {
-            $this->fallback->expects($this->never())->method('restore');
+            $this->fallback->expects(self::never())->method('restore');
         } else {
-            $this->fallback->expects($this->once())->method('restore');
+            $this->fallback->expects(self::once())->method('restore');
         }
 
         $this->executor->addExpectedValues($expectedRes, 'ASSET MANAGER OUTPUT');
 
-        $this->assertSame($expectedRes, $this->getManager()->run());
-        $this->assertSame($expectedCommand, $this->executor->getLastCommand());
-        $this->assertSame('ASSET MANAGER OUTPUT', $this->executor->getLastOutput());
+        self::assertSame(
+            $expectedRes,
+            $this->getManager()->run(),
+        );
+        self::assertSame(
+            $expectedCommand,
+            $this->executor->getLastCommand(),
+        );
+        self::assertSame(
+            'ASSET MANAGER OUTPUT',
+            $this->executor->getLastOutput(),
+        );
     }
 
     public function testRunRestoresTimeoutWhenExecutorThrows(): void
@@ -393,15 +411,131 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
 
             try {
                 $this->manager->run();
-                $this->fail('Expected a runtime exception when execute fails.');
+                self::fail('Expected a runtime exception when execute fails.');
             } catch (\RuntimeException $exception) {
-                $this->assertSame('Process execution failed.', $exception->getMessage());
+                self::assertSame(
+                    'Process execution failed.',
+                    $exception->getMessage(),
+                );
             }
 
-            $this->assertSame($expectedTimeout, ProcessExecutor::getTimeout());
+            self::assertSame(
+                $expectedTimeout,
+                ProcessExecutor::getTimeout(),
+            );
         } finally {
             ProcessExecutor::setTimeout($originalTimeout);
         }
+    }
+
+    public function testRunWithChdirFailure(): void
+    {
+        $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'root-package';
+        $this->sfs->mkdir($rootPackageDir);
+        $originalCwd = getcwd();
+
+        $this->config = new Config(
+            [],
+            ['run-asset-manager' => true, 'root-package-json-dir' => $rootPackageDir],
+        );
+        $this->manager = $this->getManager();
+
+        MockerState::addCondition('Foxy\\Asset', 'chdir', [$rootPackageDir], false);
+
+        try {
+            $this->getManager()->run();
+            self::fail('Expected a runtime exception when chdir fails.');
+        } catch (RuntimeException $exception) {
+            self::assertSame(
+                sprintf('Unable to change working directory to "%s".', $rootPackageDir),
+                $exception->getMessage(),
+            );
+            self::assertSame(
+                $originalCwd,
+                getcwd(),
+            );
+        }
+    }
+
+    public function testRunWithChdirRestoreFailure(): void
+    {
+        $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'root-package';
+        $this->sfs->mkdir($rootPackageDir);
+        $originalCwd = getcwd();
+
+        $this->config = new Config(
+            [],
+            ['run-asset-manager' => true, 'root-package-json-dir' => $rootPackageDir],
+        );
+        $this->manager = $this->getManager();
+
+        MockerState::addCondition('Foxy\\Asset', 'chdir', [$rootPackageDir], true);
+        MockerState::addCondition('Foxy\\Asset', 'chdir', [$originalCwd], false);
+
+        $this->executor->addExpectedValues(0, 'ASSET MANAGER OUTPUT');
+
+        try {
+            $this->manager->run();
+            self::fail('Expected a runtime exception when restoring chdir fails.');
+        } catch (RuntimeException $exception) {
+            self::assertSame(
+                sprintf('Unable to restore working directory to "%s".', $originalCwd),
+                $exception->getMessage(),
+            );
+            self::assertSame(
+                $originalCwd,
+                getcwd(),
+            );
+        }
+    }
+
+    public function testRunWithDisableOption(): void
+    {
+        $this->config = new Config([], ['run-asset-manager' => false]);
+
+        self::assertSame(
+            0,
+            $this->getManager()->run(),
+        );
+    }
+
+    public function testRunWithGetcwdFailure(): void
+    {
+        $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'root-package';
+        $this->sfs->mkdir($rootPackageDir);
+        $originalCwd = getcwd();
+
+        $this->config = new Config(
+            [],
+            ['run-asset-manager' => true, 'root-package-json-dir' => $rootPackageDir],
+        );
+        $this->manager = $this->getManager();
+
+        MockerState::addCondition('Foxy\\Asset', 'getcwd', [], false);
+
+        try {
+            $this->getManager()->run();
+            self::fail('Expected a runtime exception when getcwd fails.');
+        } catch (RuntimeException $exception) {
+            self::assertSame(
+                'Unable to get the current working directory.',
+                $exception->getMessage(),
+            );
+            self::assertSame(
+                $originalCwd,
+                getcwd(),
+            );
+        }
+    }
+
+    public function testSetUpdatable(): void
+    {
+        $res = $this->manager->setUpdatable(false);
+
+        self::assertInstanceOf(
+            AssetManagerInterface::class,
+            $res,
+        );
     }
 
     public function testSpecifyCustomDirectoryFromPackageJson(): void
@@ -416,9 +550,18 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
         );
         $this->manager = $this->getManager();
 
-        $this->assertSame($rootPackageDir, $this->config->get('root-package-json-dir'));
-        $this->assertSame(0, $this->getManager()->run());
-        $this->assertSame($originalCwd, getcwd());
+        self::assertSame(
+            $rootPackageDir,
+            $this->config->get('root-package-json-dir'),
+        );
+        self::assertSame(
+            0,
+            $this->getManager()->run(),
+        );
+        self::assertSame(
+            $originalCwd,
+            getcwd(),
+        );
     }
 
     public function testSpecifyCustomDirectoryFromPackageJsonException(): void
@@ -434,131 +577,64 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
 
         try {
             $this->getManager()->run();
-            $this->fail('Expected a runtime exception for invalid root package directory.');
-        } catch (\Foxy\Exception\RuntimeException $exception) {
-            $this->assertSame(
+            self::fail('Expected a runtime exception for invalid root package directory.');
+        } catch (RuntimeException $exception) {
+            self::assertSame(
                 sprintf('The root package directory "%s" doesn\'t exist.', $expectedPath),
-                $exception->getMessage()
+                $exception->getMessage(),
             );
-            $this->assertSame($originalCwd, getcwd());
-        }
-    }
-
-    public function testRunWithGetcwdFailure(): void
-    {
-        $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'root-package';
-        $this->sfs->mkdir($rootPackageDir);
-        $originalCwd = \getcwd();
-
-        $this->config = new Config(
-            [],
-            ['run-asset-manager' => true, 'root-package-json-dir' => $rootPackageDir],
-        );
-        $this->manager = $this->getManager();
-
-        MockerState::addCondition('Foxy\\Asset', 'getcwd', [], false);
-
-        try {
-            $this->getManager()->run();
-            $this->fail('Expected a runtime exception when getcwd fails.');
-        } catch (\Foxy\Exception\RuntimeException $exception) {
-            $this->assertSame('Unable to get the current working directory.', $exception->getMessage());
-            $this->assertSame($originalCwd, \getcwd());
-        }
-    }
-
-    public function testHasLockFileWithRelativeRootPackageDirAndGetcwdFailure(): void
-    {
-        $this->config = new Config([], ['root-package-json-dir' => 'root-package']);
-        $this->manager = $this->getManager();
-
-        MockerState::addCondition('Foxy\\Asset', 'getcwd', [], false);
-
-        $this->expectException(\Foxy\Exception\RuntimeException::class);
-        $this->expectExceptionMessage('Unable to get the current working directory.');
-
-        $this->manager->hasLockFile();
-    }
-
-    public function testHasLockFileWithoutRootPackageDirAndGetcwdFailure(): void
-    {
-        $this->config = new Config([]);
-        $this->manager = $this->getManager();
-
-        MockerState::addCondition('Foxy\\Asset', 'getcwd', [], false);
-
-        $this->expectException(\Foxy\Exception\RuntimeException::class);
-        $this->expectExceptionMessage('Unable to get the current working directory.');
-
-        $this->manager->hasLockFile();
-    }
-
-    public function testRunWithChdirFailure(): void
-    {
-        $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'root-package';
-        $this->sfs->mkdir($rootPackageDir);
-        $originalCwd = \getcwd();
-
-        $this->config = new Config(
-            [],
-            ['run-asset-manager' => true, 'root-package-json-dir' => $rootPackageDir],
-        );
-        $this->manager = $this->getManager();
-
-        MockerState::addCondition('Foxy\\Asset', 'chdir', [$rootPackageDir], false);
-
-        try {
-            $this->getManager()->run();
-            $this->fail('Expected a runtime exception when chdir fails.');
-        } catch (\Foxy\Exception\RuntimeException $exception) {
-            $this->assertSame(
-                sprintf('Unable to change working directory to "%s".', $rootPackageDir),
-                $exception->getMessage()
+            self::assertSame(
+                $originalCwd,
+                getcwd(),
             );
-            $this->assertSame($originalCwd, \getcwd());
         }
     }
 
-    public function testRunWithChdirRestoreFailure(): void
+    public function testValidateWithInstalledManagerAndWithoutValidationVersion(): void
     {
-        $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'root-package';
-        $this->sfs->mkdir($rootPackageDir);
-        $originalCwd = \getcwd();
+        $this->executor->addExpectedValues(0, '42.0.0');
+        $this->manager->validate();
 
-        $this->config = new Config(
-            [],
-            ['run-asset-manager' => true, 'root-package-json-dir' => $rootPackageDir],
+        self::assertNull(
+            $this->config->get('manager-version'),
         );
-        $this->manager = $this->getManager();
-
-        MockerState::addCondition('Foxy\\Asset', 'chdir', [$rootPackageDir], true);
-        MockerState::addCondition('Foxy\\Asset', 'chdir', [$originalCwd], false);
-
-        $this->executor->addExpectedValues(0, 'ASSET MANAGER OUTPUT');
-
-        try {
-            $this->manager->run();
-            $this->fail('Expected a runtime exception when restoring chdir fails.');
-        } catch (\Foxy\Exception\RuntimeException $exception) {
-            $this->assertSame(
-                sprintf('Unable to restore working directory to "%s".', $originalCwd),
-                $exception->getMessage()
-            );
-            $this->assertSame($originalCwd, \getcwd());
-        }
     }
 
-    abstract protected function getManager(): AssetManagerInterface;
+    public function testValidateWithInstalledManagerAndWithoutValidVersion(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessageMatches(
+            '/The installed (\w+) version "42.0.0" doesn\'t match with the constraint version ">=50.0"/',
+        );
 
-    abstract protected function getValidName(): string;
+        $this->config = new Config([], ['manager-version' => '>=50.0']);
 
-    abstract protected function getValidLockPackageName(): string;
+        $this->manager = $this->getManager();
+        $this->executor->addExpectedValues(0, '42.0.0');
+        $this->manager->validate();
+    }
 
-    abstract protected function getValidVersionCommand(): string;
+    public function testValidateWithInstalledManagerAndWithValidVersion(): void
+    {
+        $this->config = new Config([], ['manager-version' => '>=41.0']);
 
-    abstract protected function getValidInstallCommand(): string;
+        $this->manager = $this->getManager();
+        $this->executor->addExpectedValues(0, '42.0.0');
+        $this->manager->validate();
 
-    abstract protected function getValidUpdateCommand(): string;
+        self::assertSame(
+            '>=41.0',
+            $this->config->get('manager-version'),
+        );
+    }
+
+    public function testValidateWithoutInstalledManager(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessageMatches('/The binary of "(\w+)" must be installed/');
+
+        $this->manager->validate();
+    }
 
     protected function actionForTestAddDependenciesForUpdateCommand(): void
     {
@@ -571,5 +647,44 @@ abstract class AssetManager extends \PHPUnit\Framework\TestCase
     protected function actionForTestRunForInstallCommand(string $action): void
     {
         // do nothing by default
+    }
+
+    /**
+     * @throws Exception
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->config = new Config([]);
+        $this->io = $this->createMock(IOInterface::class);
+        $this->executor = new ProcessExecutorMock($this->io);
+        $this->fs = $this->createMock(Filesystem::class);
+        $this->sfs = new \Symfony\Component\Filesystem\Filesystem();
+        $this->fallback = $this->createMock(FallbackInterface::class);
+        $this->manager = $this->getManager();
+        $this->oldCwd = getcwd();
+        $this->cwd = sys_get_temp_dir() . DIRECTORY_SEPARATOR . uniqid('foxy_asset_manager_test_', true);
+        $this->sfs->mkdir($this->cwd);
+
+        chdir($this->cwd);
+    }
+
+    protected function tearDown(): void
+    {
+        parent::tearDown();
+
+        chdir($this->oldCwd);
+
+        $this->sfs->remove($this->cwd);
+        $this->config = null;
+        $this->io = null;
+        $this->executor = null;
+        $this->fs = null;
+        $this->sfs = null;
+        $this->fallback = null;
+        $this->manager = null;
+        $this->oldCwd = null;
+        $this->cwd = null;
     }
 }

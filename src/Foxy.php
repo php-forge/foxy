@@ -2,69 +2,48 @@
 
 declare(strict_types=1);
 
-/*
- * This file is part of the Foxy package.
- *
- * (c) François Pluchino <francois.pluchino@gmail.com>
- *
- * For the full copyright and license information, please view the LICENSE
- * file that was distributed with this source code.
- */
-
 namespace Foxy;
 
 use Composer\Composer;
 use Composer\DependencyResolver\Operation\InstallOperation;
 use Composer\EventDispatcher\EventSubscriberInterface;
-use Composer\Installer\PackageEvent;
-use Composer\Installer\PackageEvents;
+use Composer\Installer\{PackageEvent, PackageEvents};
 use Composer\IO\IOInterface;
 use Composer\Plugin\PluginInterface;
-use Composer\Script\Event;
-use Composer\Script\ScriptEvents;
-use Composer\Util\Filesystem;
-use Composer\Util\ProcessExecutor;
-use Foxy\Asset\AbstractAssetManager;
-use Foxy\Asset\AssetManagerFinder;
-use Foxy\Asset\AssetManagerInterface;
-use Foxy\Config\Config;
-use Foxy\Config\ConfigBuilder;
+use Composer\Script\{Event, ScriptEvents};
+use Composer\Util\{Filesystem, ProcessExecutor};
+use Foxy\Asset\{AbstractAssetManager, AssetManagerFinder, AssetManagerInterface};
+use Foxy\Asset\{BunManager, NpmManager, PnpmManager, YarnManager};
+use Foxy\Config\{Config, ConfigBuilder};
 use Foxy\Exception\RuntimeException;
-use Foxy\Fallback\AssetFallback;
-use Foxy\Fallback\ComposerFallback;
-use Foxy\Solver\Solver;
-use Foxy\Solver\SolverInterface;
-use Foxy\Util\ComposerUtil;
-use Foxy\Util\ConsoleUtil;
+use Foxy\Fallback\{AssetFallback, ComposerFallback};
+use Foxy\Solver\{Solver, SolverInterface};
+use Foxy\Util\{ComposerUtil, ConsoleUtil};
+use Seld\JsonLint\ParsingException;
 
-/**
- * Composer plugin.
- *
- * @author François Pluchino <francois.pluchino@gmail.com>
- *
- * @psalm-suppress MissingConstructor
- */
 final class Foxy implements PluginInterface, EventSubscriberInterface
 {
     final public const REQUIRED_COMPOSER_VERSION = '^2.0.0';
-    private Config $config;
-    private AssetManagerInterface $assetManager;
+
     private AssetFallback $assetFallback;
-    private ComposerFallback $composerFallback;
-    private SolverInterface $solver;
-    private bool $initialized = false;
+
+    private AssetManagerInterface $assetManager;
 
     /**
      * The list of the classes of asset managers.
      *
      * @psalm-var list<class-string<AssetManagerInterface>>
      */
-    private static $assetManagers = [
-        Asset\BunManager::class,
-        Asset\NpmManager::class,
-        Asset\PnpmManager::class,
-        Asset\YarnManager::class,
+    private static array $assetManagers = [
+        BunManager::class,
+        NpmManager::class,
+        PnpmManager::class,
+        YarnManager::class,
     ];
+
+    private ComposerFallback $composerFallback;
+
+    private Config $config;
 
     /**
      * The default values of config.
@@ -90,16 +69,13 @@ final class Foxy implements PluginInterface, EventSubscriberInterface
         'enable-packages' => [],
     ];
 
-    public static function getSubscribedEvents(): array
-    {
-        return [
-            ComposerUtil::getInitEventName() => [['init', 100]],
-            PackageEvents::POST_PACKAGE_INSTALL => [['initOnInstall', 100]],
-            ScriptEvents::POST_INSTALL_CMD => [['solveAssets', 100]],
-            ScriptEvents::POST_UPDATE_CMD => [['solveAssets', 100]],
-        ];
-    }
+    private bool $initialized = false;
 
+    private SolverInterface $solver;
+
+    /**
+     * @throws ParsingException
+     */
     public function activate(Composer $composer, IOInterface $io): void
     {
         ComposerUtil::validateVersion(self::REQUIRED_COMPOSER_VERSION, Composer::VERSION);
@@ -127,23 +103,14 @@ final class Foxy implements PluginInterface, EventSubscriberInterface
         // Do nothing
     }
 
-    public function uninstall(Composer $composer, IOInterface $io): void
+    public static function getSubscribedEvents(): array
     {
-        // Do nothing
-    }
-
-    /**
-     * Init the plugin just after the first installation.
-     *
-     * @param PackageEvent $event The package event
-     */
-    public function initOnInstall(PackageEvent $event): void
-    {
-        $operation = $event->getOperation();
-
-        if ($operation instanceof InstallOperation && 'php-forge/foxy' === $operation->getPackage()->getName()) {
-            $this->init();
-        }
+        return [
+            ComposerUtil::getInitEventName() => [['init', 100]],
+            PackageEvents::POST_PACKAGE_INSTALL => [['initOnInstall', 100]],
+            ScriptEvents::POST_INSTALL_CMD => [['solveAssets', 100]],
+            ScriptEvents::POST_UPDATE_CMD => [['solveAssets', 100]],
+        ];
     }
 
     /**
@@ -159,6 +126,20 @@ final class Foxy implements PluginInterface, EventSubscriberInterface
             if ($this->config->get('enabled')) {
                 $this->assetManager->validate();
             }
+        }
+    }
+
+    /**
+     * Init the plugin just after the first installation.
+     *
+     * @param PackageEvent $event The package event
+     */
+    public function initOnInstall(PackageEvent $event): void
+    {
+        $operation = $event->getOperation();
+
+        if ($operation instanceof InstallOperation && 'php-forge/foxy' === $operation->getPackage()->getName()) {
+            $this->init();
         }
     }
 
@@ -183,6 +164,11 @@ final class Foxy implements PluginInterface, EventSubscriberInterface
         $this->solver->solve($event->getComposer(), $event->getIO());
     }
 
+    public function uninstall(Composer $composer, IOInterface $io): void
+    {
+        // Do nothing
+    }
+
     /**
      * Get the asset manager.
      *
@@ -193,11 +179,11 @@ final class Foxy implements PluginInterface, EventSubscriberInterface
      *
      * @throws RuntimeException When the asset manager is not found.
      */
-    protected function getAssetManager(
+    private function getAssetManager(
         IOInterface $io,
         Config $config,
         ProcessExecutor $executor,
-        Filesystem $fs
+        Filesystem $fs,
     ): AssetManagerInterface {
         $amf = new AssetManagerFinder();
 

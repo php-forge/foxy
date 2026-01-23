@@ -2,24 +2,13 @@
 
 declare(strict_types=1);
 
-/*
- * This file is part of the Foxy package.
- *
- * (c) François Pluchino <francois.pluchino@gmail.com>
- *
- * For the full copyright and license information, please view the LICENSE
- * file that was distributed with this source code.
- */
-
 namespace Foxy\Converter;
 
 use Composer\Package\Version\VersionParser;
 
-/**
- * Utils for semver converter.
- *
- * @author François Pluchino <francois.pluchino@gmail.com>
- */
+use function in_array;
+use function strlen;
+
 abstract class SemverUtil
 {
     /**
@@ -82,6 +71,40 @@ abstract class SemverUtil
     }
 
     /**
+     * Clean the raw version.
+     *
+     * @param string $version The version.
+     * @param array $matches The match of pattern asset version.
+     *
+     * @return array The list of $type, $version and $end.
+     *
+     * @psalm-suppress MixedArrayAccess
+     * @psalm-suppress MixedOperand
+     *
+     * @psalm-return array{0: string, 1: string, 2: string}
+     */
+    private static function cleanVersion(string $version, array $matches): array
+    {
+        $end = substr($version, strlen((string) $matches[1][0][0]));
+        $version = $matches[1][0][0] . '-';
+
+        $matches = [];
+
+        if (preg_match('/^([-+])/', $end, $matches)) {
+            $end = substr($end, 1);
+        }
+
+        $matches = [];
+
+        preg_match('/^[a-z]+/', $end, $matches);
+
+        $type = isset($matches[0]) ? self::normalizeStability($matches[0]) : '';
+        $end = substr($end, strlen($type));
+
+        return [$type, $version, $end];
+    }
+
+    /**
      * Clean the wildcard in version.
      *
      * @param string $version The version.
@@ -98,34 +121,40 @@ abstract class SemverUtil
     }
 
     /**
-     * Clean the raw version.
+     * Convert the minor version of date.
+     *
+     * @param string $minor The minor version.
+     */
+    private static function convertDateMinorVersion(string $minor): string
+    {
+        $split = explode('.', $minor);
+        $minor = (int) $split[0];
+        $revision = isset($split[1]) ? (int) $split[1] : 0;
+
+        return '.' . sprintf('%03d', $minor) . sprintf('%03d', $revision);
+    }
+
+    /**
+     * Match the version.
      *
      * @param string $version The version.
-     * @param array $matches The match of pattern asset version.
+     * @param string $type The type of version.
      *
-     * @return array The list of $type, $version and $end.
+     * @return array The list of $version and $patchVersion.
      *
-     * @psalm-suppress MixedArrayAccess
-     * @psalm-suppress MixedOperand
-     *
-     * @psalm-return array{0: string, 1: string, 2: string}
+     * @psalm-return array{0: string, 1: bool}
      */
-    private static function cleanVersion(string $version, array $matches): array
+    private static function matchVersion(string $version, string $type): array
     {
-        $end = substr($version, \strlen((string) $matches[1][0][0]));
-        $version = $matches[1][0][0] . '-';
+        $type = match ($type) {
+            'dev', 'snapshot' => 'dev',
+            default => in_array($type, ['alpha', 'beta', 'RC'], true) ? $type : 'patch',
+        };
 
-        $matches = [];
-        if (preg_match('/^([-+])/', $end, $matches)) {
-            $end = substr($end, 1);
-        }
+        $patchVersion = $type !== 'dev';
+        $version .= $type;
 
-        $matches = [];
-        preg_match('/^[a-z]+/', $end, $matches);
-        $type = isset($matches[0]) ? self::normalizeStability($matches[0]) : '';
-        $end = substr($end, \strlen($type));
-
-        return [$type, $version, $end];
+        return [$version, $patchVersion];
     }
 
     /**
@@ -147,43 +176,5 @@ abstract class SemverUtil
             'dev', 'snapshot' => 'dev',
             default => VersionParser::normalizeStability($stability),
         };
-    }
-
-    /**
-     * Match the version.
-     *
-     * @param string $version The version.
-     * @param string $type The type of version.
-     *
-     * @return array The list of $version and $patchVersion.
-     *
-     * @psalm-return array{0: string, 1: bool}
-     */
-    private static function matchVersion(string $version, string $type): array
-    {
-        $type = match ($type) {
-            'dev', 'snapshot' => 'dev',
-            default => \in_array($type, ['alpha', 'beta', 'RC'], true) ? $type : 'patch',
-        };
-
-        $patchVersion = !\in_array($type, ['dev'], true);
-
-        $version .= $type;
-
-        return [$version, $patchVersion];
-    }
-
-    /**
-     * Convert the minor version of date.
-     *
-     * @param string $minor The minor version.
-     */
-    private static function convertDateMinorVersion(string $minor): string
-    {
-        $split = explode('.', $minor);
-        $minor = (int) $split[0];
-        $revision = isset($split[1]) ? (int) $split[1] : 0;
-
-        return '.' . sprintf('%03d', $minor) . sprintf('%03d', $revision);
     }
 }
