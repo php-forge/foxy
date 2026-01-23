@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Foxy\Tests\Fixtures\Util;
 
 use Composer\Util\ProcessExecutor;
-use RuntimeException;
+use Foxy\Exception\RuntimeException;
 
 final class ThrowingProcessExecutorMock extends ProcessExecutor
 {

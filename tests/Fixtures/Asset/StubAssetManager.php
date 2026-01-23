@@ -9,8 +9,8 @@ use Composer\Package\RootPackageInterface;
 use Composer\Util\{Filesystem, ProcessExecutor};
 use Foxy\Asset\{AssetManagerInterface, AssetPackageInterface};
 use Foxy\Config\Config;
+use Foxy\Exception\RuntimeException;
 use Foxy\Fallback\FallbackInterface;
-use RuntimeException;
 
 final class StubAssetManager implements AssetManagerInterface
 {

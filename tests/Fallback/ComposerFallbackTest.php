@@ -166,7 +166,6 @@ final class ComposerFallbackTest extends TestCase
         $this->io = $this->createMock(IOInterface::class);
         $this->input = $this->createMock(InputInterface::class);
         $this->fs = $this->createMock(Filesystem::class);
-        /** @var Installer|MockObject $this */
         $this->installer = $this
             ->getMockBuilder(Installer::class)
             ->disableOriginalConstructor()
