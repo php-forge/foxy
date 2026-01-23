@@ -2,82 +2,79 @@
 
 declare(strict_types=1);
 
-/*
- * This file is part of the Foxy package.
- *
- * (c) François Pluchino <francois.pluchino@gmail.com>
- *
- * For the full copyright and license information, please view the LICENSE
- * file that was distributed with this source code.
- */
-
 namespace Foxy\Tests\Util;
 
 use Composer\Installer\InstallationManager;
-use Composer\Package\Link;
-use Composer\Package\PackageInterface;
+use Composer\Package\{Link, PackageInterface};
 use Composer\Semver\Constraint\Constraint;
-use Foxy\Asset\AbstractAssetManager;
-use Foxy\Asset\AssetManagerInterface;
+use Foxy\Asset\{AbstractAssetManager, AssetManagerInterface};
 use Foxy\Util\AssetUtil;
+use JsonException;
 use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 
-/**
- * Tests for asset util.
- *
- * @author François Pluchino <francois.pluchino@gmail.com>
- *
- * @internal
- */
-final class AssetUtilTest extends \PHPUnit\Framework\TestCase
+use function count;
+use function file_put_contents;
+use function realpath;
+use function str_replace;
+
+use const DIRECTORY_SEPARATOR;
+
+final class AssetUtilTest extends TestCase
 {
-    private Filesystem|null $sfs;
     private string|null $cwd;
+    private Filesystem|null $sfs;
 
-    protected function setUp(): void
+    public static function getExtraData(): array
     {
-        parent::setUp();
-
-        $this->cwd = sys_get_temp_dir() . \DIRECTORY_SEPARATOR . uniqid('foxy_asset_util_test_', true);
-        $this->sfs = new Filesystem();
-        $this->sfs->mkdir($this->cwd);
+        return [[false, false], [true, false], [false, true], [true, true]];
     }
 
-    protected function tearDown(): void
+    public static function getFormatPackageData(): array
     {
-        parent::tearDown();
-
-        $this->sfs->remove($this->cwd);
-        $this->sfs = null;
-        $this->cwd = null;
+        return [
+            ['1.0.0', null, '1.0.0'],
+            ['1.0.1', '1.0.0', '1.0.0'],
+            ['1.0.0.x-dev', null, '1.0.0'],
+            ['1.0.0.x', null, '1.0.0'],
+            ['1.0.0.1', null, '1.0.0'],
+            ['dev-master', null, '1.0.0', '1-dev'],
+            ['dev-master', null, '1.0.0', '1.0-dev'],
+            ['dev-master', null, '1.0.0', '1.0.0-dev'],
+            ['dev-master', null, '1.0.0', '1.x-dev'],
+            ['dev-master', null, '1.0.0', '1.0.x-dev'],
+            ['dev-master', null, '1.0.0', '1.*-dev'],
+            ['dev-master', null, '1.0.0', '1.0.*-dev'],
+        ];
     }
 
-    public function testGetName(): void
+    public static function getIsProjectActivationData(): array
     {
-        $package = $this->createMock(PackageInterface::class);
-        $package->expects($this->once())->method('getName')->willReturn('foo/bar');
-
-        $this->assertSame('@composer-asset/foo--bar', AssetUtil::getName($package));
+        return [
+            ['full/qualified', true],
+            ['full-disable/qualified', false],
+            ['foo/bar', true],
+            ['baz/foo', false],
+            ['baz/foo-test', false],
+            ['bar/test', true],
+            ['other/package', false],
+            ['test-string/package', true],
+        ];
     }
 
-    public function testGetPathWithoutRequiredFoxy(): void
+    public static function getIsProjectActivationWithWildcardData(): array
     {
-        $installationManager = $this->createMock(InstallationManager::class);
-
-        $installationManager->expects($this->never())->method('getInstallPath');
-
-        $assetManager = $this->createMock(AbstractAssetManager::class);
-
-        /** @var MockObject|PackageInterface $package */
-        $package = $this->createMock(PackageInterface::class);
-
-        $package->expects($this->once())->method('getRequires')->willReturn([]);
-        $package->expects($this->once())->method('getDevRequires')->willReturn([]);
-
-        $res = AssetUtil::getPath($installationManager, $assetManager, $package);
-
-        $this->assertNull($res);
+        return [
+            ['full/qualified', true],
+            ['full-disable/qualified', false],
+            ['foo/bar', true],
+            ['baz/foo', false],
+            ['baz/foo-test', false],
+            ['bar/test', true],
+            ['other/package', true],
+            ['test-string/package', true],
+        ];
     }
 
     public static function getRequiresData(): array
@@ -107,62 +104,62 @@ final class AssetUtilTest extends \PHPUnit\Framework\TestCase
     }
 
     /**
-     * @dataProvider getRequiresData
-     *
-     * @param Link[] $requires
-     * @param Link[] $devRequires
+     * @dataProvider getFormatPackageData
      */
-    public function testGetPathWithRequiredFoxy(array $requires, array $devRequires, bool $fileExists = false): void
-    {
-        $installationManager = $this->createMock(InstallationManager::class);
+    public function testFormatPackage(
+        string $packageVersion,
+        string|null $assetVersion,
+        string $expectedAssetVersion,
+        string|null $branchAlias = null,
+    ): void {
+        $packageName = '@composer-asset/foo--bar';
 
-        $installationManager->expects($this->once())->method('getInstallPath')->willReturn($this->cwd);
-
-        /** @var AbstractAssetManager|MockObject $assetManager */
-        $assetManager = $this
-            ->getMockBuilder(AbstractAssetManager::class)
-            ->disableOriginalConstructor()
-            ->getMockForAbstractClass();
-
+        /** @var MockObject|PackageInterface $package */
         $package = $this->createMock(PackageInterface::class);
 
-        $package->expects($this->once())->method('getRequires')->willReturn($requires);
+        $assetPackage = [];
 
-        if (0 === \count($devRequires)) {
-            $package->expects($this->never())->method('getDevRequires');
+        if (null !== $assetVersion) {
+            $assetPackage['version'] = $assetVersion;
+
+            $package->expects(self::never())->method('getPrettyVersion');
+            $package->expects(self::never())->method('getExtra');
         } else {
-            $package->expects($this->once())->method('getDevRequires')->willReturn($devRequires);
+            $extra = [];
+
+            if (null !== $branchAlias) {
+                $extra['branch-alias'][$packageVersion] = $branchAlias;
+            }
+
+            $package->expects(self::once())->method('getPrettyVersion')->willReturn($packageVersion);
+            $package->expects(self::once())->method('getExtra')->willReturn($extra);
         }
 
-        if ($fileExists) {
-            $expectedFilename = $this->cwd . \DIRECTORY_SEPARATOR . $assetManager->getPackageName();
+        $expected = ['name' => $packageName, 'version' => $expectedAssetVersion];
 
-            \file_put_contents($expectedFilename, '{}');
+        $res = AssetUtil::formatPackage($package, $packageName, $assetPackage);
 
-            $expectedFilename = \str_replace('\\', '/', \realpath($expectedFilename));
-        } else {
-            $expectedFilename = null;
-        }
-
-        $res = AssetUtil::getPath($installationManager, $assetManager, $package);
-
-        $this->assertSame($expectedFilename, $res);
+        self::assertEquals($expected, $res);
     }
 
-    public static function getExtraData(): array
+    public function testGetName(): void
     {
-        return [[false, false], [true, false], [false, true], [true, true]];
+        $package = $this->createMock(PackageInterface::class);
+        $package->expects(self::once())->method('getName')->willReturn('foo/bar');
+
+        self::assertSame('@composer-asset/foo--bar', AssetUtil::getName($package));
     }
 
     /**
      * @dataProvider getExtraData
+     * @throws JsonException
      */
     public function testGetPathWithExtraActivation(bool $withExtra, bool $fileExists = false): void
     {
         $installationManager = $this->createMock(InstallationManager::class);
 
         if ($withExtra && $fileExists) {
-            $installationManager->expects($this->once())->method('getInstallPath')->willReturn($this->cwd);
+            $installationManager->expects(self::once())->method('getInstallPath')->willReturn($this->cwd);
         }
 
         /** @var AbstractAssetManager|MockObject $assetManager */
@@ -173,57 +170,139 @@ final class AssetUtilTest extends \PHPUnit\Framework\TestCase
 
         $package = $this->createMock(PackageInterface::class);
 
-        $package->expects($this->any())->method('getRequires')->willReturn([]);
-        $package->expects($this->any())->method('getDevRequires')->willReturn([]);
-        $package->expects($this->atLeastOnce())->method('getExtra')->willReturn(['foxy' => $withExtra]);
+        $package->expects(self::any())->method('getRequires')->willReturn([]);
+        $package->expects(self::any())->method('getDevRequires')->willReturn([]);
+        $package->expects(self::atLeastOnce())->method('getExtra')->willReturn(['foxy' => $withExtra]);
 
         if ($fileExists) {
-            $expectedFilename = $this->cwd . \DIRECTORY_SEPARATOR . $assetManager->getPackageName();
+            $expectedFilename = $this->cwd . DIRECTORY_SEPARATOR . $assetManager->getPackageName();
 
-            \file_put_contents($expectedFilename, '{}');
+            file_put_contents($expectedFilename, '{}');
 
-            $expectedFilename = $withExtra ? \str_replace('\\', '/', \realpath($expectedFilename)) : null;
+            $expectedFilename = $withExtra ? str_replace('\\', '/', realpath($expectedFilename)) : null;
         } else {
             $expectedFilename = null;
         }
 
         $res = AssetUtil::getPath($installationManager, $assetManager, $package);
 
-        $this->assertSame($expectedFilename, $res);
+        self::assertSame($expectedFilename, $res);
+    }
+
+    /**
+     * @throws JsonException
+     */
+    public function testGetPathWithoutRequiredFoxy(): void
+    {
+        $installationManager = $this->createMock(InstallationManager::class);
+
+        $installationManager->expects(self::never())->method('getInstallPath');
+
+        $assetManager = $this->createMock(AbstractAssetManager::class);
+
+        /** @var MockObject|PackageInterface $package */
+        $package = $this->createMock(PackageInterface::class);
+
+        $package->expects(self::once())->method('getRequires')->willReturn([]);
+        $package->expects(self::once())->method('getDevRequires')->willReturn([]);
+
+        $res = AssetUtil::getPath($installationManager, $assetManager, $package);
+
+        self::assertNull($res);
+    }
+
+    /**
+     * @dataProvider getRequiresData
+     *
+     * @param Link[] $requires
+     * @param Link[] $devRequires
+     * @throws JsonException
+     */
+    public function testGetPathWithRequiredFoxy(array $requires, array $devRequires, bool $fileExists = false): void
+    {
+        $installationManager = $this->createMock(InstallationManager::class);
+
+        $installationManager->expects(self::once())->method('getInstallPath')->willReturn($this->cwd);
+
+        /** @var AbstractAssetManager|MockObject $assetManager */
+        $assetManager = $this
+            ->getMockBuilder(AbstractAssetManager::class)
+            ->disableOriginalConstructor()
+            ->getMockForAbstractClass();
+
+        $package = $this->createMock(PackageInterface::class);
+
+        $package->expects(self::once())->method('getRequires')->willReturn($requires);
+
+        if (0 === count($devRequires)) {
+            $package->expects(self::never())->method('getDevRequires');
+        } else {
+            $package->expects(self::once())->method('getDevRequires')->willReturn($devRequires);
+        }
+
+        if ($fileExists) {
+            $expectedFilename = $this->cwd . DIRECTORY_SEPARATOR . $assetManager->getPackageName();
+
+            file_put_contents($expectedFilename, '{}');
+
+            $expectedFilename = str_replace('\\', '/', realpath($expectedFilename));
+        } else {
+            $expectedFilename = null;
+        }
+
+        $res = AssetUtil::getPath($installationManager, $assetManager, $package);
+
+        self::assertSame($expectedFilename, $res);
+    }
+
+    /**
+     * @throws JsonException
+     */
+    public function testGetPathWithRootPackageDir(): void
+    {
+        $installationManager = $this->createMock(InstallationManager::class);
+        $installationManager
+            ->expects(self::once())
+            ->method('getInstallPath')
+            ->willReturn('tests/Fixtures/package/global');
+
+        $assetManager = $this->createMock(AssetManagerInterface::class);
+        $assetManager->expects(self::once())->method('getPackageName')->willReturn('foo/bar');
+
+        $package = $this->createMock(PackageInterface::class);
+        $package->expects(self::once())->method('getName')->willReturn('foo/bar');
+        $package->expects(self::once())->method('getRequires')->willReturn([]);
+        $package->expects(self::once())->method('getDevRequires')->willReturn([]);
+
+        $configPackages = [
+            '/^foo\/bar$/' => true,
+        ];
+
+        $expectedPath = 'tests/Fixtures/package/global/theme/foo/bar';
+
+        $res = AssetUtil::getPath($installationManager, $assetManager, $package, $configPackages);
+
+        self::assertStringContainsString($expectedPath, $res);
     }
 
     public function testHasNoPluginDependency(): void
     {
-        $this->assertFalse(
-            AssetUtil::hasPluginDependency([new Link('root/package', 'foo/bar', new Constraint('=', '1.0.0'))])
+        self::assertFalse(
+            AssetUtil::hasPluginDependency([new Link('root/package', 'foo/bar', new Constraint('=', '1.0.0'))]),
         );
     }
 
     public function testHasPluginDependency(): void
     {
-        $this->assertTrue(
+        self::assertTrue(
             AssetUtil::hasPluginDependency(
                 [
                     new Link('root/package', 'foo/bar', new Constraint('=', '1.0.0')),
                     new Link('root/package', 'php-forge/foxy', new Constraint('=', '1.0.0')),
                     new Link('root/package', 'bar/foo', new Constraint('=', '1.0.0')),
                 ],
-            )
+            ),
         );
-    }
-
-    public static function getIsProjectActivationData(): array
-    {
-        return [
-            ['full/qualified', true],
-            ['full-disable/qualified', false],
-            ['foo/bar', true],
-            ['baz/foo', false],
-            ['baz/foo-test', false],
-            ['bar/test', true],
-            ['other/package', false],
-            ['test-string/package', true],
-        ];
     }
 
     /**
@@ -243,25 +322,11 @@ final class AssetUtilTest extends \PHPUnit\Framework\TestCase
         /** @var MockObject|PackageInterface $package */
         $package = $this->createMock(PackageInterface::class);
 
-        $package->expects($this->once())->method('getName')->willReturn($packageName);
+        $package->expects(self::once())->method('getName')->willReturn($packageName);
 
         $res = AssetUtil::isProjectActivation($package, $enablePackages);
 
-        $this->assertSame($expected, $res);
-    }
-
-    public static function getIsProjectActivationWithWildcardData(): array
-    {
-        return [
-            ['full/qualified', true],
-            ['full-disable/qualified', false],
-            ['foo/bar', true],
-            ['baz/foo', false],
-            ['baz/foo-test', false],
-            ['bar/test', true],
-            ['other/package', true],
-            ['test-string/package', true],
-        ];
+        self::assertSame($expected, $res);
     }
 
     /**
@@ -278,94 +343,28 @@ final class AssetUtilTest extends \PHPUnit\Framework\TestCase
         /** @var MockObject|PackageInterface $package */
         $package = $this->createMock(PackageInterface::class);
 
-        $package->expects($this->once())->method('getName')->willReturn($packageName);
+        $package->expects(self::once())->method('getName')->willReturn($packageName);
 
         $res = AssetUtil::isProjectActivation($package, $enablePackages);
 
-        $this->assertSame($expected, $res);
+        self::assertSame($expected, $res);
     }
 
-    public static function getFormatPackageData(): array
+    protected function setUp(): void
     {
-        return [
-            ['1.0.0', null, '1.0.0'],
-            ['1.0.1', '1.0.0', '1.0.0'],
-            ['1.0.0.x-dev', null, '1.0.0'],
-            ['1.0.0.x', null, '1.0.0'],
-            ['1.0.0.1', null, '1.0.0'],
-            ['dev-master', null, '1.0.0', '1-dev'],
-            ['dev-master', null, '1.0.0', '1.0-dev'],
-            ['dev-master', null, '1.0.0', '1.0.0-dev'],
-            ['dev-master', null, '1.0.0', '1.x-dev'],
-            ['dev-master', null, '1.0.0', '1.0.x-dev'],
-            ['dev-master', null, '1.0.0', '1.*-dev'],
-            ['dev-master', null, '1.0.0', '1.0.*-dev'],
-        ];
+        parent::setUp();
+
+        $this->cwd = sys_get_temp_dir() . DIRECTORY_SEPARATOR . uniqid('foxy_asset_util_test_', true);
+        $this->sfs = new Filesystem();
+        $this->sfs->mkdir($this->cwd);
     }
 
-    /**
-     * @dataProvider getFormatPackageData
-     */
-    public function testFormatPackage(
-        string $packageVersion,
-        string|null $assetVersion,
-        string $expectedAssetVersion,
-        string|null $branchAlias = null
-    ): void {
-        $packageName = '@composer-asset/foo--bar';
-
-        /** @var MockObject|PackageInterface $package */
-        $package = $this->createMock(PackageInterface::class);
-
-        $assetPackage = [];
-
-        if (null !== $assetVersion) {
-            $assetPackage['version'] = $assetVersion;
-
-            $package->expects($this->never())->method('getPrettyVersion');
-            $package->expects($this->never())->method('getExtra');
-        } else {
-            $extra = [];
-
-            if (null !== $branchAlias) {
-                $extra['branch-alias'][$packageVersion] = $branchAlias;
-            }
-
-            $package->expects($this->once())->method('getPrettyVersion')->willReturn($packageVersion);
-            $package->expects($this->once())->method('getExtra')->willReturn($extra);
-        }
-
-        $expected = ['name' => $packageName, 'version' => $expectedAssetVersion];
-
-        $res = AssetUtil::formatPackage($package, $packageName, $assetPackage);
-
-        $this->assertEquals($expected, $res);
-    }
-
-    public function testGetPathWithRootPackageDir(): void
+    protected function tearDown(): void
     {
-        $installationManager = $this->createMock(InstallationManager::class);
-        $installationManager
-            ->expects($this->once())
-            ->method('getInstallPath')
-            ->willReturn('tests/Fixtures/package/global');
+        parent::tearDown();
 
-        $assetManager = $this->createMock(AssetManagerInterface::class);
-        $assetManager->expects($this->once())->method('getPackageName')->willReturn('foo/bar');
-
-        $package = $this->createMock(PackageInterface::class);
-        $package->expects($this->once())->method('getName')->willReturn('foo/bar');
-        $package->expects($this->once())->method('getRequires')->willReturn([]);
-        $package->expects($this->once())->method('getDevRequires')->willReturn([]);
-
-        $configPackages = [
-            '/^foo\/bar$/' => true,
-        ];
-
-        $expectedPath = 'tests/Fixtures/package/global/theme/foo/bar';
-
-        $res = AssetUtil::getPath($installationManager, $assetManager, $package, $configPackages);
-
-        $this->assertStringContainsString($expectedPath, $res);
+        $this->sfs->remove($this->cwd);
+        $this->sfs = null;
+        $this->cwd = null;
     }
 }

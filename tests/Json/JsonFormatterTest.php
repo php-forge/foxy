@@ -2,29 +2,18 @@
 
 declare(strict_types=1);
 
-/*
- * This file is part of the Foxy package.
- *
- * (c) François Pluchino <francois.pluchino@gmail.com>
- *
- * For the full copyright and license information, please view the LICENSE
- * file that was distributed with this source code.
- */
-
 namespace Foxy\Tests\Json;
 
 use Foxy\Json\JsonFormatter;
-use PHPForge\Support\Assert;
+use JsonException;
+use PHPForge\Support\LineEndingNormalizer;
+use PHPUnit\Framework\TestCase;
 
-/**
- * Tests for json formatter.
- *
- * @author François Pluchino <francois.pluchino@gmail.com>
- *
- * @internal
- */
-final class JsonFormatterTest extends \PHPUnit\Framework\TestCase
+final class JsonFormatterTest extends TestCase
 {
+    /**
+     * @throws JsonException
+     */
     public function testFormat(): void
     {
         $expected = <<<JSON
@@ -43,14 +32,23 @@ final class JsonFormatterTest extends \PHPUnit\Framework\TestCase
             'contributors' => [],
             'dependencies' => ['@foo/bar' => '^1.0.0'], 'devDependencies' => [],
         ];
-        $content = json_encode($data);
 
-        Assert::equalsWithoutLE($expected, JsonFormatter::format($content, ['contributors'], 2));
+        $content = json_encode($data, JSON_THROW_ON_ERROR);
+
+        self::assertSame(
+            LineEndingNormalizer::normalize($expected),
+            LineEndingNormalizer::normalize(JsonFormatter::format($content, ['contributors'], 2)),
+        );
     }
 
+    /**
+     * @throws JsonException
+     */
     public function testFormatWithEmptyContent(): void
     {
-        $this->assertEmpty(JsonFormatter::format('', [], 2));
+        self::assertEmpty(
+            JsonFormatter::format('', [], 2),
+        );
     }
 
     public function testGetArrayKeys(): void
@@ -64,7 +62,10 @@ final class JsonFormatterTest extends \PHPUnit\Framework\TestCase
         JSON;
         $expected = ['contributors'];
 
-        $this->assertSame($expected, JsonFormatter::getArrayKeys($content));
+        self::assertSame(
+            $expected,
+            JsonFormatter::getArrayKeys($content),
+        );
     }
 
     public function testGetArrayKeysWithoutSpacesBeforeArray(): void
@@ -72,7 +73,10 @@ final class JsonFormatterTest extends \PHPUnit\Framework\TestCase
         $content = '{"name":"test","workspaces":[]}';
         $expected = ['workspaces'];
 
-        $this->assertSame($expected, JsonFormatter::getArrayKeys($content));
+        self::assertSame(
+            $expected,
+            JsonFormatter::getArrayKeys($content),
+        );
     }
 
     public function testGetIndent(): void
@@ -84,27 +88,20 @@ final class JsonFormatterTest extends \PHPUnit\Framework\TestCase
         }
         JSON;
 
-        $this->assertSame(2, JsonFormatter::getIndent($content));
+        self::assertSame(
+            2,
+            JsonFormatter::getIndent($content),
+        );
     }
 
-    public function testUnescapeUnicode(): void
-    {
-        $data = ['name' => '\u0048\u0065\u006c\u006c\u006f'];
-        $content = json_encode($data);
-
-        $expected = <<<JSON
-        {
-          "name": "Hello"
-        }
-        JSON;
-
-        Assert::equalsWithoutLE($expected, JsonFormatter::format($content, [], 2, true));
-    }
-
+    /**
+     * @throws JsonException
+     */
     public function testUnescapeSlashes(): void
     {
         $data = ['url' => 'https:\/\/example.com'];
-        $content = json_encode($data);
+
+        $content = json_encode($data, JSON_THROW_ON_ERROR);
 
         $expected = <<<JSON
         {
@@ -112,6 +109,30 @@ final class JsonFormatterTest extends \PHPUnit\Framework\TestCase
         }
         JSON;
 
-        Assert::equalsWithoutLE($expected, JsonFormatter::format($content, [], 4, true));
+        self::assertSame(
+            LineEndingNormalizer::normalize($expected),
+            LineEndingNormalizer::normalize(JsonFormatter::format($content, [], 4)),
+        );
+    }
+
+    /**
+     * @throws JsonException
+     */
+    public function testUnescapeUnicode(): void
+    {
+        $data = ['name' => '\u0048\u0065\u006c\u006c\u006f'];
+
+        $content = json_encode($data, JSON_THROW_ON_ERROR);
+
+        $expected = <<<JSON
+        {
+          "name": "Hello"
+        }
+        JSON;
+
+        self::assertSame(
+            LineEndingNormalizer::normalize($expected),
+            LineEndingNormalizer::normalize(JsonFormatter::format($content, [], 2)),
+        );
     }
 }

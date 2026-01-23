@@ -10,12 +10,16 @@ on:
 
   push: *ignore-paths
 
-name: ecs
+name: mutation test
 
 permissions:
   contents: read
   pull-requests: write
 
 jobs:
-  easy-coding-standard:
-    uses: yii2-framework/actions/.github/workflows/ecs.yml@main
+  mutation:
+    uses: yii2-framework/actions/.github/workflows/infection.yml@v1
+    with:
+      phpstan: true
+    secrets:
+      STRYKER_DASHBOARD_API_KEY: ${{ secrets.STRYKER_DASHBOARD_API_KEY }}

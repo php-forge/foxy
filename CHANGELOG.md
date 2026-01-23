@@ -15,6 +15,7 @@ Change Log
 - Bug #112: Update `README.md` and add development and testing documentation (@terabytesoftw)
 - Bug #113: Fix PHP `8.4` nullable type deprecation warnings in tests (@terabytesoftw)
 - Bug #114: Fix PHP `8.5` deprecation of `setAccessible()` in `ReflectionProperty` class (`@terabytesoftw`)
+- Bug #115: Update CI workflows and apply automated refactors (@terabytesoftw)
 
 ## 0.1.2 June 10, 2024
 

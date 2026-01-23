@@ -21,10 +21,15 @@
         "symfony/console": "^6.0|^7.0"
     },
     "require-dev": {
+        "infection/infection": "^0.27|^0.32",
         "maglnet/composer-require-checker": "^4.7",
-        "php-forge/support": "^0.1",
+        "php-forge/support": "^0.3",
+        "phpstan/extension-installer": "^1.4",
+        "phpstan/phpstan": "^2.1",
+        "phpstan/phpstan-strict-rules": "^2.0.3",
         "phpunit/phpunit": "^10.5",
-        "symplify/easy-coding-standard": "^12.5",
+        "rector/rector": "^2.2",
+        "symplify/easy-coding-standard": "^13.0",
         "vimeo/psalm": "^5.26.1|^6.4.1",
         "xepozz/internal-mocker": "^1.4"
     },
@@ -32,7 +37,11 @@
         "preferred-install": {
             "*": "dist"
         },
-        "sort-packages": true
+        "sort-packages": true,
+        "allow-plugins": {
+            "infection/extension-installer": true,
+            "phpstan/extension-installer": true
+        }
     },
     "autoload": {
         "psr-4": {
@@ -51,9 +60,22 @@
         }
     },
     "scripts": {
-        "check-dependencies": "composer-require-checker",
-        "easy-coding-standard": "ecs check",
-        "psalm": "psalm",
-        "test": "phpunit"
+        "check-dependencies": "./vendor/bin/composer-require-checker check",
+        "ecs": "./vendor/bin/ecs --fix",
+        "mutation": "./vendor/bin/infection --threads=4 --ignore-msi-with-no-mutations --min-msi=100 --min-covered-msi=100",
+        "mutation-static": "./vendor/bin/infection --threads=4 --ignore-msi-with-no-mutations --min-msi=100 --min-covered-msi=100 --static-analysis-tool=phpstan --static-analysis-tool-options='--memory-limit=-1'",
+        "rector": "./vendor/bin/rector process src",
+        "static": "./vendor/bin/phpstan --memory-limit=-1",
+        "sync-metadata": [
+            "curl -fsSL -o .editorconfig https://raw.githubusercontent.com/yii2-extensions/template/main/.editorconfig",
+            "curl -fsSL -o .gitattributes https://raw.githubusercontent.com/yii2-extensions/template/main/.gitattributes",
+            "curl -fsSL -o .gitignore https://raw.githubusercontent.com/yii2-extensions/template/main/.gitignore",
+            "curl -fsSL -o ecs.php https://raw.githubusercontent.com/yii2-extensions/template/main/ecs.php",
+            "curl -fsSL -o infection.json5 https://raw.githubusercontent.com/yii2-extensions/template/main/infection.json5",
+            "curl -fsSL -o phpstan.neon https://raw.githubusercontent.com/yii2-extensions/template/main/phpstan.neon",
+            "curl -fsSL -o phpunit.xml.dist https://raw.githubusercontent.com/yii2-extensions/template/main/phpunit.xml.dist",
+            "curl -fsSL -o rector.php https://raw.githubusercontent.com/yii2-extensions/template/main/rector.php"
+        ],
+        "tests": "./vendor/bin/phpunit"
     }
 }

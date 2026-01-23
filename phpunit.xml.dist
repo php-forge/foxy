@@ -1,35 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <phpunit
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  backupGlobals="false"
+  xsi:noNamespaceSchemaLocation="./vendor/phpunit/phpunit/phpunit.xsd"
+  backupStaticProperties="false"
+  bootstrap="./vendor/autoload.php"
+  cacheDirectory="./runtime/.phpunit.cache"
   colors="true"
+  failOnRisky="true"
+  failOnWarning="true"
   processIsolation="false"
   stopOnFailure="false"
-  bootstrap="vendor/autoload.php"
-  xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/10.5/phpunit.xsd"
-  cacheDirectory=".phpunit.cache"
-  backupStaticProperties="false"
 >
-
   <extensions>
     <bootstrap class="Foxy\Tests\Support\InternalMockerExtension"/>
   </extensions>
 
   <testsuites>
     <testsuite name="Foxy">
-      <directory>./tests/</directory>
+      <directory>tests</directory>
     </testsuite>
   </testsuites>
 
   <source>
     <include>
-      <directory>./src</directory>
+      <directory suffix=".php">./src</directory>
     </include>
-    <exclude>
-      <file>.php-cs-fixer.dist.php</file>
-      <directory>./tests</directory>
-      <directory>./resources</directory>
-      <directory>./vendor</directory>
-    </exclude>
   </source>
 </phpunit>

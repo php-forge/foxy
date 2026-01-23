@@ -2,31 +2,12 @@
 
 declare(strict_types=1);
 
-/*
- * This file is part of the Foxy package.
- *
- * (c) François Pluchino <francois.pluchino@gmail.com>
- *
- * For the full copyright and license information, please view the LICENSE
- * file that was distributed with this source code.
- */
-
 namespace Foxy;
 
-/**
- * Events of Foxy.
- *
- * @author François Pluchino <francois.pluchino@gmail.com>
- */
+use Event;
+
 abstract class FoxyEvents
 {
-    /**
-     * The "PRE_SOLVE" event is triggered before the `solve` action of asset packages.
-     *
-     * @Event("Foxy\Event\PreSolveEvent")
-     */
-    final public const PRE_SOLVE = 'foxy.pre-solve';
-
     /**
      * The "GET_ASSETS" event is triggered before the `solve` action of asset packages
      * and during the retrieves the map of the asset packages.
@@ -42,4 +23,11 @@ abstract class FoxyEvents
      * @Event("Foxy\Event\PostSolveEvent")
      */
     final public const POST_SOLVE = 'foxy.post-solve';
+
+    /**
+     * The "PRE_SOLVE" event is triggered before the `solve` action of asset packages.
+     *
+     * @Event("Foxy\Event\PreSolveEvent")
+     */
+    final public const PRE_SOLVE = 'foxy.pre-solve';
 }

@@ -2,40 +2,30 @@
 
 declare(strict_types=1);
 
-/*
- * This file is part of the Foxy package.
- *
- * (c) François Pluchino <francois.pluchino@gmail.com>
- *
- * For the full copyright and license information, please view the LICENSE
- * file that was distributed with this source code.
- */
-
 namespace Foxy\Tests\Fixtures\Util;
 
 use Composer\Util\ProcessExecutor;
 
-/**
- * Mock of ProcessExecutor.
- *
- * @author François Pluchino <francois.pluchino@gmail.com>
- */
+use function count;
+
 abstract class AbstractProcessExecutorMock extends ProcessExecutor
 {
-    /**
-     * @var array
-     */
-    private $expectedValues = [];
+    private array $executedCommands = [];
+
+    private array $expectedValues = [];
+
+    private int $position = 0;
 
     /**
-     * @var array
+     * @param int $returnedCode The returned code
+     * @param null $output       The output
      */
-    private $executedCommands = [];
+    public function addExpectedValues(int $returnedCode = 0, $output = null): static
+    {
+        $this->expectedValues[] = [$returnedCode, $output];
 
-    /**
-     * @var int
-     */
-    private $position = 0;
+        return $this;
+    }
 
     public function doExecute($command, &$output = null, string|null $cwd = null): int
     {
@@ -49,93 +39,66 @@ abstract class AbstractProcessExecutorMock extends ProcessExecutor
     }
 
     /**
-     * @param int  $returnedCode The returned code
-     * @param null $output       The output
+     * Get the executed command.
      *
-     * @return self
+     * @param int $position The position of executed command
      */
-    public function addExpectedValues($returnedCode = 0, $output = null)
+    public function getExecutedCommand(int $position): int|string|null
     {
-        $this->expectedValues[] = [$returnedCode, $output];
-
-        return $this;
+        return $this->getExecutedValue($position, 0);
     }
 
     /**
      * Get the executed command.
      *
      * @param int $position The position of executed command
-     *
-     * @return string|null
      */
-    public function getExecutedCommand($position)
+    public function getExecutedOutput(int $position): int|string|null
     {
-        return $this->getExecutedValue($position, 0);
+        return $this->getExecutedValue($position, 2);
     }
 
     /**
      * Get the executed returned code.
      *
      * @param int $position The position of executed command
-     *
-     * @return int|null
      */
-    public function getExecutedReturnedCode($position)
+    public function getExecutedReturnedCode(int $position): int|string|null
     {
         return $this->getExecutedValue($position, 1);
     }
 
     /**
-     * Get the executed command.
-     *
-     * @param int $position The position of executed command
-     *
-     * @return string|null
-     */
-    public function getExecutedOutput($position)
-    {
-        return $this->getExecutedValue($position, 2);
-    }
-
-    /**
      * Get the last executed command.
-     *
-     * @return string|null
      */
-    public function getLastCommand()
+    public function getLastCommand(): int|string|null
     {
-        return $this->getExecutedCommand(\count($this->executedCommands) - 1);
-    }
-
-    /**
-     * Get the last executed returned code.
-     *
-     * @return int|null
-     */
-    public function getLastReturnedCode()
-    {
-        return $this->getExecutedReturnedCode(\count($this->executedCommands) - 1);
+        return $this->getExecutedCommand(count($this->executedCommands) - 1);
     }
 
     /**
      * Get the last executed output.
-     *
-     * @return string|null
      */
-    public function getLastOutput()
+    public function getLastOutput(): int|string|null
     {
-        return $this->getExecutedOutput(\count($this->executedCommands) - 1);
+        return $this->getExecutedOutput(count($this->executedCommands) - 1);
+    }
+
+    /**
+     * Get the last executed returned code.
+     */
+    public function getLastReturnedCode(): int|string|null
+    {
+        return $this->getExecutedReturnedCode(count($this->executedCommands) - 1);
     }
 
     /**
      * Get the value of the executed command.
      *
      * @param int $position The position
-     * @param int $index    The index of value
-     *
-     * @return int|string|null
+     * @param int $index The index of value
      */
-    private function getExecutedValue($position, int $index)
+    private function getExecutedValue(int $position, int $index): int|string|null
     {
         return isset($this->executedCommands[$position])
             ? $this->executedCommands[$position][$index]

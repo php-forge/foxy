@@ -1,0 +1,17 @@
+---
+on:
+  - pull_request
+  - push
+
+name: linter
+
+permissions:
+  checks: write
+  contents: read
+  statuses: write
+
+jobs:
+  linter:
+    uses: yii2-framework/actions/.github/workflows/super-linter.yml@v1
+    secrets:
+      AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

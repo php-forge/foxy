@@ -1,0 +1,12 @@
+{
+    $schema: "./vendor/infection/infection/resources/schema.json",
+    logs: {
+        text: "php://stderr",
+        stryker: {
+            report: "main",
+        },
+    },
+    source: {
+        directories: ["src"],
+    },
+}

@@ -2,26 +2,14 @@
 
 declare(strict_types=1);
 
-/*
- * This file is part of the Foxy package.
- *
- * (c) François Pluchino <francois.pluchino@gmail.com>
- *
- * For the full copyright and license information, please view the LICENSE
- * file that was distributed with this source code.
- */
-
 namespace Foxy\Asset;
 
 use Composer\IO\IOInterface;
 use Composer\Package\RootPackageInterface;
 use Composer\Semver\VersionParser;
-use Composer\Util\Filesystem;
-use Composer\Util\Platform;
-use Composer\Util\ProcessExecutor;
+use Composer\Util\{Filesystem, Platform, ProcessExecutor};
 use Foxy\Config\Config;
-use Foxy\Converter\SemverConverter;
-use Foxy\Converter\VersionConverterInterface;
+use Foxy\Converter\{SemverConverter, VersionConverterInterface};
 use Foxy\Exception\RuntimeException;
 use Foxy\Fallback\FallbackInterface;
 use Foxy\Json\JsonFile;
@@ -29,22 +17,20 @@ use Foxy\Json\JsonFile;
 use function is_dir;
 use function is_string;
 use function ltrim;
+use function preg_match;
 use function rtrim;
 use function sprintf;
 use function trim;
 
 use const DIRECTORY_SEPARATOR;
 
-/**
- * Abstract Manager.
- *
- * @author François Pluchino <francois.pluchino@gmail.com>
- */
 abstract class AbstractAssetManager implements AssetManagerInterface
 {
     final public const NODE_MODULES_PATH = './node_modules';
+
     protected bool $updatable = true;
-    private null|string $version = '';
+
+    private string|null $version = '';
 
     public function __construct(
         protected IOInterface $io,
@@ -52,19 +38,39 @@ abstract class AbstractAssetManager implements AssetManagerInterface
         protected ProcessExecutor $executor,
         protected Filesystem $fs,
         protected FallbackInterface|null $fallback = null,
-        protected VersionConverterInterface|null $versionConverter = null
+        protected VersionConverterInterface|null $versionConverter = null,
     ) {
         $this->versionConverter ??= new SemverConverter();
     }
 
-    public function isAvailable(): bool
-    {
-        return null !== $this->getVersion();
-    }
+    /**
+     * Get the command to install the asset dependencies.
+     */
+    abstract protected function getInstallCommand(): string;
 
-    public function getPackageName(): string
+    /**
+     * Get the command to update the asset dependencies.
+     */
+    abstract protected function getUpdateCommand(): string;
+
+    /**
+     * Get the command to retrieve the version.
+     */
+    abstract protected function getVersionCommand(): string;
+
+    public function addDependencies(RootPackageInterface $rootPackage, array $dependencies): AssetPackageInterface
     {
-        return 'package.json';
+        $assetPackage = new AssetPackage(
+            $rootPackage,
+            new JsonFile($this->getPackageJsonPath(), null, $this->io),
+        );
+        $assetPackage->removeUnusedDependencies($dependencies);
+        $alreadyInstalledDependencies = $assetPackage->addNewDependencies($dependencies);
+
+        $this->actionWhenComposerDependenciesAreAlreadyInstalled($alreadyInstalledDependencies);
+        $this->io->write('<info>Merging Composer dependencies in the asset package</info>');
+
+        return $assetPackage->write();
     }
 
     public function getPackageJsonPath(): string
@@ -72,28 +78,24 @@ abstract class AbstractAssetManager implements AssetManagerInterface
         return rtrim($this->getRootPackageDir(), '/\\') . DIRECTORY_SEPARATOR . $this->getPackageName();
     }
 
+    public function getPackageName(): string
+    {
+        return 'package.json';
+    }
+
     public function hasLockFile(): bool
     {
         return file_exists($this->getLockFilePath());
     }
 
+    public function isAvailable(): bool
+    {
+        return null !== $this->getVersion();
+    }
+
     public function isInstalled(): bool
     {
         return is_dir($this->getNodeModulesPath()) && file_exists($this->getPackageJsonPath());
-    }
-
-    public function setFallback(FallbackInterface $fallback): static
-    {
-        $this->fallback = $fallback;
-
-        return $this;
-    }
-
-    public function setUpdatable($updatable): static
-    {
-        $this->updatable = $updatable;
-
-        return $this;
     }
 
     public function isUpdatable(): bool
@@ -104,48 +106,6 @@ abstract class AbstractAssetManager implements AssetManagerInterface
     public function isValidForUpdate(): bool
     {
         return true;
-    }
-
-    public function validate(): void
-    {
-        $version = $this->getVersion();
-        /** @var string $constraintVersion */
-        $constraintVersion = $this->config->get('manager-version');
-
-        if (null === $version) {
-            throw new RuntimeException(sprintf('The binary of "%s" must be installed', $this->getName()));
-        }
-
-        if ($constraintVersion) {
-            $parser = new VersionParser();
-            $constraint = $parser->parseConstraints($constraintVersion);
-
-            if (!$constraint->matches($parser->parseConstraints($version))) {
-                throw new RuntimeException(
-                    sprintf(
-                        'The installed %s version "%s" doesn\'t match with the constraint version "%s"',
-                        $this->getName(),
-                        $version,
-                        $constraintVersion
-                    )
-                );
-            }
-        }
-    }
-
-    public function addDependencies(RootPackageInterface $rootPackage, array $dependencies): AssetPackageInterface
-    {
-        $assetPackage = new AssetPackage(
-            $rootPackage,
-            new JsonFile($this->getPackageJsonPath(), null, $this->io)
-        );
-        $assetPackage->removeUnusedDependencies($dependencies);
-        $alreadyInstalledDependencies = $assetPackage->addNewDependencies($dependencies);
-
-        $this->actionWhenComposerDependenciesAreAlreadyInstalled($alreadyInstalledDependencies);
-        $this->io->write('<info>Merging Composer dependencies in the asset package</info>');
-
-        return $assetPackage->write();
     }
 
     public function run(): int
@@ -202,12 +162,53 @@ abstract class AbstractAssetManager implements AssetManagerInterface
 
             return $res;
         } finally {
-            if ($changedDir && null !== $originalDir) {
-                if (chdir($originalDir) === false) {
-                    throw new RuntimeException(
-                        sprintf('Unable to restore working directory to "%s".', $originalDir)
-                    );
-                }
+            if ($changedDir && null !== $originalDir && chdir($originalDir) === false) {
+                throw new RuntimeException(
+                    sprintf('Unable to restore working directory to "%s".', $originalDir),
+                );
+            }
+        }
+
+        return 0;
+    }
+
+    public function setFallback(FallbackInterface $fallback): static
+    {
+        $this->fallback = $fallback;
+
+        return $this;
+    }
+
+    public function setUpdatable($updatable): static
+    {
+        $this->updatable = $updatable;
+
+        return $this;
+    }
+
+    public function validate(): void
+    {
+        $version = $this->getVersion();
+        /** @var string $constraintVersion */
+        $constraintVersion = $this->config->get('manager-version');
+
+        if (null === $version) {
+            throw new RuntimeException(sprintf('The binary of "%s" must be installed', $this->getName()));
+        }
+
+        if ($constraintVersion) {
+            $parser = new VersionParser();
+            $constraint = $parser->parseConstraints($constraintVersion);
+
+            if (!$constraint->matches($parser->parseConstraints($version))) {
+                throw new RuntimeException(
+                    sprintf(
+                        'The installed %s version "%s" doesn\'t match with the constraint version "%s"',
+                        $this->getName(),
+                        $version,
+                        $constraintVersion,
+                    ),
+                );
             }
         }
     }
@@ -224,6 +225,36 @@ abstract class AbstractAssetManager implements AssetManagerInterface
         // do nothing by default
     }
 
+    /**
+     * Build the command with binary and command options.
+     *
+     * @param string $defaultBin The default binary of command if option isn't defined.
+     * @param string $action The command action to retrieve the options in config.
+     * @param array|string $command The command.
+     */
+    protected function buildCommand(string $defaultBin, string $action, array|string $command): string
+    {
+        $bin = $this->config->get('manager-bin', $defaultBin);
+        $bin = Platform::isWindows() ? str_replace('/', '\\', (string) $bin) : $bin;
+        $gOptions = trim((string) $this->config->get('manager-options', ''));
+        $options = trim((string) $this->config->get('manager-' . $action . '-options', ''));
+
+        /** @psalm-var string|string[] $command */
+        return (string) $bin . ' ' . implode(' ', (array) $command)
+            . (empty($gOptions) ? '' : ' ' . $gOptions)
+            . (empty($options) ? '' : ' ' . $options);
+    }
+
+    protected function getLockFilePath(): string
+    {
+        return rtrim($this->getRootPackageDir(), '/\\') . DIRECTORY_SEPARATOR . $this->getLockPackageName();
+    }
+
+    protected function getNodeModulesPath(): string
+    {
+        return rtrim($this->getRootPackageDir(), '/\\') . DIRECTORY_SEPARATOR . ltrim(self::NODE_MODULES_PATH, './');
+    }
+
     protected function getRootPackageDir(): string
     {
         $rootPackageDir = $this->config->get('root-package-json-dir');
@@ -233,7 +264,7 @@ abstract class AbstractAssetManager implements AssetManagerInterface
 
             if ('' === $rootPackageDir) {
                 $rootPackageDir = DIRECTORY_SEPARATOR;
-            } elseif (1 === \preg_match('/^[A-Za-z]:$/', $rootPackageDir)) {
+            } elseif (1 === preg_match('/^[A-Za-z]:$/', $rootPackageDir)) {
                 $rootPackageDir .= DIRECTORY_SEPARATOR;
             }
 
@@ -259,60 +290,17 @@ abstract class AbstractAssetManager implements AssetManagerInterface
         return $currentDir;
     }
 
-    protected function getLockFilePath(): string
-    {
-        return rtrim($this->getRootPackageDir(), '/\\') . DIRECTORY_SEPARATOR . $this->getLockPackageName();
-    }
-
-    protected function getNodeModulesPath(): string
-    {
-        return rtrim($this->getRootPackageDir(), '/\\') . DIRECTORY_SEPARATOR . ltrim(self::NODE_MODULES_PATH, './');
-    }
-
-    /**
-     * Build the command with binary and command options.
-     *
-     * @param string $defaultBin The default binary of command if option isn't defined.
-     * @param string $action The command action to retrieve the options in config.
-     * @param array|string $command The command.
-     */
-    protected function buildCommand(string $defaultBin, string $action, array|string $command): string
-    {
-        $bin = $this->config->get('manager-bin', $defaultBin);
-        $bin = Platform::isWindows() ? str_replace('/', '\\', (string) $bin) : $bin;
-        $gOptions = trim((string) $this->config->get('manager-options', ''));
-        $options = trim((string) $this->config->get('manager-' . $action . '-options', ''));
-
-        /** @psalm-var string|string[] $command */
-        return (string) $bin . ' ' . implode(' ', (array) $command)
-            . (empty($gOptions) ? '' : ' ' . $gOptions)
-            . (empty($options) ? '' : ' ' . $options);
-    }
-
     protected function getVersion(): string|null
     {
         if ($this->version === '' && $this->versionConverter !== null) {
             $this->executor->execute($this->getVersionCommand(), $version);
-            $this->version = '' !== trim((string) $version) ? $this->versionConverter->convertVersion(trim((string) $version)) : null;
+            $this->version = '' !== trim((string) $version)
+                ? $this->versionConverter->convertVersion(trim((string) $version))
+                : null;
         }
 
         return $this->version;
     }
-
-    /**
-     * Get the command to retrieve the version.
-     */
-    abstract protected function getVersionCommand(): string;
-
-    /**
-     * Get the command to install the asset dependencies.
-     */
-    abstract protected function getInstallCommand(): string;
-
-    /**
-     * Get the command to update the asset dependencies.
-     */
-    abstract protected function getUpdateCommand(): string;
 
     private function isAbsolutePath(string $path): bool
     {
@@ -320,6 +308,6 @@ abstract class AbstractAssetManager implements AssetManagerInterface
             return true;
         }
 
-        return (bool) \preg_match('/^[A-Za-z]:[\\\\\/]/', $path);
+        return (bool) preg_match('/^[A-Za-z]:[\\\\\/]/', $path);
     }
 }
