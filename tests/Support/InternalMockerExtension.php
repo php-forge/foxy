@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Foxy\Tests\Support;
 
+use PHPUnit\Event\Test\{Finished, FinishedSubscriber};
 use PHPUnit\Event\Test\{PreparationStarted, PreparationStartedSubscriber};
 use PHPUnit\Event\TestSuite\{Started, StartedSubscriber};
 use PHPUnit\Runner\Extension\{Extension, Facade, ParameterCollection};
@@ -23,6 +24,12 @@ final class InternalMockerExtension implements Extension
             },
             new class implements PreparationStartedSubscriber {
                 public function notify(PreparationStarted $event): void
+                {
+                    MockerState::resetState();
+                }
+            },
+            new class implements FinishedSubscriber {
+                public function notify(Finished $event): void
                 {
                     MockerState::resetState();
                 }
