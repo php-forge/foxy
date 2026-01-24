@@ -55,6 +55,7 @@ enabled:
   - phpdoc_no_empty_return
   - phpdoc_no_useless_inheritdoc
   - phpdoc_order
+  - phpdoc_param_order
   - phpdoc_property
   - phpdoc_scalar
   - phpdoc_singular_inheritdoc
