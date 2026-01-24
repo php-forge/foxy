@@ -7,7 +7,7 @@ namespace Foxy;
 abstract class FoxyEvents
 {
     /**
-     * The `GET_ASSETS` event is triggered before the `solve` action of asset packages and during the retrieves the map
+     * The `GET_ASSETS` event is triggered before the `solve` action of asset packages and while retrieving the map
      * of the asset packages.
      */
     final public const GET_ASSETS = 'foxy.get-assets';
