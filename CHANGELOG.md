@@ -1,5 +1,7 @@
 # ChangeLog
 
+## 0.2.1 Under development
+
 ## 0.2.0 January 24, 2024
 
 - Enh #87: Refactor `SemverUtil::class` stability normalization logic (@terabytesoftw)
