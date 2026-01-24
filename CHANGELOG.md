@@ -19,6 +19,7 @@
 - Bug #117: Raise PHPStan level to `5` (@terabytesoftw)
 - Bug #118: Add `phpdoc_param_order` rule and update namespace references in `rector.php` (@terabytesoftw)
 - Enh #119: Add `php-forge/coding-standard` to development dependencies for code quality checks (@terabytesoftw)
+- Bug #120: Clean up event documentation in `FoxyEvents` class (@terabytesoftw)
 
 ## 0.1.2 June 10, 2024
 
