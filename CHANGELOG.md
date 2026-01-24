@@ -1,7 +1,6 @@
 # ChangeLog
 
-## 0.1.3 Under development
-
+## 0.2.0 January 24, 2024
 - Enh #87: Refactor `SemverUtil::class` stability normalization logic (@terabytesoftw)
 - Bug #104: Add support for PHP 8.4 (@terabytesoftw)
 - Enh #105: Update dependencies in `composer.lock` (@terabytesoftw)
@@ -13,7 +12,7 @@
 - Bug #111: Throw `RuntimeException` class on asset/JSON `I/O` failures (@terabytesoftw)
 - Bug #112: Update `README.md` and add development and testing documentation (@terabytesoftw)
 - Bug #113: Fix PHP `8.4` nullable type deprecation warnings in tests (@terabytesoftw)
-- Bug #114: Fix PHP `8.5` deprecation of `setAccessible()` in `ReflectionProperty` class (`@terabytesoftw`)
+- Bug #114: Fix PHP `8.5` deprecation of `setAccessible()` in `ReflectionProperty` class (@terabytesoftw)
 - Bug #115: Update CI workflows and apply automated refactors (@terabytesoftw)
 - Bug #116: Update `LICENSE` and `composer.json` (@terabytesoftw)
 - Bug #117: Raise PHPStan level to `5` (@terabytesoftw)
