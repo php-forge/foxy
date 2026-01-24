@@ -32,13 +32,12 @@
     },
     "require-dev": {
         "maglnet/composer-require-checker": "^4.7",
+        "php-forge/coding-standard": "^0.1",
         "php-forge/support": "^0.3",
         "phpstan/extension-installer": "^1.4",
         "phpstan/phpstan": "^2.1",
         "phpstan/phpstan-strict-rules": "^2.0.3",
         "phpunit/phpunit": "^10.5",
-        "rector/rector": "^2.2",
-        "symplify/easy-coding-standard": "^13.0",
         "xepozz/internal-mocker": "^1.4"
     },
     "suggest": {
@@ -81,11 +80,9 @@
             "curl -fsSL -o .editorconfig https://raw.githubusercontent.com/yii2-extensions/template/main/.editorconfig",
             "curl -fsSL -o .gitattributes https://raw.githubusercontent.com/yii2-extensions/template/main/.gitattributes",
             "curl -fsSL -o .gitignore https://raw.githubusercontent.com/yii2-extensions/template/main/.gitignore",
-            "curl -fsSL -o ecs.php https://raw.githubusercontent.com/yii2-extensions/template/main/ecs.php",
             "curl -fsSL -o infection.json5 https://raw.githubusercontent.com/yii2-extensions/template/main/infection.json5",
             "curl -fsSL -o phpstan.neon https://raw.githubusercontent.com/yii2-extensions/template/main/phpstan.neon",
-            "curl -fsSL -o phpunit.xml.dist https://raw.githubusercontent.com/yii2-extensions/template/main/phpunit.xml.dist",
-            "curl -fsSL -o rector.php https://raw.githubusercontent.com/yii2-extensions/template/main/rector.php"
+            "curl -fsSL -o phpunit.xml.dist https://raw.githubusercontent.com/yii2-extensions/template/main/phpunit.xml.dist"
         ],
         "tests": "./vendor/bin/phpunit"
     }
