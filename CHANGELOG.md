@@ -1,6 +1,7 @@
 # ChangeLog
 
 ## 0.2.0 January 24, 2024
+
 - Enh #87: Refactor `SemverUtil::class` stability normalization logic (@terabytesoftw)
 - Bug #104: Add support for PHP 8.4 (@terabytesoftw)
 - Enh #105: Update dependencies in `composer.lock` (@terabytesoftw)
