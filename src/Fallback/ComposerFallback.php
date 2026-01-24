@@ -121,7 +121,12 @@ final class ComposerFallback implements FallbackInterface
 
         $isLocked = $this->composer->getLocker()->isLocked();
         $lockData = $isLocked ? $this->composer->getLocker()->getLockData() : null;
-        $hasPackage = is_array($lockData) && isset($lockData['packages']) && $lockData['packages'] !== [];
+
+        $hasPackage = is_array($lockData)
+            && (
+                (isset($lockData['packages']) && $lockData['packages'] !== [])
+                || (isset($lockData['packages-dev']) && $lockData['packages-dev'] !== [])
+            );
 
         return $isLocked && $hasPackage;
     }
