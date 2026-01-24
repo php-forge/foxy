@@ -8,11 +8,13 @@ use Composer\IO\IOInterface;
 use Composer\Package\RootPackageInterface;
 use Composer\Semver\VersionParser;
 use Composer\Util\{Filesystem, Platform, ProcessExecutor};
+use Exception;
 use Foxy\Config\Config;
 use Foxy\Converter\{SemverConverter, VersionConverterInterface};
 use Foxy\Exception\RuntimeException;
 use Foxy\Fallback\FallbackInterface;
 use Foxy\Json\JsonFile;
+use Seld\JsonLint\ParsingException;
 
 use function is_dir;
 use function is_string;
@@ -58,6 +60,9 @@ abstract class AbstractAssetManager implements AssetManagerInterface
      */
     abstract protected function getVersionCommand(): string;
 
+    /**
+     * @throws Exception|ParsingException
+     */
     public function addDependencies(RootPackageInterface $rootPackage, array $dependencies): AssetPackageInterface
     {
         $assetPackage = new AssetPackage(
@@ -118,7 +123,7 @@ abstract class AbstractAssetManager implements AssetManagerInterface
         $originalDir = null;
         $changedDir = false;
 
-        if (is_string($rootPackageDir) && !empty($rootPackageDir)) {
+        if (is_string($rootPackageDir) && $rootPackageDir !== '') {
             $rootPackageDir = $this->getRootPackageDir();
 
             if (is_dir($rootPackageDir) === false) {
@@ -159,8 +164,6 @@ abstract class AbstractAssetManager implements AssetManagerInterface
             if ($res > 0 && null !== $this->fallback) {
                 $this->fallback->restore();
             }
-
-            return $res;
         } finally {
             if ($changedDir && null !== $originalDir && chdir($originalDir) === false) {
                 throw new RuntimeException(
@@ -169,7 +172,7 @@ abstract class AbstractAssetManager implements AssetManagerInterface
             }
         }
 
-        return 0;
+        return $res;
     }
 
     public function setFallback(FallbackInterface $fallback): static
@@ -189,14 +192,14 @@ abstract class AbstractAssetManager implements AssetManagerInterface
     public function validate(): void
     {
         $version = $this->getVersion();
-        /** @var string $constraintVersion */
+        /** @var string|null $constraintVersion */
         $constraintVersion = $this->config->get('manager-version');
 
         if (null === $version) {
             throw new RuntimeException(sprintf('The binary of "%s" must be installed', $this->getName()));
         }
 
-        if ($constraintVersion) {
+        if (is_string($constraintVersion) && $constraintVersion !== '') {
             $parser = new VersionParser();
             $constraint = $parser->parseConstraints($constraintVersion);
 
@@ -239,10 +242,13 @@ abstract class AbstractAssetManager implements AssetManagerInterface
         $gOptions = trim((string) $this->config->get('manager-options', ''));
         $options = trim((string) $this->config->get('manager-' . $action . '-options', ''));
 
-        /** @psalm-var string|string[] $command */
-        return (string) $bin . ' ' . implode(' ', (array) $command)
-            . (empty($gOptions) ? '' : ' ' . $gOptions)
-            . (empty($options) ? '' : ' ' . $options);
+        return sprintf(
+            '%s %s%s%s',
+            $bin,
+            implode(' ', (array) $command),
+            $gOptions === '' ? '' : ' ' . $gOptions,
+            $options === '' ? '' : ' ' . $options,
+        );
     }
 
     protected function getLockFilePath(): string

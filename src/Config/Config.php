@@ -128,13 +128,13 @@ class Config
     {
         $value = json_decode($value, true);
 
-        if (json_last_error()) {
+        if (json_last_error() !== JSON_ERROR_NONE) {
             throw new RuntimeException(
                 sprintf('The "%s" environment variable isn\'t a valid JSON', $environmentVariable),
             );
         }
 
-        return is_array($value) ? $value : [];
+        return $value;
     }
 
     /**

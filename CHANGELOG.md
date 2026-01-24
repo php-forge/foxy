@@ -16,6 +16,7 @@
 - Bug #114: Fix PHP `8.5` deprecation of `setAccessible()` in `ReflectionProperty` class (`@terabytesoftw`)
 - Bug #115: Update CI workflows and apply automated refactors (@terabytesoftw)
 - Bug #116: Update `LICENSE` and `composer.json` (@terabytesoftw)
+- Bug #117: Raise PHPStan level to `5` (@terabytesoftw)
 
 ## 0.1.2 June 10, 2024
 

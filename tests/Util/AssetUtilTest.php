@@ -10,7 +10,6 @@ use Composer\Semver\Constraint\Constraint;
 use Foxy\Asset\{AbstractAssetManager, AssetManagerInterface};
 use Foxy\Util\AssetUtil;
 use JsonException;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 
@@ -114,7 +113,6 @@ final class AssetUtilTest extends TestCase
     ): void {
         $packageName = '@composer-asset/foo--bar';
 
-        /** @var MockObject|PackageInterface $package */
         $package = $this->createMock(PackageInterface::class);
 
         $assetPackage = [];
@@ -163,7 +161,6 @@ final class AssetUtilTest extends TestCase
             $installationManager->expects(self::once())->method('getInstallPath')->willReturn($this->cwd);
         }
 
-        /** @var AbstractAssetManager|MockObject $assetManager */
         $assetManager = $this
             ->getMockBuilder(AbstractAssetManager::class)
             ->disableOriginalConstructor()
@@ -201,7 +198,6 @@ final class AssetUtilTest extends TestCase
 
         $assetManager = $this->createMock(AbstractAssetManager::class);
 
-        /** @var MockObject|PackageInterface $package */
         $package = $this->createMock(PackageInterface::class);
 
         $package->expects(self::once())->method('getRequires')->willReturn([]);
@@ -226,7 +222,6 @@ final class AssetUtilTest extends TestCase
 
         $installationManager->expects(self::once())->method('getInstallPath')->willReturn($this->cwd);
 
-        /** @var AbstractAssetManager|MockObject $assetManager */
         $assetManager = $this
             ->getMockBuilder(AbstractAssetManager::class)
             ->disableOriginalConstructor()
@@ -321,7 +316,6 @@ final class AssetUtilTest extends TestCase
             'full-disable/qualified' => false,
         ];
 
-        /** @var MockObject|PackageInterface $package */
         $package = $this->createMock(PackageInterface::class);
 
         $package->expects(self::once())->method('getName')->willReturn($packageName);
@@ -342,7 +336,6 @@ final class AssetUtilTest extends TestCase
             '*' => true,
         ];
 
-        /** @var MockObject|PackageInterface $package */
         $package = $this->createMock(PackageInterface::class);
 
         $package->expects(self::once())->method('getName')->willReturn($packageName);

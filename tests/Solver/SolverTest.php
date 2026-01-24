@@ -21,7 +21,6 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 use function chdir;
-use function class_exists;
 use function dirname;
 use function file_put_contents;
 
@@ -64,7 +63,6 @@ class SolverTest extends TestCase
      */
     public function testSolve(int $resRunManager): void
     {
-        /** @var MockObject|PackageInterface $requirePackage */
         $requirePackage = $this->createMock(PackageInterface::class);
 
         $requirePackage->expects(self::any())->method('getPrettyVersion')->willReturn('1.0.0');
@@ -137,13 +135,13 @@ class SolverTest extends TestCase
 
         $this->localRepo = $this->createMock(InstalledArrayRepository::class);
 
-        if (class_exists(HttpDownloader::class)) {
-            $rm = new RepositoryManager($this->io, $this->composerConfig, new HttpDownloader($this->io, $this->composerConfig));
-            $rm->setLocalRepository($this->localRepo);
-        } else {
-            $rm = new RepositoryManager($this->io, $this->composerConfig);
-            $rm->setLocalRepository($this->localRepo);
-        }
+        $rm = new RepositoryManager(
+            $this->io,
+            $this->composerConfig,
+            new HttpDownloader($this->io, $this->composerConfig),
+        );
+
+        $rm->setLocalRepository($this->localRepo);
 
         $this->composer->expects(self::any())->method('getRepositoryManager')->willReturn($rm);
         $this->composer->expects(self::any())->method('getInstallationManager')->willReturn($this->im);

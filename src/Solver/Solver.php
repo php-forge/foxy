@@ -49,7 +49,9 @@ final class Solver implements SolverInterface
      */
     public function solve(Composer $composer, IOInterface $io): void
     {
-        if (!$this->config->get('enabled')) {
+        $enabled = $this->config->get('enabled');
+
+        if ($enabled !== true && $enabled !== 1 && $enabled !== '1') {
             return;
         }
 
@@ -66,7 +68,7 @@ final class Solver implements SolverInterface
         $res = $this->assetManager->run();
         $dispatcher->dispatch(FoxyEvents::POST_SOLVE, new PostSolveEvent($assetDir, $packages, $res));
 
-        if ($res > 0 && $this->composerFallback) {
+        if ($res > 0 && $this->composerFallback !== null) {
             $this->composerFallback->restore();
 
             throw new RuntimeException('The asset manager ended with an error');
@@ -93,7 +95,7 @@ final class Solver implements SolverInterface
         foreach ($packages as $package) {
             $filename = AssetUtil::getPath($installationManager, $this->assetManager, $package, $configPackages);
 
-            if (null !== $filename) {
+            if (is_string($filename) && $filename !== '') {
                 [$packageName, $packagePath] = $this->getMockPackagePath($package, $assetDir, $filename);
                 $assets[$packageName] = $packagePath;
             }

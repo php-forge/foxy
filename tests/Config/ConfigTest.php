@@ -139,11 +139,14 @@ final class ConfigTest extends TestCase
                 ->method('writeError')
                 ->willReturnCallback(
                     static function ($message) use ($globalPath, &$globalLogComposer, &$globalLogConfig): void {
-                        if (sprintf('Loading Foxy config in file %s/composer.json', $globalPath)) {
+                        $expectedComposerMessage = sprintf('Loading Foxy config in file %s/composer.json', $globalPath);
+                        $expectedConfigMessage = sprintf('Loading Foxy config in file %s/config.json', $globalPath);
+
+                        if ($message === $expectedComposerMessage) {
                             $globalLogComposer = true;
                         }
 
-                        if (sprintf('Loading Foxy config in file %s/config.json', $globalPath)) {
+                        if ($message === $expectedConfigMessage) {
                             $globalLogConfig = true;
                         }
                     },
@@ -155,7 +158,8 @@ final class ConfigTest extends TestCase
 
         // remove env variables
         if (null !== $env) {
-            $envKey = substr($env, 0, strpos($env, '='));
+            $envKeyPos = strpos($env, '=');
+            $envKey = $envKeyPos !== false ? substr($env, 0, $envKeyPos) : '';
             putenv($envKey);
 
             self::assertFalse(
@@ -205,7 +209,7 @@ final class ConfigTest extends TestCase
         );
 
         if (null === $ex) {
-            throw new Exception('The expected exception was not thrown');
+            throw new RuntimeException('The expected exception was not thrown');
         }
 
         throw $ex;

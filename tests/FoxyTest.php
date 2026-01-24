@@ -25,12 +25,9 @@ use Seld\JsonLint\ParsingException;
 
 use function getcwd;
 
-use const PHP_VERSION_ID;
-
 final class FoxyTest extends TestCase
 {
     private Composer|MockObject $composer;
-    private Config $composerConfig;
     private IOInterface $io;
     private RootPackageInterface|MockObject $package;
 
@@ -45,10 +42,11 @@ final class FoxyTest extends TestCase
     public function testActivate(): void
     {
         $foxy = new Foxy();
+
         $foxy->activate($this->composer, $this->io);
         $foxy->init();
 
-        self::assertTrue(true);
+        $this->expectNotToPerformAssertions();
     }
 
     /**
@@ -88,16 +86,10 @@ final class FoxyTest extends TestCase
     public function testActivateOnInstall(): void
     {
         $package = $this->createMock(Package::class);
-
         $package->expects(self::once())->method('getName')->willReturn('php-forge/foxy');
-
         $operation = $this->createMock(InstallOperation::class);
-
         $operation->expects(self::once())->method('getPackage')->willReturn($package);
-
-        /** @var MockObject|PackageEvent $event */
         $event = $this->createMock(PackageEvent::class);
-
         $event->expects(self::once())->method('getOperation')->willReturn($operation);
 
         $foxy = new Foxy();
@@ -117,23 +109,16 @@ final class FoxyTest extends TestCase
             ->willReturn(['foxy' => ['manager' => 'stub']]);
 
         $foxyReflection = new ReflectionClass(Foxy::class);
+
         $assetManagersProperty = $foxyReflection->getProperty('assetManagers');
-
-        if (PHP_VERSION_ID < 80500) {
-        }
-
         $originalAssetManagers = $assetManagersProperty->getValue();
         $assetManagersProperty->setValue(null, [StubAssetManager::class]);
 
         try {
             $foxy = new Foxy();
+
             $foxy->activate($this->composer, $this->io);
-
             $assetFallbackProperty = $foxyReflection->getProperty('assetFallback');
-
-            if (PHP_VERSION_ID < 80500) {
-            }
-
             $assetFallback = $assetFallbackProperty->getValue($foxy);
 
             $fallbackReflection = new ReflectionClass($assetFallback);
@@ -160,15 +145,17 @@ final class FoxyTest extends TestCase
             ->willReturn(['foxy' => ['manager' => 'invalid_manager']]);
 
         $foxy = new Foxy();
+
         $foxy->activate($this->composer, $this->io);
     }
 
     public function testDeactivate(): void
     {
         $foxy = new Foxy();
+
         $foxy->deactivate($this->composer, $this->io);
 
-        self::assertTrue(true);
+        $this->expectNotToPerformAssertions();
     }
 
     public function testGetSubscribedEvents(): void
@@ -183,7 +170,6 @@ final class FoxyTest extends TestCase
     {
         $event = new Event($eventName, $this->composer, $this->io);
 
-        /** @var MockObject|SolverInterface $solver */
         $solver = $this->createMock(SolverInterface::class);
 
         $solver->expects(self::once())->method('setUpdatable')->with($expectedUpdatable);
@@ -198,15 +184,16 @@ final class FoxyTest extends TestCase
     public function testUninstall(): void
     {
         $foxy = new Foxy();
+
         $foxy->uninstall($this->composer, $this->io);
 
-        self::assertTrue(true);
+        $this->expectNotToPerformAssertions();
     }
 
     protected function setUp(): void
     {
         $this->composer = $this->createMock(Composer::class);
-        $this->composerConfig = $this->createMock(Config::class);
+        $composerConfig = $this->createMock(Config::class);
         $this->io = $this->createMock(IOInterface::class);
         $this->package = $this->createMock(RootPackageInterface::class);
 
@@ -218,7 +205,7 @@ final class FoxyTest extends TestCase
         $this->composer
             ->expects(self::any())
             ->method('getConfig')
-            ->willReturn($this->composerConfig);
+            ->willReturn($composerConfig);
 
         $rm = $this->createMock(RepositoryManager::class);
 

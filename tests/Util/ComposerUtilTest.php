@@ -31,7 +31,7 @@ final class ComposerUtilTest extends TestCase
     public function testValidateVersion(string $composerVersion, string $requiredVersion, bool $valid): void
     {
         if ($valid) {
-            self::assertTrue(true, 'Composer\'s version is valid');
+            $this->expectNotToPerformAssertions();
         } else {
             $this->expectException(RuntimeException::class);
             $this->expectExceptionMessageMatches(

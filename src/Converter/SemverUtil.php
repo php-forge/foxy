@@ -41,7 +41,7 @@ abstract class SemverUtil
             [$version, $patchVersion] = self::matchVersion($version, $type);
 
             $matches = [];
-            $hasPatchNumber = preg_match('/[0-9]+\.[0-9]+|[0-9]+|\.[0-9]+$/', $end, $matches);
+            $hasPatchNumber = preg_match('/\d+\.\d+|\d+|\.\d+$/', $end, $matches);
             $end = $hasPatchNumber ? $matches[0] : '1';
 
             if ($patchVersion) {
@@ -71,6 +71,22 @@ abstract class SemverUtil
     }
 
     /**
+     * Clean the wildcard in version.
+     *
+     * @param string $version The version.
+     *
+     * @return string The cleaned version.
+     */
+    protected static function cleanWildcard(string $version): string
+    {
+        while (str_contains($version, '.x.x')) {
+            $version = str_replace('.x.x', '.x', $version);
+        }
+
+        return $version;
+    }
+
+    /**
      * Clean the raw version.
      *
      * @param string $version The version.
@@ -94,30 +110,12 @@ abstract class SemverUtil
             $end = substr($end, 1);
         }
 
-        $matches = [];
-
         preg_match('/^[a-z]+/', $end, $matches);
 
         $type = isset($matches[0]) ? self::normalizeStability($matches[0]) : '';
         $end = substr($end, strlen($type));
 
         return [$type, $version, $end];
-    }
-
-    /**
-     * Clean the wildcard in version.
-     *
-     * @param string $version The version.
-     *
-     * @return string The cleaned version.
-     */
-    private static function cleanWildcard(string $version): string
-    {
-        while (str_contains($version, '.x.x')) {
-            $version = str_replace('.x.x', '.x', $version);
-        }
-
-        return $version;
     }
 
     /**
@@ -128,7 +126,7 @@ abstract class SemverUtil
     private static function convertDateMinorVersion(string $minor): string
     {
         $split = explode('.', $minor);
-        $minor = (int) $split[0];
+        $minor = $split[0];
         $revision = isset($split[1]) ? (int) $split[1] : 0;
 
         return '.' . sprintf('%03d', $minor) . sprintf('%03d', $revision);

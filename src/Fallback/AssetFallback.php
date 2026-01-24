@@ -22,12 +22,14 @@ final class AssetFallback implements FallbackInterface
         private readonly string $path,
         Filesystem|null $fs = null,
     ) {
-        $this->fs = $fs ?: new Filesystem();
+        $this->fs = $fs ?? new Filesystem();
     }
 
     public function restore(): void
     {
-        if (!$this->config->get('fallback-asset')) {
+        $fallbackAsset = $this->config->get('fallback-asset');
+
+        if ($fallbackAsset !== true && $fallbackAsset !== 1 && $fallbackAsset !== '1') {
             return;
         }
 
@@ -43,7 +45,7 @@ final class AssetFallback implements FallbackInterface
             );
         }
 
-        if (null !== $this->originalContent) {
+        if (null !== $this->originalContent && $this->originalContent !== '') {
             $result = file_put_contents($this->path, $this->originalContent);
 
             if (false === $result) {

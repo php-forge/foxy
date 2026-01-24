@@ -24,11 +24,9 @@ use function trim;
 
 final class JsonFormatter
 {
-    public const ARRAY_KEYS_REGEX = '/["\']([\w\d_\-.]+)["\']\s*:\s*\[\s*\]/';
-
+    public const ARRAY_KEYS_REGEX = '/["\']([\w\-.]+)["\']\s*:\s*\[\s*]/';
     public const DEFAULT_INDENT = 4;
-
-    public const INDENT_REGEX = '/^[{\[][\r\n]([ ]+)["\']/';
+    public const INDENT_REGEX = '/^[{\[][\r\n]( +)["\']/';
 
     /**
      * Format the data in JSON.
@@ -70,7 +68,7 @@ final class JsonFormatter
     {
         preg_match_all(self::ARRAY_KEYS_REGEX, trim($content), $matches);
 
-        return !empty($matches) ? $matches[1] : [];
+        return $matches[1];
     }
 
     /**
@@ -83,7 +81,7 @@ final class JsonFormatter
         $indent = self::DEFAULT_INDENT;
         preg_match(self::INDENT_REGEX, trim($content), $matches);
 
-        if (!empty($matches)) {
+        if (isset($matches[1])) {
             $indent = strlen($matches[1]);
         }
 
@@ -111,9 +109,8 @@ final class JsonFormatter
                 if (is_string($item)) {
                     $item = preg_replace_callback(
                         '/\\\\u([0-9a-fA-F]{4})/',
-                        static function (mixed $match): string|array {
-                            $result = mb_convert_encoding(pack('H*', $match[1]), 'UTF-8', 'UCS-2BE');
-                            return $result !== false ? $result : '';
+                        static function (mixed $match): string {
+                            return mb_convert_encoding(pack('H*', $match[1]), 'UTF-8', 'UCS-2BE');
                         },
                         $item,
                     );
@@ -146,7 +143,7 @@ final class JsonFormatter
 
         foreach ($matches as $match) {
             if (!in_array($match[1], $arrayKeys, true)) {
-                $replace = preg_replace('/\[\s*\]/', '{}', $match[0]);
+                $replace = preg_replace('/\[\s*]/', '{}', $match[0]);
                 if (null !== $replace) {
                     $json = str_replace($match[0], $replace, $json);
                 }

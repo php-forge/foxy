@@ -123,7 +123,7 @@ Composer state preserved if the install fails.
 ## Quality code
 
 [![Codecov](https://img.shields.io/codecov/c/github/php-forge/foxy.svg?style=for-the-badge&logo=codecov&logoColor=white&label=Coverage)](https://codecov.io/gh/php-forge/foxy)
-[![PHPStan Level Max](https://img.shields.io/badge/PHPStan-Level%202-4F5D95.svg?style=for-the-badge&logo=github&logoColor=white)](https://github.com/php-forge/foxy/actions/workflows/static.yml)
+[![PHPStan Level Max](https://img.shields.io/badge/PHPStan-Level%205-4F5D95.svg?style=for-the-badge&logo=github&logoColor=white)](https://github.com/php-forge/foxy/actions/workflows/static.yml)
 [![Super-Linter](https://img.shields.io/github/actions/workflow/status/php-forge/foxy/linter.yml?style=for-the-badge&label=Super-Linter&logo=github)](https://github.com/php-forge/foxy/actions/workflows/linter.yml)
 [![Dependency Check](https://img.shields.io/github/actions/workflow/status/php-forge/foxy/dependency-check.yml?style=for-the-badge&label=Dependency%20Check&logo=github)](https://github.com/php-forge/foxy/actions/workflows/dependency-check.yml)
 
