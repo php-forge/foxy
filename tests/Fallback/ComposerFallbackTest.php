@@ -39,6 +39,22 @@ final class ComposerFallbackTest extends TestCase
     private string|null $oldCwd = '';
     private \Symfony\Component\Filesystem\Filesystem|null $sfs = null;
 
+    public static function getIgnorePlatformReqsData(): array
+    {
+        return [
+            'ignore-platform-reqs is true' => ['ignore-platform-reqs', true],
+            'ignore-platform-reqs is array' => ['ignore-platform-reqs', ['php', 'ext-json']],
+        ];
+    }
+
+    public static function getIgnorePlatformReqData(): array
+    {
+        return [
+            'ignore-platform-req is true' => ['ignore-platform-req', true],
+            'ignore-platform-req is array' => ['ignore-platform-req', ['php', 'ext-json']],
+        ];
+    }
+
     public static function getRestoreData(): array
     {
         return [[[]], [[['name' => 'foo/bar', 'version' => '1.0.0.0']]]];
@@ -47,6 +63,153 @@ final class ComposerFallbackTest extends TestCase
     public static function getSaveData(): array
     {
         return [[true], [false]];
+    }
+
+    /**
+     * @dataProvider getIgnorePlatformReqsData
+     *
+     * @throws Exception|JsonException
+     */
+    public function testRestoreWithIgnorePlatformReqs(string $optionName, mixed $optionValue): void
+    {
+        $composerFile = 'composer.json';
+        $composerContent = '{}';
+        $lockFile = 'composer.lock';
+        $vendorDir = $this->cwd . '/vendor/';
+        $packages = [['name' => 'foo/bar', 'version' => '1.0.0.0']];
+
+        file_put_contents($this->cwd . '/' . $composerFile, $composerContent);
+        file_put_contents(
+            $this->cwd . '/' . $lockFile,
+            json_encode(
+                [
+                    'content-hash' => 'HASH_VALUE',
+                    'packages' => $packages,
+                    'packages-dev' => [],
+                    'prefer-stable' => true,
+                ],
+                JSON_THROW_ON_ERROR,
+            ),
+        );
+
+        $this->input
+            ->expects(self::any())
+            ->method('getOption')
+            ->willReturnCallback(
+                fn($option): mixed => match ($option) {
+                    $optionName => $optionValue,
+                    'verbose' => false,
+                    default => null,
+                }
+            );
+
+        $ed = $this->createMock(EventDispatcher::class);
+
+        $this->composer->expects(self::any())->method('getEventDispatcher')->willReturn($ed);
+
+        $rm = $this->createMock(RepositoryManager::class);
+
+        $this->composer->expects(self::any())->method('getRepositoryManager')->willReturn($rm);
+
+        $im = $this->createMock(InstallationManager::class);
+
+        $this->composer->expects(self::any())->method('getInstallationManager')->willReturn($im);
+        $this->io->expects(self::once())->method('write');
+
+        $locker = LockerUtil::getLocker($this->io, $im, $composerFile);
+
+        $this->composer->expects(self::atLeastOnce())->method('getLocker')->willReturn($locker);
+
+        $config = $this->getMockBuilder(\Composer\Config::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['get'])
+            ->getMock();
+
+        $this->composer->expects(self::atLeastOnce())->method('getConfig')->willReturn($config);
+
+        $config
+            ->expects(self::atLeastOnce())
+            ->method('get')
+            ->willReturnCallback(fn($key, $default = null) => 'vendor-dir' === $key ? $vendorDir : $default);
+
+        $this->installer->expects(self::once())->method('run');
+
+        $this->composerFallback->save();
+        $this->composerFallback->restore();
+    }
+
+    /**
+     * @dataProvider getIgnorePlatformReqData
+     *
+     * @throws Exception|JsonException
+     */
+    public function testRestoreWithIgnorePlatformReq(string $optionName, mixed $optionValue): void
+    {
+        $composerFile = 'composer.json';
+        $composerContent = '{}';
+        $lockFile = 'composer.lock';
+        $vendorDir = $this->cwd . '/vendor/';
+        $packages = [['name' => 'foo/bar', 'version' => '1.0.0.0']];
+
+        file_put_contents($this->cwd . '/' . $composerFile, $composerContent);
+        file_put_contents(
+            $this->cwd . '/' . $lockFile,
+            json_encode(
+                [
+                    'content-hash' => 'HASH_VALUE',
+                    'packages' => $packages,
+                    'packages-dev' => [],
+                    'prefer-stable' => true,
+                ],
+                JSON_THROW_ON_ERROR,
+            ),
+        );
+
+        $this->input
+            ->expects(self::any())
+            ->method('getOption')
+            ->willReturnCallback(
+                fn($option): mixed => match ($option) {
+                    'ignore-platform-reqs' => null,
+                    $optionName => $optionValue,
+                    'verbose' => false,
+                    default => null,
+                }
+            );
+
+        $ed = $this->createMock(EventDispatcher::class);
+
+        $this->composer->expects(self::any())->method('getEventDispatcher')->willReturn($ed);
+
+        $rm = $this->createMock(RepositoryManager::class);
+
+        $this->composer->expects(self::any())->method('getRepositoryManager')->willReturn($rm);
+
+        $im = $this->createMock(InstallationManager::class);
+
+        $this->composer->expects(self::any())->method('getInstallationManager')->willReturn($im);
+        $this->io->expects(self::once())->method('write');
+
+        $locker = LockerUtil::getLocker($this->io, $im, $composerFile);
+
+        $this->composer->expects(self::atLeastOnce())->method('getLocker')->willReturn($locker);
+
+        $config = $this->getMockBuilder(\Composer\Config::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['get'])
+            ->getMock();
+
+        $this->composer->expects(self::atLeastOnce())->method('getConfig')->willReturn($config);
+
+        $config
+            ->expects(self::atLeastOnce())
+            ->method('get')
+            ->willReturnCallback(fn($key, $default = null) => 'vendor-dir' === $key ? $vendorDir : $default);
+
+        $this->installer->expects(self::once())->method('run');
+
+        $this->composerFallback->save();
+        $this->composerFallback->restore();
     }
 
     /**
