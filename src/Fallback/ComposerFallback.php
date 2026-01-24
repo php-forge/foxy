@@ -142,9 +142,7 @@ final class ComposerFallback implements FallbackInterface
 
         [$preferSource, $preferDist] = ConsoleUtil::getPreferredInstallOptions($config, $this->input);
 
-        $isOptionTrue = static function (mixed $value): bool {
-            return $value === true || $value === 1 || $value === '1';
-        };
+        $isOptionTrue = (static fn(mixed $value): bool => $value === true || $value === 1 || $value === '1');
 
         $optimize = $isOptionTrue($this->input->getOption('optimize-autoloader'))
             || $isOptionTrue($config->get('optimize-autoloader'));

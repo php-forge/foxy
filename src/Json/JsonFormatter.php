@@ -105,17 +105,22 @@ final class JsonFormatter
         $array = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
 
         if ($unescapeUnicode) {
-            array_walk_recursive($array, static function (mixed &$item): void {
-                if (is_string($item)) {
-                    $item = preg_replace_callback(
-                        '/\\\\u([0-9a-fA-F]{4})/',
-                        static function (mixed $match): string {
-                            return mb_convert_encoding(pack('H*', $match[1]), 'UTF-8', 'UCS-2BE');
-                        },
-                        $item,
-                    );
-                }
-            });
+            array_walk_recursive(
+                $array,
+                static function (mixed &$item): void {
+                    if (is_string($item)) {
+                        $item = preg_replace_callback(
+                            '/\\\\u([0-9a-fA-F]{4})/',
+                            static fn(mixed $match): string => mb_convert_encoding(
+                                pack('H*', $match[1]),
+                                'UTF-8',
+                                'UCS-2BE',
+                            ),
+                            $item,
+                        );
+                    }
+                },
+            );
         }
 
         if ($unescapeSlashes) {
