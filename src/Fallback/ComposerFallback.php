@@ -179,8 +179,7 @@ final class ComposerFallback implements FallbackInterface
         $installer->setPlatformRequirementFilter(PlatformRequirementFilterFactory::fromBoolOrList($ignorePlatformReqs));
         $runScripts = $isOptionTrue($this->input->getOption('no-scripts')) === false;
         $dispatcher = $this->composer->getEventDispatcher();
-        $dispatcher->setRunScripts(false);
-        $installer->run();
         $dispatcher->setRunScripts($runScripts);
+        $installer->run();
     }
 }
