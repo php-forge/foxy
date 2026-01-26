@@ -80,6 +80,7 @@
             "curl -fsSL -o .editorconfig https://raw.githubusercontent.com/yii2-extensions/template/main/.editorconfig",
             "curl -fsSL -o .gitattributes https://raw.githubusercontent.com/yii2-extensions/template/main/.gitattributes",
             "curl -fsSL -o .gitignore https://raw.githubusercontent.com/yii2-extensions/template/main/.gitignore",
+            "curl -fsSL -o .styleci.yml https://raw.githubusercontent.com/yii2-extensions/template/main/.styleci.yml",
             "curl -fsSL -o infection.json5 https://raw.githubusercontent.com/yii2-extensions/template/main/infection.json5",
             "curl -fsSL -o phpstan.neon https://raw.githubusercontent.com/yii2-extensions/template/main/phpstan.neon",
             "curl -fsSL -o phpunit.xml.dist https://raw.githubusercontent.com/yii2-extensions/template/main/phpunit.xml.dist"
