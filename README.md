@@ -105,14 +105,13 @@ Composer state preserved if the install fails.
 
 ## Documentation
 
-- [Guide](resources/doc/index.md)
-- [Usage](resources/doc/usage.md)
-- [Configuration](resources/doc/config.md)
-- [Events](resources/doc/events.md)
-- [FAQs](resources/doc/faqs.md)
-- [Development Guide](docs/development.md)
-- [Testing Guide](docs/testing.md)
-- [Release Notes](https://github.com/php-forge/foxy/releases)
+- 📚 [Guide](resources/doc/index.md)
+- 💡 [Usage](resources/doc/usage.md)
+- ⚙️ [Configuration](resources/doc/config.md)
+- 📅 [Events](resources/doc/events.md)
+- ❓ [FAQs](resources/doc/faqs.md)
+- 🧪 [Testing Guide](docs/testing.md)
+- 🛠️ [Development Guide](docs/development.md)
 
 ## Package information
 

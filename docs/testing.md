@@ -1,20 +1,30 @@
 # Testing
 
-This package provides a consistent set of Composer scripts for local validation.
+This package provides a consistent set of [Composer](https://getcomposer.org/) scripts for local validation.
 
 Tool references:
 
 - [Composer Require Checker](https://github.com/maglnet/ComposerRequireChecker) for dependency definition checks.
 - [Easy Coding Standard (ECS)](https://github.com/easy-coding-standard/easy-coding-standard) for coding standards.
-- [Psalm](https://psalm.dev/) for static analysis.
+- [Infection](https://infection.github.io/) for mutation testing.
+- [PHPStan](https://phpstan.org/) for static analysis.
 - [PHPUnit](https://phpunit.de/) for unit tests.
+- [Rector](https://github.com/rectorphp/rector) for automated refactoring.
+
+## Automated refactoring (Rector)
+
+Run Rector to apply automated code refactoring.
+
+```bash
+composer rector
+```
 
 ## Coding standards (ECS)
 
 Run Easy Coding Standard (ECS) and apply fixes.
 
 ```bash
-composer run easy-coding-standard
+composer ecs
 ```
 
 ## Dependency definition check
@@ -22,15 +32,29 @@ composer run easy-coding-standard
 Verify that runtime dependencies are correctly declared in `composer.json`.
 
 ```bash
-composer run check-dependencies
+composer check-dependencies
 ```
 
-## Static analysis (Psalm)
+## Mutation testing (Infection)
+
+Run mutation testing.
+
+```bash
+composer mutation
+```
+
+Run mutation testing with static analysis enabled.
+
+```bash
+composer mutation-static
+```
+
+## Static analysis (PHPStan)
 
 Run static analysis.
 
 ```bash
-composer run psalm
+composer static
 ```
 
 ## Unit tests (PHPUnit)
@@ -38,21 +62,21 @@ composer run psalm
 Run the full test suite.
 
 ```bash
-composer run test
+composer tests
 ```
 
 ## Passing extra arguments
 
 Composer scripts support forwarding additional arguments using `--`.
 
-Example: run a specific PHPUnit test or filter by name.
+Run PHPUnit with code coverage report generation.
 
 ```bash
-composer run test -- --filter AssetManagerTest
+composer tests -- --coverage-html code_coverage
 ```
 
-Example: run Psalm with a different memory limit.
+Run PHPStan with a different memory limit.
 
 ```bash
-composer run psalm -- --memory-limit=512M
+composer static -- --memory-limit=512M
 ```
