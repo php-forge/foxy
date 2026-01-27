@@ -3,6 +3,7 @@
 ## 0.2.1 Under development
 
 - Bug #121: Update command syntax in `development.md` and `testing.md` for clarity and consistency (@terabytesoftw)
+- Bug #122: Update Rector command in `composer.json` to remove unnecessary 'src' argument (@terabytesoftw)
 
 ## 0.2.0 January 24, 2024
 
