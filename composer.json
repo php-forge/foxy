@@ -32,7 +32,7 @@
     },
     "require-dev": {
         "maglnet/composer-require-checker": "^4.7",
-        "php-forge/coding-standard": "^0.1",
+        "php-forge/coding-standard": "^0.3",
         "php-forge/support": "^0.3",
         "phpstan/extension-installer": "^1.4",
         "phpstan/phpstan": "^2.1",
