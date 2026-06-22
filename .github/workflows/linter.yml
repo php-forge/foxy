@@ -12,6 +12,6 @@ permissions:
 
 jobs:
   linter:
-    uses: yii2-framework/actions/.github/workflows/super-linter.yml@v1
+    uses: yii2-framework/actions/.github/workflows/super-linter.yml@v2
     secrets:
       AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
