@@ -8,8 +8,10 @@ use Composer\Installer\InstallationManager;
 use Composer\Package\{Link, PackageInterface};
 use Composer\Semver\Constraint\Constraint;
 use Foxy\Asset\{AbstractAssetManager, AssetManagerInterface};
+use Foxy\Exception\RuntimeException;
 use Foxy\Util\AssetUtil;
 use JsonException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 
@@ -102,9 +104,7 @@ final class AssetUtilTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider getFormatPackageData
-     */
+    #[DataProvider('getFormatPackageData')]
     public function testFormatPackage(
         string $packageVersion,
         string|null $assetVersion,
@@ -140,6 +140,33 @@ final class AssetUtilTest extends TestCase
         self::assertEquals($expected, $res);
     }
 
+    public function testFormatPackageStripsExecutableAndUnneededMetadata(): void
+    {
+        $package = $this->createMock(PackageInterface::class);
+        $package->method('getPrettyVersion')->willReturn('1.2.3');
+        $package->method('getExtra')->willReturn([]);
+
+        $formatted = AssetUtil::formatPackage(
+            $package,
+            '@composer-asset/foo--bar',
+            [
+                'scripts' => ['install' => 'touch compromised'],
+                'bin' => ['tool' => 'bin/tool'],
+                'main' => 'index.js',
+                'dependencies' => ['safe-package' => '^1.0'],
+            ],
+        );
+
+        self::assertSame(
+            [
+                'dependencies' => ['safe-package' => '^1.0'],
+                'name' => '@composer-asset/foo--bar',
+                'version' => '1.2.3',
+            ],
+            $formatted,
+        );
+    }
+
     public function testGetName(): void
     {
         $package = $this->createMock(PackageInterface::class);
@@ -149,10 +176,99 @@ final class AssetUtilTest extends TestCase
     }
 
     /**
-     * @dataProvider getExtraData
-     *
      * @throws JsonException
      */
+    public function testGetPathPrefersConfiguredManifestOverRootManifest(): void
+    {
+        $installPath = $this->cwd . '/configured-package';
+        $configuredDirectory = $installPath . '/resources';
+
+        $this->sfs->mkdir($configuredDirectory);
+        file_put_contents(
+            $installPath . '/composer.json',
+            '{"config":{"foxy":{"root-package-json-dir":"resources"}}}',
+        );
+        file_put_contents($installPath . '/package.json', '{"source":"root"}');
+        file_put_contents($configuredDirectory . '/package.json', '{"source":"configured"}');
+
+        $installationManager = $this->createMock(InstallationManager::class);
+        $installationManager->expects(self::once())->method('getInstallPath')->willReturn($installPath);
+
+        $assetManager = $this->createMock(AssetManagerInterface::class);
+        $assetManager->expects(self::once())->method('getPackageName')->willReturn('package.json');
+
+        $package = $this->createMock(PackageInterface::class);
+        $package->method('getExtra')->willReturn(['foxy' => true]);
+        $package->method('getRequires')->willReturn([]);
+        $package->method('getDevRequires')->willReturn([]);
+
+        self::assertSame(
+            str_replace('\\', '/', (string) realpath($configuredDirectory . '/package.json')),
+            AssetUtil::getPath($installationManager, $assetManager, $package),
+        );
+    }
+
+    /**
+     * @throws JsonException
+     */
+    public function testGetPathRejectsInvalidComposerMetadataEvenWhenRootManifestExists(): void
+    {
+        $installPath = $this->cwd . '/direct-package';
+        $this->sfs->mkdir($installPath);
+        file_put_contents($installPath . '/composer.json', 'invalid json');
+        file_put_contents($installPath . '/package.json', '{}');
+
+        $installationManager = $this->createMock(InstallationManager::class);
+        $installationManager->expects(self::once())->method('getInstallPath')->willReturn($installPath);
+
+        $assetManager = $this->createMock(AssetManagerInterface::class);
+        $assetManager->expects(self::once())->method('getPackageName')->willReturn('package.json');
+
+        $package = $this->createMock(PackageInterface::class);
+        $package->method('getExtra')->willReturn(['foxy' => true]);
+        $package->method('getRequires')->willReturn([]);
+        $package->method('getDevRequires')->willReturn([]);
+
+        $this->expectException(JsonException::class);
+
+        AssetUtil::getPath($installationManager, $assetManager, $package);
+    }
+
+    /**
+     * @throws JsonException
+     */
+    public function testGetPathRejectsRootPackageDirectoryTraversal(): void
+    {
+        $installPath = $this->cwd . '/install';
+        $outsidePath = $this->cwd . '/outside';
+        $this->sfs->mkdir([$installPath, $outsidePath]);
+        file_put_contents(
+            $installPath . '/composer.json',
+            '{"config":{"foxy":{"root-package-json-dir":"../outside"}}}',
+        );
+        file_put_contents($outsidePath . '/package.json', '{}');
+
+        $installationManager = $this->createMock(InstallationManager::class);
+        $installationManager->expects(self::once())->method('getInstallPath')->willReturn($installPath);
+
+        $assetManager = $this->createMock(AssetManagerInterface::class);
+        $assetManager->expects(self::once())->method('getPackageName')->willReturn('package.json');
+
+        $package = $this->createMock(PackageInterface::class);
+        $package->method('getExtra')->willReturn(['foxy' => true]);
+        $package->method('getRequires')->willReturn([]);
+        $package->method('getDevRequires')->willReturn([]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('escapes its Composer install directory');
+
+        AssetUtil::getPath($installationManager, $assetManager, $package);
+    }
+
+    /**
+     * @throws JsonException
+     */
+    #[DataProvider('getExtraData')]
     public function testGetPathWithExtraActivation(bool $withExtra, bool $fileExists = false): void
     {
         $installationManager = $this->createMock(InstallationManager::class);
@@ -164,7 +280,8 @@ final class AssetUtilTest extends TestCase
         $assetManager = $this
             ->getMockBuilder(AbstractAssetManager::class)
             ->disableOriginalConstructor()
-            ->getMockForAbstractClass();
+            ->getMock();
+        $assetManager->method('getPackageName')->willReturn('package.json');
 
         $package = $this->createMock(PackageInterface::class);
 
@@ -209,13 +326,12 @@ final class AssetUtilTest extends TestCase
     }
 
     /**
-     * @dataProvider getRequiresData
-     *
      * @param Link[] $requires
      * @param Link[] $devRequires
      *
      * @throws JsonException
      */
+    #[DataProvider('getRequiresData')]
     public function testGetPathWithRequiredFoxy(array $requires, array $devRequires, bool $fileExists = false): void
     {
         $installationManager = $this->createMock(InstallationManager::class);
@@ -225,7 +341,8 @@ final class AssetUtilTest extends TestCase
         $assetManager = $this
             ->getMockBuilder(AbstractAssetManager::class)
             ->disableOriginalConstructor()
-            ->getMockForAbstractClass();
+            ->getMock();
+        $assetManager->method('getPackageName')->willReturn('package.json');
 
         $package = $this->createMock(PackageInterface::class);
 
@@ -264,7 +381,7 @@ final class AssetUtilTest extends TestCase
             ->willReturn('tests/Fixtures/package/global');
 
         $assetManager = $this->createMock(AssetManagerInterface::class);
-        $assetManager->expects(self::once())->method('getPackageName')->willReturn('foo/bar');
+        $assetManager->expects(self::once())->method('getPackageName')->willReturn('foo/bar/package.json');
 
         $package = $this->createMock(PackageInterface::class);
         $package->expects(self::once())->method('getName')->willReturn('foo/bar');
@@ -275,7 +392,7 @@ final class AssetUtilTest extends TestCase
             '/^foo\/bar$/' => true,
         ];
 
-        $expectedPath = 'tests/Fixtures/package/global/theme/foo/bar';
+        $expectedPath = 'tests/Fixtures/package/global/theme/foo/bar/package.json';
 
         $res = AssetUtil::getPath($installationManager, $assetManager, $package, $configPackages);
 
@@ -302,9 +419,7 @@ final class AssetUtilTest extends TestCase
         );
     }
 
-    /**
-     * @dataProvider getIsProjectActivationData
-     */
+    #[DataProvider('getIsProjectActivationData')]
     public function testIsProjectActivation(string $packageName, bool $expected): void
     {
         $enablePackages = [
@@ -325,9 +440,7 @@ final class AssetUtilTest extends TestCase
         self::assertSame($expected, $res);
     }
 
-    /**
-     * @dataProvider getIsProjectActivationWithWildcardData
-     */
+    #[DataProvider('getIsProjectActivationWithWildcardData')]
     public function testIsProjectActivationWithWildcardPattern(string $packageName, bool $expected): void
     {
         $enablePackages = [

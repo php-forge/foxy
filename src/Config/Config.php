@@ -7,20 +7,24 @@ namespace Foxy\Config;
 use Foxy\Exception\RuntimeException;
 
 use function array_key_exists;
-use function ctype_digit;
+use function getenv;
 use function in_array;
 use function is_array;
 use function json_decode;
 use function json_last_error;
+use function preg_match;
 use function sprintf;
 use function str_replace;
 use function str_starts_with;
+use function strtolower;
 use function strtoupper;
 use function trim;
 
 class Config
 {
     private array $cacheEnv = [];
+
+    private string|null $resolvedManager = null;
 
     /**
      * @param array $config The config.
@@ -68,13 +72,21 @@ class Config
     }
 
     /**
+     * Set the manager selected during automatic discovery.
+     */
+    public function setResolvedManager(string $manager): void
+    {
+        $this->resolvedManager = $manager;
+    }
+
+    /**
      * Convert the value of environment variable into a boolean.
      *
      * @param string $value The value of environment variable.
      */
     private function convertBoolean(string $value): bool
     {
-        return in_array($value, ['true', '1', 'yes', 'y'], true);
+        return in_array(strtolower($value), ['true', '1', 'yes', 'y'], true);
     }
 
     /**
@@ -148,7 +160,7 @@ class Config
     {
         if (str_starts_with($key, 'manager-') && is_array($value)) {
             /** @var int|string $manager */
-            $manager = $this->get('manager', '');
+            $manager = $this->resolvedManager ?? $this->get('manager', '');
 
             $value = array_key_exists($manager, $value)
                 ? $value[$manager]
@@ -192,7 +204,7 @@ class Config
      */
     private function isInteger(string $value): bool
     {
-        return ctype_digit(trim($value, '-'));
+        return 1 === preg_match('/^-?\d+$/', $value);
     }
 
     /**

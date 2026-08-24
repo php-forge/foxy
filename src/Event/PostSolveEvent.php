@@ -11,10 +11,8 @@ final class PostSolveEvent extends AbstractSolveEvent
 {
     /**
      * @param string $assetDir The directory of mock assets.
-     * @param array $packages  All installed Composer packages.
+     * @param PackageInterface[] $packages  All installed Composer packages.
      * @param int $runResult The process result of asset manager execution.
-     *
-     * @psalm-param PackageInterface[] $packages All installed Composer packages.
      */
     public function __construct(string $assetDir, array $packages, private readonly int $runResult)
     {

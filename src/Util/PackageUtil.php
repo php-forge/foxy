@@ -27,7 +27,7 @@ final class PackageUtil
         $alias = [];
 
         /**
-         * @psalm-var array{
+         * @var array{
          *   array{alias: string, alias_normalized: string, version: string, package: string}
          * } $loadDatawithaliases
          */
@@ -56,15 +56,13 @@ final class PackageUtil
     {
         $key = $dev ? 'packages-dev' : 'packages';
 
+        /** @var array[] $loadDataWithKeys */
         $loadDataWithKeys = $lockData[$key] ?? [];
 
         if ($loadDataWithKeys === []) {
             return $lockData;
         }
 
-        /**
-         * @psalm-var array[] $loadDataWithKeys
-         */
         foreach ($loadDataWithKeys as $index => $package) {
             $package = $loader->load($package);
             $package = $package instanceof AliasPackage ? $package->getAliasOf() : $package;
@@ -80,14 +78,17 @@ final class PackageUtil
      * Load all packages in the lock data of locker.
      *
      * @param array $lockData The lock data of locker.
+     * @param bool $convertAliases Whether the aliases should be converted to the legacy lookup map.
      *
      * @return array The lock data.
      */
-    public static function loadLockPackages(array $lockData): array
+    public static function loadLockPackages(array $lockData, bool $convertAliases = true): array
     {
         $loader = new ArrayLoader();
+
         $lockData = self::loadLockPackage($loader, $lockData);
         $lockData = self::loadLockPackage($loader, $lockData, true);
-        return self::convertLockAlias($lockData);
+
+        return $convertAliases ? self::convertLockAlias($lockData) : $lockData;
     }
 }

@@ -101,6 +101,18 @@ final class JsonFileTest extends TestCase
     }
 
     /**
+     * @throws Exception
+     */
+    public function testWriteEmptyManifestAsObject(): void
+    {
+        $jsonFile = new JsonFile('./empty-package.json');
+
+        $jsonFile->write([]);
+
+        self::assertSame("{}\n", file_get_contents('./empty-package.json'));
+    }
+
+    /**
      * @throws Exception|ParsingException
      */
     public function testWriteForcesFourSpacesIndentWithExistingTwoSpaceFile(): void
@@ -172,6 +184,25 @@ final class JsonFileTest extends TestCase
         self::assertStringContainsString('"files": []', $content);
         self::assertStringContainsString('"dependencies": {}', $content);
         self::assertMatchesRegularExpression('/^ {4}"dependencies": \{\}/m', $content);
+    }
+
+    /**
+     * @throws Exception|ParsingException
+     */
+    public function testWritePreservesNewNestedEmptyArray(): void
+    {
+        file_put_contents('./package.json', '{"dependencies":{}}');
+
+        $jsonFile = new JsonFile('./package.json');
+        $data = $jsonFile->read();
+        $data['metadata'] = ['files' => []];
+
+        $jsonFile->write($data);
+
+        $content = (string) file_get_contents('./package.json');
+
+        self::assertStringContainsString('"dependencies": {}', $content);
+        self::assertStringContainsString('"files": []', $content);
     }
 
     /**

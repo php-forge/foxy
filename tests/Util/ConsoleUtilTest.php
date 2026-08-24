@@ -7,6 +7,7 @@ namespace Foxy\Tests\Util;
 use Composer\Config;
 use Composer\IO\{ConsoleIO, IOInterface};
 use Foxy\Util\ConsoleUtil;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Helper\HelperSet;
 use Symfony\Component\Console\Input\{ArgvInput, InputInterface};
@@ -41,9 +42,7 @@ final class ConsoleUtilTest extends TestCase
         self::assertInstanceOf(ArgvInput::class, ConsoleUtil::getInput($io));
     }
 
-    /**
-     * @dataProvider getPreferredInstallOptionsData
-     */
+    #[DataProvider('getPreferredInstallOptionsData')]
     public function testGetPreferredInstallOptions(
         bool $expectedPreferSource,
         bool $expectedPreferDist,

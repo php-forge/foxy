@@ -9,4 +9,6 @@
     source: {
         directories: ["src"],
     },
+    timeoutsAsEscaped: true,
+    maxTimeouts: 0,
 }

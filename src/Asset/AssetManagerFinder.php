@@ -6,17 +6,18 @@ namespace Foxy\Asset;
 
 use Foxy\Exception\RuntimeException;
 
+use function count;
 use function sprintf;
 
 final class AssetManagerFinder
 {
     /**
-     * @psalm-var AssetManagerInterface[]
+     * @var AssetManagerInterface[]
      */
     private array $managers = [];
 
     /**
-     * @psalm-param AssetManagerInterface[] $managers The asset managers
+     * @param AssetManagerInterface[] $managers The asset managers
      */
     public function __construct(array $managers = [])
     {
@@ -58,14 +59,33 @@ final class AssetManagerFinder
      */
     private function findAvailableManager(): AssetManagerInterface
     {
-        // find asset manager by lockfile
+        $lockedManagers = [];
+
+        // Find asset managers by their native lockfile first.
         foreach ($this->managers as $manager) {
             if ($manager->hasLockFile()) {
-                return $manager;
+                $lockedManagers[] = $manager;
             }
         }
 
-        // find asset manager by availability
+        if (count($lockedManagers) > 1) {
+            throw new RuntimeException('Multiple asset manager lock files were found; configure "manager" explicitly');
+        }
+
+        if (isset($lockedManagers[0])) {
+            if ($lockedManagers[0]->isAvailable()) {
+                return $lockedManagers[0];
+            }
+
+            throw new RuntimeException(
+                sprintf(
+                    'The asset manager "%s" selected by its lock file is not available',
+                    $lockedManagers[0]->getName(),
+                ),
+            );
+        }
+
+        // Find the first available manager when no lockfile exists.
         foreach ($this->managers as $manager) {
             if ($manager->isAvailable()) {
                 return $manager;

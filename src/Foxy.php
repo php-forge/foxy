@@ -21,28 +21,27 @@ use Foxy\Solver\{Solver, SolverInterface};
 use Foxy\Util\{ComposerUtil, ConsoleUtil};
 use Seld\JsonLint\ParsingException;
 
+use function str_contains;
+
 final class Foxy implements PluginInterface, EventSubscriberInterface
 {
-    final public const REQUIRED_COMPOSER_VERSION = '^2.0.0';
+    final public const string REQUIRED_COMPOSER_VERSION = '^2.10.2';
 
     private AssetFallback $assetFallback;
 
     private AssetManagerInterface $assetManager;
 
     /**
-     * The list of the classes of asset managers.
-     *
-     * @psalm-var list<class-string<AssetManagerInterface>>
+     * @var list<class-string<AssetManagerInterface>> The list of the classes of asset managers.
      */
     private static array $assetManagers = [
-        BunManager::class,
         NpmManager::class,
         PnpmManager::class,
         YarnManager::class,
+        BunManager::class,
     ];
 
     private ComposerFallback $composerFallback;
-
     private Config $config;
 
     /**
@@ -81,12 +80,18 @@ final class Foxy implements PluginInterface, EventSubscriberInterface
         ComposerUtil::validateVersion(self::REQUIRED_COMPOSER_VERSION, Composer::VERSION);
 
         $input = ConsoleUtil::getInput($io);
+
         $executor = new ProcessExecutor($io);
         $fs = new Filesystem($executor);
 
         $this->config = ConfigBuilder::build($composer, self::$defaultConfig, $io);
 
+        if (!$this->isEnabled()) {
+            return;
+        }
+
         $this->assetManager = $this->getAssetManager($io, $this->config, $executor, $fs);
+        $this->config->setResolvedManager($this->assetManager->getName());
         $packageJsonPath = $this->assetManager instanceof AbstractAssetManager
             ? $this->assetManager->getPackageJsonPath()
             : $this->assetManager->getPackageName();
@@ -120,12 +125,17 @@ final class Foxy implements PluginInterface, EventSubscriberInterface
     {
         if (!$this->initialized) {
             $this->initialized = true;
+
+            if (!$this->isEnabled()) {
+                return;
+            }
+
             $this->assetFallback->save();
             $this->composerFallback->save();
 
-            $enabled = $this->config->get('enabled');
+            $runAssetManager = $this->config->get('run-asset-manager');
 
-            if ($enabled === true || $enabled === 1 || $enabled === '1') {
+            if (true === $runAssetManager || 1 === $runAssetManager || '1' === $runAssetManager) {
                 $this->assetManager->validate();
             }
         }
@@ -146,8 +156,6 @@ final class Foxy implements PluginInterface, EventSubscriberInterface
     }
 
     /**
-     * Set the solver.
-     *
      * @param SolverInterface $solver The solver instance.
      */
     public function setSolver(SolverInterface $solver): void
@@ -156,12 +164,14 @@ final class Foxy implements PluginInterface, EventSubscriberInterface
     }
 
     /**
-     * Solve the assets.
-     *
      * @param Event $event The composer script event.
      */
     public function solveAssets(Event $event): void
     {
+        if (isset($this->config) && !$this->isEnabled()) {
+            return;
+        }
+
         $this->solver->setUpdatable(str_contains($event->getName(), 'update'));
         $this->solver->solve($event->getComposer(), $event->getIO());
     }
@@ -172,8 +182,6 @@ final class Foxy implements PluginInterface, EventSubscriberInterface
     }
 
     /**
-     * Get the asset manager.
-     *
      * @param IOInterface $io The IO interface.
      * @param Config $config The config of plugin.
      * @param ProcessExecutor $executor The process executor.
@@ -197,5 +205,15 @@ final class Foxy implements PluginInterface, EventSubscriberInterface
         $manager = $config->get('manager');
 
         return $amf->findManager($manager);
+    }
+
+    /**
+     * Check whether plugin execution is enabled.
+     */
+    private function isEnabled(): bool
+    {
+        $enabled = $this->config->get('enabled');
+
+        return true === $enabled || 1 === $enabled || '1' === $enabled;
     }
 }

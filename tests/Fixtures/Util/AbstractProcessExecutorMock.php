@@ -39,8 +39,6 @@ abstract class AbstractProcessExecutorMock extends ProcessExecutor
     }
 
     /**
-     * Get the executed command.
-     *
      * @param int $position The position of executed command
      */
     public function getExecutedCommand(int $position): int|string|null
@@ -59,8 +57,6 @@ abstract class AbstractProcessExecutorMock extends ProcessExecutor
     }
 
     /**
-     * Get the executed returned code.
-     *
      * @param int $position The position of executed command
      */
     public function getExecutedReturnedCode(int $position): int|string|null

@@ -11,8 +11,6 @@ use Symfony\Component\Console\Input\{ArgvInput, InputInterface};
 
 /**
  * Helper for console.
- *
- * @author François Pluchino <francois.pluchino@gmail.com>
  */
 final class ConsoleUtil
 {
@@ -61,7 +59,6 @@ final class ConsoleUtil
 
                 break;
 
-            case 'auto':
             default:
                 break;
         }

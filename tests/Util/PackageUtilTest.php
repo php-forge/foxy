@@ -79,6 +79,29 @@ final class PackageUtilTest extends TestCase
         self::assertEquals($expectedDevPackages, $lockDataLoaded['packages-dev']);
     }
 
+    public function testLoadLockPackagesCanPreserveRawAliases(): void
+    {
+        $aliases = [
+            [
+                'package' => 'foo/bar',
+                'version' => 'dev-feature',
+                'alias' => '1.0.x-dev',
+                'alias_normalized' => '1.0.9999999.9999999-dev',
+            ],
+        ];
+        $lockData = [
+            'packages' => [
+                ['name' => 'foo/bar', 'version' => 'dev-feature'],
+            ],
+            'aliases' => $aliases,
+        ];
+
+        $lockDataLoaded = PackageUtil::loadLockPackages($lockData, false);
+
+        self::assertInstanceOf(CompletePackage::class, $lockDataLoaded['packages'][0]);
+        self::assertSame($aliases, $lockDataLoaded['aliases']);
+    }
+
     public function testLoadLockPackagesWithoutPackages(): void
     {
         self::assertSame([], PackageUtil::loadLockPackages([]));

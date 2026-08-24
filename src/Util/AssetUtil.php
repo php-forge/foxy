@@ -9,22 +9,47 @@ use Composer\Package\Link;
 use Composer\Package\PackageInterface;
 use Foxy\Asset\AssetManagerInterface;
 use Foxy\Asset\AssetPackage;
+use Foxy\Exception\RuntimeException;
 use JsonException;
 
+use function array_flip;
+use function array_intersect_key;
 use function count;
 use function explode;
-use function file_exists;
-use function file_get_contents;
 use function fnmatch;
+use function is_bool;
+use function is_dir;
+use function is_file;
 use function is_int;
 use function is_string;
 use function json_decode;
 use function preg_match;
 use function realpath;
+use function sprintf;
 use function str_replace;
+use function str_starts_with;
 
 final class AssetUtil
 {
+    /**
+     * Package metadata required to resolve transitive asset dependencies safely.
+     */
+    private const array SAFE_PACKAGE_KEYS = [
+        'bundleDependencies',
+        'bundledDependencies',
+        'cpu',
+        'dependencies',
+        'engines',
+        'name',
+        'optionalDependencies',
+        'os',
+        'overrides',
+        'peerDependencies',
+        'peerDependenciesMeta',
+        'resolutions',
+        'version',
+    ];
+
     /**
      * Format the asset package.
      *
@@ -34,6 +59,8 @@ final class AssetUtil
      */
     public static function formatPackage(PackageInterface $package, string $packageName, array $packageValue): array
     {
+        $packageValue = array_intersect_key($packageValue, array_flip(self::SAFE_PACKAGE_KEYS));
+
         $packageValue['name'] = $packageName;
 
         if (!isset($packageValue['version'])) {
@@ -76,35 +103,49 @@ final class AssetUtil
         PackageInterface $package,
         array $configPackages = [],
     ): string|null {
-        $path = null;
+        if (!self::isAsset($package, $configPackages)) {
+            return null;
+        }
 
+        $installPath = $installationManager->getInstallPath($package);
 
-        if (self::isAsset($package, $configPackages)) {
-            $composerJsonPath = null;
-            $installPath = $installationManager->getInstallPath($package);
+        if (null === $installPath) {
+            return null;
+        }
 
-            if (null !== $installPath) {
-                $composerJsonPath = $installPath . '/composer.json';
+        $installRoot = realpath($installPath);
+
+        if (false === $installRoot || !is_dir($installRoot)) {
+            return null;
+        }
+
+        $packageName = $assetManager->getPackageName();
+
+        $composerJsonPath = "{$installRoot}/composer.json";
+
+        if (is_file($composerJsonPath)) {
+            $content = file_get_contents($composerJsonPath);
+
+            if (false === $content) {
+                throw new RuntimeException(
+                    sprintf('Unable to read Composer package file "%s".', $composerJsonPath),
+                );
             }
 
-            if (null !== $composerJsonPath && file_exists($composerJsonPath)) {
-                /** @var array[] $composerJson */
-                $composerJson = json_decode(file_get_contents($composerJsonPath), true, 512, JSON_THROW_ON_ERROR);
-                $rootPackageDir = $composerJson['config']['foxy']['root-package-json-dir'] ?? null;
+            /** @var array[] $composerJson */
+            $composerJson = json_decode($content, true, flags: JSON_THROW_ON_ERROR);
 
-                if (is_string($rootPackageDir)) {
-                    $installPath .= '/' . $rootPackageDir;
-                }
-            }
+            $rootPackageDir = $composerJson['config']['foxy']['root-package-json-dir'] ?? null;
 
-
-            if (null !== $installPath) {
-                $filename = $installPath . '/' . $assetManager->getPackageName();
-                $path = file_exists($filename) ? str_replace('\\', '/', realpath($filename)) : null;
+            if (is_string($rootPackageDir) && '' !== $rootPackageDir) {
+                return self::resolvePackagePath(
+                    $installRoot . '/' . $rootPackageDir . '/' . $packageName,
+                    $installRoot,
+                );
             }
         }
 
-        return $path;
+        return self::resolvePackagePath("{$installRoot}/{$packageName}", $installRoot);
     }
 
     /**
@@ -128,17 +169,13 @@ final class AssetUtil
      */
     public static function hasPluginDependency(array $requires): bool
     {
-        $assets = false;
-
         foreach ($requires as $require) {
             if ('php-forge/foxy' === $require->getTarget()) {
-                $assets = true;
-
-                break;
+                return true;
             }
         }
 
-        return $assets;
+        return false;
     }
 
     /**
@@ -150,6 +187,7 @@ final class AssetUtil
     public static function isAsset(PackageInterface $package, array $configPackages = []): bool
     {
         $projectConfig = self::getProjectActivation($package, $configPackages);
+
         $enabled = false !== $projectConfig;
 
         return $enabled && (self::hasExtraActivation($package)
@@ -185,14 +223,14 @@ final class AssetUtil
             }
         }
 
-        return $exp[0] . '.' . $exp[1] . '.' . $exp[2];
+        return "{$exp[0]}.{$exp[1]}.{$exp[2]}";
     }
 
     /**
      * Get the activation of the package defined in the project config.
      *
      * @param PackageInterface $package The package instance.
-     * @param array $configPackages The packages defined in config.
+     * @param array<int|string, bool|string> $configPackages The packages defined in config.
      *
      * @return bool|null returns NULL, if the package isn't defined in the project config
      */
@@ -201,9 +239,6 @@ final class AssetUtil
         $name = $package->getName();
         $value = null;
 
-        /**
-         * @var array<int|string, bool|string> $configPackages
-         */
         foreach ($configPackages as $pattern => $activation) {
             if (is_int($pattern) && is_string($activation)) {
                 $pattern = $activation;
@@ -212,7 +247,7 @@ final class AssetUtil
 
             if (
                 is_string($pattern)
-                && ((str_starts_with($pattern, '/') && preg_match($pattern, $name)) || fnmatch($pattern, $name))
+                && (str_starts_with($pattern, '/') && preg_match($pattern, $name) || fnmatch($pattern, $name))
             ) {
                 $value = $activation;
 
@@ -221,5 +256,28 @@ final class AssetUtil
         }
 
         return is_bool($value) ? $value : null;
+    }
+
+    /**
+     * Resolve a package manifest and ensure it stays inside the Composer install path.
+     */
+    private static function resolvePackagePath(string $filename, string $installRoot): string|null
+    {
+        $resolvedPath = realpath($filename);
+
+        if (false === $resolvedPath || !is_file($resolvedPath)) {
+            return null;
+        }
+
+        $normalizedRoot = rtrim(str_replace('\\', '/', $installRoot), '/');
+        $normalizedPath = str_replace('\\', '/', $resolvedPath);
+
+        if ($normalizedPath !== $normalizedRoot && !str_starts_with($normalizedPath, "{$normalizedRoot}/")) {
+            throw new RuntimeException(
+                sprintf('The asset package path "%s" escapes its Composer install directory.', $normalizedPath),
+            );
+        }
+
+        return $normalizedPath;
     }
 }

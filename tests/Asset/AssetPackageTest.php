@@ -9,12 +9,15 @@ use Composer\Package\RootPackageInterface;
 use Exception;
 use Foxy\Asset\AssetPackage;
 use JsonException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Seld\JsonLint\ParsingException;
 use Symfony\Component\Filesystem\Filesystem;
 
+use function chdir;
 use function file_put_contents;
+use function getcwd;
 
 use const DIRECTORY_SEPARATOR;
 
@@ -22,6 +25,7 @@ final class AssetPackageTest extends TestCase
 {
     protected string|null $cwd = '';
     protected JsonFile|MockObject|null $jsonFile = null;
+    protected string|null $oldCwd = '';
     protected MockObject|RootPackageInterface|null $rootPackage = null;
     protected Filesystem|null $sfs = null;
 
@@ -109,6 +113,45 @@ final class AssetPackageTest extends TestCase
 
     /**
      * @throws ParsingException
+     */
+    public function testAddNewDependenciesPreservesFileUriFromEventListener(): void
+    {
+        $this->jsonFile->expects(self::once())->method('exists')->willReturn(false);
+
+        $assetPackage = new AssetPackage($this->rootPackage, $this->jsonFile);
+        $assetPackage->addNewDependencies(
+            ['@composer-asset/foo--bar' => 'file:../custom/foo/bar'],
+        );
+
+        self::assertSame(
+            'file:../custom/foo/bar',
+            $assetPackage->getPackage()['dependencies']['@composer-asset/foo--bar'],
+        );
+    }
+
+    /**
+     * @throws JsonException|ParsingException
+     */
+    public function testAddNewDependenciesUpdatesExistingManagedPath(): void
+    {
+        $this->addPackageFile(
+            ['dependencies' => ['@composer-asset/foo--bar' => 'file:./stale/path']],
+        );
+
+        $assetPackage = new AssetPackage($this->rootPackage, $this->jsonFile);
+        $existing = $assetPackage->addNewDependencies(
+            ['@composer-asset/foo--bar' => $this->cwd . '/fresh/path/package.json'],
+        );
+
+        self::assertSame(['@composer-asset/foo--bar'], $existing);
+        self::assertSame(
+            'file:./fresh/path',
+            $assetPackage->getPackage()['dependencies']['@composer-asset/foo--bar'],
+        );
+    }
+
+    /**
+     * @throws ParsingException
      * @throws JsonException
      */
     public function testGetInstalledDependencies(): void
@@ -156,10 +199,9 @@ final class AssetPackageTest extends TestCase
     }
 
     /**
-     * @dataProvider getDataRequiredKeys
-     *
      * @throws JsonException|ParsingException
      */
+    #[DataProvider('getDataRequiredKeys')]
     public function testInjectionOfRequiredKeys(array $expected, array $package, string $license): void
     {
         $this->addPackageFile($package);
@@ -251,6 +293,7 @@ final class AssetPackageTest extends TestCase
         parent::setUp();
 
         $this->cwd = sys_get_temp_dir() . DIRECTORY_SEPARATOR . uniqid('foxy_asset_package_test_', true);
+        $this->oldCwd = getcwd();
 
         $this->sfs = new Filesystem();
 
@@ -264,16 +307,19 @@ final class AssetPackageTest extends TestCase
         $this->rootPackage->expects(self::any())->method('getLicense')->willReturn([]);
 
         $this->sfs->mkdir($this->cwd);
+        chdir($this->cwd);
     }
 
     protected function tearDown(): void
     {
         parent::tearDown();
 
+        chdir($this->oldCwd);
         $this->sfs->remove($this->cwd);
         $this->jsonFile = null;
         $this->rootPackage = null;
         $this->sfs = null;
         $this->cwd = null;
+        $this->oldCwd = null;
     }
 }

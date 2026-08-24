@@ -8,8 +8,10 @@ use Composer\{Composer, Config};
 use Composer\IO\IOInterface;
 use Composer\Package\RootPackageInterface;
 use Exception;
+use Foxy\Config\Config as FoxyConfig;
 use Foxy\Config\ConfigBuilder;
 use Foxy\Exception\RuntimeException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Seld\JsonLint\ParsingException;
@@ -46,7 +48,9 @@ final class ConfigTest extends TestCase
             ['global-composer-bar', 70, 0],
             ['global-config-foo', 23, 0],
             ['env-boolean', false, true, 'FOXY__ENV_BOOLEAN=false'],
+            ['env-boolean-uppercase', true, false, 'FOXY__ENV_BOOLEAN_UPPERCASE=TRUE'],
             ['env-integer', -32, 0, 'FOXY__ENV_INTEGER=-32'],
+            ['env-invalid-integer', '--1', 0, 'FOXY__ENV_INVALID_INTEGER=--1'],
             ['env-json', ['foo' => 'bar'], [], 'FOXY__ENV_JSON="{"foo": "bar"}"'],
             ['env-json-array', [['foo' => 'bar']], [], 'FOXY__ENV_JSON_ARRAY="[{"foo": "bar"}]"'],
             ['env-string', 'baz', 'foo', 'FOXY__ENV_STRING=baz'],
@@ -57,8 +61,6 @@ final class ConfigTest extends TestCase
     }
 
     /**
-     * @dataProvider getDataForGetArrayConfig
-     *
      * @param string $key The key.
      * @param array $expected The expected value.
      * @param array $default The default value.
@@ -66,6 +68,7 @@ final class ConfigTest extends TestCase
      *
      * @throws ParsingException
      */
+    #[DataProvider('getDataForGetArrayConfig')]
     public function testGetArrayConfig(string $key, array $expected, array $default, array $defaults = []): void
     {
         $config = ConfigBuilder::build($this->composer, $defaults, $this->io);
@@ -77,8 +80,6 @@ final class ConfigTest extends TestCase
     }
 
     /**
-     * @dataProvider getDataForGetConfig
-     *
      * @param string $key The key.
      * @param mixed $expected The expected value.
      * @param mixed $default The default value.
@@ -87,6 +88,7 @@ final class ConfigTest extends TestCase
      *
      * @throws ParsingException
      */
+    #[DataProvider('getDataForGetConfig')]
     public function testGetConfig(
         string $key,
         mixed $expected,
@@ -213,6 +215,20 @@ final class ConfigTest extends TestCase
         }
 
         throw $ex;
+    }
+
+    public function testResolvedManagerSelectsManagerSpecificDefaults(): void
+    {
+        $config = new FoxyConfig(
+            [],
+            ['manager-version' => ['npm' => '>=10.0.0', 'yarn' => '>=4.0.0']],
+        );
+
+        self::assertNull($config->get('manager-version'));
+
+        $config->setResolvedManager('yarn');
+
+        self::assertSame('>=4.0.0', $config->get('manager-version'));
     }
 
     protected function setUp(): void

@@ -6,13 +6,9 @@ namespace Foxy\Json;
 
 use JsonException;
 
-use function array_walk_recursive;
 use function in_array;
-use function is_string;
 use function json_decode;
 use function json_encode;
-use function mb_convert_encoding;
-use function pack;
 use function preg_match;
 use function preg_match_all;
 use function preg_replace;
@@ -24,21 +20,20 @@ use function trim;
 
 final class JsonFormatter
 {
-    public const ARRAY_KEYS_REGEX = '/["\']([\w\-.]+)["\']\s*:\s*\[\s*]/';
-    public const DEFAULT_INDENT = 4;
-    public const INDENT_REGEX = '/^[{\[][\r\n]( +)["\']/';
+    public const string ARRAY_KEYS_REGEX = '/["\']([\w\-.]+)["\']\s*:\s*\[\s*]/';
+    public const int DEFAULT_INDENT = 4;
+    public const string INDENT_REGEX = '/^[{\[][\r\n]( +)["\']/';
+    public const string MAP_KEYS_REGEX = '/["\']([\w\-.]+)["\']\s*:\s*\{\s*}/';
 
     /**
      * Format the data in JSON.
      *
      * @param string $json The original JSON.
-     * @param array $arrayKeys The list of keys to be retained with an array representation if they are empty.
+     * @param string[] $arrayKeys The list of keys to be retained with an array representation if they are empty.
      * @param int $indent The space count for indent.
      * @param bool $formatJson Check if the JSON must be formatted.
      *
-     * @psalm-param string[] $arrayKeys The list of keys to be retained with an array representation if they are empty.
-     *
-     * @throws JsonException
+     * @throws JsonException if the JSON cannot be decoded or encoded.
      */
     public static function format(
         string $json,
@@ -47,11 +42,15 @@ final class JsonFormatter
         bool $formatJson = true,
     ): string {
         if ($formatJson) {
-            $json = self::formatInternal($json, true, true);
+            $json = self::formatInternal($json);
         }
 
         if (4 !== $indent) {
-            $json = str_replace('    ', str_repeat(' ', $indent), $json);
+            $json = preg_replace_callback(
+                '/^( {4})+/m',
+                static fn(array $match): string => str_repeat(' ', (int) (strlen($match[0]) / 4) * $indent),
+                $json,
+            ) ?? $json;
         }
 
         return self::replaceArrayByMap($json, $arrayKeys);
@@ -79,6 +78,7 @@ final class JsonFormatter
     public static function getIndent(string $content): int
     {
         $indent = self::DEFAULT_INDENT;
+
         preg_match(self::INDENT_REGEX, trim($content), $matches);
 
         if (isset($matches[1])) {
@@ -89,49 +89,34 @@ final class JsonFormatter
     }
 
     /**
-     * Format the data in JSON.
+     * Get the keys that were represented as empty JSON objects.
      *
-     * @param bool $unescapeUnicode Un escape unicode.
-     * @param bool $unescapeSlashes Un escape slashes.
+     * @psalm-return string[]
+     */
+    public static function getMapKeys(string $content): array
+    {
+        preg_match_all(self::MAP_KEYS_REGEX, trim($content), $matches);
+
+        return $matches[1];
+    }
+
+    /**
+     * Format the data in JSON.
      *
      * @throws JsonException
      */
-    private static function formatInternal(string $json, bool $unescapeUnicode, bool $unescapeSlashes): string
+    private static function formatInternal(string $json): string
     {
         if ($json === '') {
             return $json;
         }
 
-        $array = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+        $data = json_decode($json, false, flags: JSON_THROW_ON_ERROR);
 
-        if ($unescapeUnicode) {
-            array_walk_recursive(
-                $array,
-                static function (mixed &$item): void {
-                    if (is_string($item)) {
-                        $item = preg_replace_callback(
-                            '/\\\\u([0-9a-fA-F]{4})/',
-                            static fn(mixed $match): string => mb_convert_encoding(
-                                pack('H*', $match[1]),
-                                'UTF-8',
-                                'UCS-2BE',
-                            ),
-                            $item,
-                        );
-                    }
-                },
-            );
-        }
-
-        if ($unescapeSlashes) {
-            array_walk_recursive($array, static function (mixed &$item): void {
-                if (is_string($item)) {
-                    $item = str_replace('\\/', '/', $item);
-                }
-            });
-        }
-
-        return json_encode($array, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        return json_encode(
+            $data,
+            JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
+        );
     }
 
     /**

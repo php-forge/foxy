@@ -97,7 +97,7 @@ final class JsonFormatterTest extends TestCase
     /**
      * @throws JsonException
      */
-    public function testUnescapeSlashes(): void
+    public function testPreservesLiteralEscapedSlashes(): void
     {
         $data = ['url' => 'https:\/\/example.com'];
 
@@ -105,7 +105,7 @@ final class JsonFormatterTest extends TestCase
 
         $expected = <<<JSON
         {
-            "url": "https://example.com"
+            "url": "https:\\\\/\\\\/example.com"
         }
         JSON;
 
@@ -118,7 +118,7 @@ final class JsonFormatterTest extends TestCase
     /**
      * @throws JsonException
      */
-    public function testUnescapeUnicode(): void
+    public function testPreservesLiteralUnicodeEscapeSequences(): void
     {
         $data = ['name' => '\u0048\u0065\u006c\u006c\u006f'];
 
@@ -126,13 +126,25 @@ final class JsonFormatterTest extends TestCase
 
         $expected = <<<JSON
         {
-          "name": "Hello"
+          "name": "\\\\u0048\\\\u0065\\\\u006c\\\\u006c\\\\u006f"
         }
         JSON;
 
         self::assertSame(
             LineEndingNormalizer::normalize($expected),
             LineEndingNormalizer::normalize(JsonFormatter::format($content, [], 2)),
+        );
+    }
+
+    /**
+     * @throws JsonException
+     */
+    public function testPreservesRootObjectAndSpacesInsideStrings(): void
+    {
+        self::assertSame('{}', JsonFormatter::format('{}', [], 2));
+        self::assertStringContainsString(
+            '"value": "left    right"',
+            JsonFormatter::format('{"value":"left    right"}', [], 2),
         );
     }
 }

@@ -6,6 +6,7 @@ namespace Foxy\Tests\Util;
 
 use Foxy\Exception\RuntimeException;
 use Foxy\Util\ComposerUtil;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class ComposerUtilTest extends TestCase
@@ -25,9 +26,7 @@ final class ComposerUtilTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider getValidateVersionData
-     */
+    #[DataProvider('getValidateVersionData')]
     public function testValidateVersion(string $composerVersion, string $requiredVersion, bool $valid): void
     {
         if ($valid) {

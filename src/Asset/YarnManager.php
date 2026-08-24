@@ -54,7 +54,9 @@ final class YarnManager extends AbstractAssetManager
     private function isYarnNext(): bool
     {
         $version = $this->getVersion();
+
         $parser = new VersionParser();
+
         $constraint = $parser->parseConstraints('>=2.0.0');
 
         return $version !== null && $constraint->matches($parser->parseConstraints($version));

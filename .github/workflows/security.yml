@@ -1,0 +1,19 @@
+---
+on:
+  - pull_request
+  - push
+
+name: security
+
+permissions:
+  contents: read
+
+jobs:
+  security:
+    uses: php-forge/actions/.github/workflows/security.yml@a574dbe95fc370db1b7b5ea546cd5ff5b70304d6 # v3.0.0
+    permissions:
+      contents: read
+    with:
+      gitleaks-config: .github/linters/.gitleaks.toml
+    secrets:
+      GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}

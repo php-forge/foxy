@@ -9,6 +9,7 @@ use Composer\Util\Filesystem;
 use Foxy\Config\Config;
 use Foxy\Exception\RuntimeException;
 use Foxy\Fallback\AssetFallback;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Xepozz\InternalMocker\MockerState;
@@ -30,7 +31,11 @@ final class AssetFallbackTest extends TestCase
 
     public static function getRestoreData(): array
     {
-        return [[true], [false]];
+        return [
+            'non-empty original manifest' => ['{}'],
+            'empty original manifest' => [''],
+            'no original manifest' => [null],
+        ];
     }
 
     public static function getSaveData(): array
@@ -38,37 +43,84 @@ final class AssetFallbackTest extends TestCase
         return [[true], [false]];
     }
 
-    /**
-     * @dataProvider getRestoreData
-     */
-    public function testRestore(bool $withPackageFile): void
+    #[DataProvider('getRestoreData')]
+    public function testRestore(string|null $originalContent): void
     {
-        $content = '{}';
         $path = $this->cwd . '/package.json';
 
-        if ($withPackageFile) {
-            file_put_contents($path, $content);
+        if (null !== $originalContent) {
+            file_put_contents($path, $originalContent);
         }
+
+        $this->assetFallback->save();
+
+        file_put_contents($path, '{"changed":true}');
 
         $this->io->expects(self::once())->method('write');
 
-        $this->fs->expects(self::once())->method('remove')->with('package.json');
+        if (null === $originalContent) {
+            $this->fs
+                ->expects(self::once())
+                ->method('remove')
+                ->with('package.json')
+                ->willReturnCallback(function (string $file): bool {
+                    $this->sfs->remove($file);
 
-        $this->assetFallback->save();
+                    return true;
+                });
+        } else {
+            $this->fs->expects(self::never())->method('remove');
+        }
+
         $this->assetFallback->restore();
 
-        if ($withPackageFile) {
+        if (null !== $originalContent) {
             self::assertFileExists($path);
-            self::assertSame($content, file_get_contents($path));
+            self::assertSame($originalContent, file_get_contents($path));
         } else {
             self::assertFileDoesNotExist($path);
         }
     }
 
-    public function testRestoreThrowsWhenRemoveFails(): void
+    public function testRestoreBeforeSaveDoesNothing(): void
     {
         $path = $this->cwd . '/package.json';
-        file_put_contents($path, '{}');
+        file_put_contents($path, '{"current":true}');
+
+        $this->io->expects(self::never())->method('write');
+        $this->fs->expects(self::never())->method('remove');
+
+        $this->assetFallback->restore();
+
+        self::assertSame('{"current":true}', file_get_contents($path));
+    }
+
+    public function testRestoreDoesNotRemoveDirectoryCreatedAfterSnapshot(): void
+    {
+        $path = $this->cwd . '/package.json';
+        $sentinel = $path . '/keep.txt';
+
+        $this->assetFallback->save();
+        $this->sfs->mkdir($path);
+        file_put_contents($sentinel, 'keep');
+
+        $this->io->expects(self::once())->method('write');
+        $this->fs->expects(self::never())->method('remove');
+
+        try {
+            $this->assetFallback->restore();
+            self::fail('Expected restore to reject a non-file manifest path.');
+        } catch (RuntimeException $exception) {
+            self::assertSame('The fallback asset path "package.json" must be a regular file.', $exception->getMessage());
+        }
+
+        self::assertFileExists($sentinel);
+    }
+
+    public function testRestoreThrowsWhenRemoveFails(): void
+    {
+        $this->assetFallback->save();
+        file_put_contents($this->cwd . '/package.json', '{}');
 
         $this->io->expects(self::once())->method('write');
 
@@ -77,8 +129,6 @@ final class AssetFallbackTest extends TestCase
             ->method('remove')
             ->with('package.json')
             ->willThrowException(new RuntimeException('Remove failed.'));
-
-        $this->assetFallback->save();
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Unable to remove fallback asset file "package.json".');
@@ -95,6 +145,31 @@ final class AssetFallbackTest extends TestCase
         }
     }
 
+    public function testRestoreThrowsWhenRemoveReturnsFalse(): void
+    {
+        $path = $this->cwd . '/package.json';
+
+        $this->assetFallback->save();
+        file_put_contents($path, '{}');
+
+        $this->io->expects(self::once())->method('write');
+        $this->fs
+            ->expects(self::once())
+            ->method('remove')
+            ->with('package.json')
+            ->willReturn(false);
+
+        try {
+            $this->assetFallback->restore();
+            self::fail('Expected restore to report the failed removal.');
+        } catch (RuntimeException $exception) {
+            self::assertSame('Unable to remove fallback asset file "package.json".', $exception->getMessage());
+            self::assertNull($exception->getPrevious());
+        }
+
+        self::assertFileExists($path);
+    }
+
     public function testRestoreThrowsWhenWriteFails(): void
     {
         $content = '{}';
@@ -104,16 +179,50 @@ final class AssetFallbackTest extends TestCase
 
         $this->io->expects(self::once())->method('write');
 
-        $this->fs->expects(self::once())->method('remove')->with('package.json');
+        $this->fs->expects(self::never())->method('remove');
 
         $this->assetFallback->save();
+        file_put_contents($path, '{"current":true}');
 
         MockerState::addCondition('Foxy\\Fallback', 'file_put_contents', ['package.json', $content, 0, null], false);
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Unable to write fallback asset file "package.json".');
 
+        try {
+            $this->assetFallback->restore();
+        } catch (RuntimeException $exception) {
+            self::assertSame('{"current":true}', file_get_contents($path));
+
+            throw $exception;
+        }
+    }
+
+    public function testRestoreUsesLatestSnapshot(): void
+    {
+        $path = $this->cwd . '/package.json';
+        file_put_contents($path, '{"original":true}');
+
+        $this->assetFallback->save();
+        $this->sfs->remove($path);
+        $this->assetFallback->save();
+
+        file_put_contents($path, '{"created":true}');
+
+        $this->io->expects(self::once())->method('write');
+        $this->fs
+            ->expects(self::once())
+            ->method('remove')
+            ->with('package.json')
+            ->willReturnCallback(function (string $file): bool {
+                $this->sfs->remove($file);
+
+                return true;
+            });
+
         $this->assetFallback->restore();
+
+        self::assertFileDoesNotExist($path);
     }
 
     public function testRestoreWithDisableOption(): void
@@ -125,12 +234,14 @@ final class AssetFallbackTest extends TestCase
 
         $this->fs->expects(self::never())->method('remove');
 
+        self::assertSame($assetFallback, $assetFallback->save());
+        file_put_contents($this->cwd . '/package.json', '{"current":true}');
         $assetFallback->restore();
+
+        self::assertFileExists($this->cwd . '/package.json');
     }
 
-    /**
-     * @dataProvider getSaveData
-     */
+    #[DataProvider('getSaveData')]
     public function testSave(bool $withPackageFile): void
     {
         if ($withPackageFile) {
@@ -138,6 +249,29 @@ final class AssetFallbackTest extends TestCase
         }
 
         self::assertInstanceOf(AssetFallback::class, $this->assetFallback->save());
+    }
+
+    public function testSaveRejectsPreExistingNonFileManifestPath(): void
+    {
+        $path = $this->cwd . '/package.json';
+        $sentinel = $path . '/keep.txt';
+
+        $this->sfs->mkdir($path);
+        file_put_contents($sentinel, 'keep');
+
+        $this->io->expects(self::never())->method('write');
+        $this->fs->expects(self::never())->method('remove');
+
+        try {
+            $this->assetFallback->save();
+            self::fail('Expected save to reject a non-file manifest path.');
+        } catch (RuntimeException $exception) {
+            self::assertSame('The fallback asset path "package.json" must be a regular file.', $exception->getMessage());
+        }
+
+        $this->assetFallback->restore();
+
+        self::assertFileExists($sentinel);
     }
 
     public function testSaveThrowsWhenFileCannotBeRead(): void

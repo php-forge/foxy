@@ -24,109 +24,130 @@
 </p>
 
 <p align="center">
-    <strong>Foxy is a Composer plugin that aggregates asset dependencies from Composer packages into a single package.json and runs Bun, npm, Yarn, or pnpm while preserving the Composer state on failures.</strong>
+    <strong>Foxy is a Composer plugin that aggregates frontend dependencies declared by Composer packages into one package.json and delegates installation to Bun, npm, pnpm, or Yarn.</strong>
 </p>
 
 ## Features
 
 <picture>
     <source media="(min-width: 768px)" srcset="./docs/svgs/features.svg">
-    <img src="./docs/svgs/features-mobile.svg" alt="Feature Overview" style="width: 100%;">
+    <img src="./docs/svgs/features-mobile.svg" alt="Foxy features: dependency aggregation, native manager support and selection, flexible roots, protected mock directories, failure recovery, defensive I/O, and stable execution." style="width: 100%;">
 </picture>
+
+## Requirements
+
+- PHP 8.3 or later.
+- Composer 2.10.2 or later.
+- One supported frontend manager: Bun, npm, pnpm, or Yarn.
+- Node.js when using npm, pnpm, or Yarn.
 
 ## Installation
 
+Authorize the Composer plugin and install Foxy 0.3:
+
 ```bash
-composer require php-forge/foxy:^0.1
+composer config allow-plugins.php-forge/foxy true
+composer require php-forge/foxy:^0.3
 ```
 
-Manager can be `bun`, `npm`, `yarn` or `pnpm`. For default, `npm` is used.
+Selecting a manager explicitly is recommended for reproducible local and CI behavior:
 
 ```json
 {
-    "require": {
-        "php-forge/foxy": "^0.1"
+  "require": {
+    "php-forge/foxy": "^0.3"
+  },
+  "config": {
+    "allow-plugins": {
+      "php-forge/foxy": true
     },
-    "config": {
-        "foxy": {
-            "manager": "bun"
-        }
+    "foxy": {
+      "manager": "npm"
     }
+  }
 }
 ```
+
+Valid manager values are `bun`, `npm`, `pnpm`, and `yarn`. When `manager` is omitted, Foxy first looks for one
+recognized native lockfile and then checks available executables. Configure the manager explicitly when the project
+contains lockfiles from more than one manager.
 
 ## Quick start
 
-### Standard PHP project (Yii2)
+### Yii2 application template 22
 
-In a standard PHP application, keep a `package.json` file at the project root. Foxy will merge asset dependencies from
-installed Composer packages and run the configured manager during Composer install and update.
+The [Yii2 basic application template branch 22](https://github.com/yiisoft/yii2-app-basic/tree/22) requires PHP 8.3
+and targets [Yii2 framework branch 22.0](https://github.com/yiisoft/yii2/tree/22.0). Create the tested development
+version with:
 
-Example (Yii2 app template):
+```bash
+composer create-project --prefer-dist yiisoft/yii2-app-basic basic 22.x-dev
+```
 
-[Yii2 app template](https://github.com/yiisoft/yii2-app-basic/tree/22)
+The application keeps `package.json` at the project root and configures npm explicitly. Foxy merges frontend
+dependencies from installed Composer packages and runs npm during Composer install and update operations.
+
+For an existing Yii2 22 application, use the installation commands above and ensure its configuration contains:
 
 ```json
 {
-    "require": {
-        "php-forge/foxy": "^0.1"
+  "config": {
+    "allow-plugins": {
+      "php-forge/foxy": true
     },
-    "config": {
-        "foxy": {
-            "manager": "npm"
-        }
+    "foxy": {
+      "manager": "npm"
     }
+  }
 }
 ```
 
-### Drupal layout (package.json under web/)
+### Project with package.json under web/
 
-In a typical Drupal proof-of-concept workflow, Composer stays at the repository root while frontend tooling and builds
-live under `web/`.
-
-Foxy lets you keep that layout while still aggregating asset dependencies and running npm in the correct directory, with
-Composer state preserved if the install fails.
-
-- Aggregates asset dependencies declared by Composer packages into a single npm install.
-- Keeps asset tooling configuration consistent across local and CI environments.
-- Restores Composer lock and PHP dependencies if npm exits with an error.
-- Runs npm against the `web/` package.json without moving Composer files.
+Composer may remain at the repository root while frontend tooling runs from `web/`:
 
 ```json
 {
-    "config": {
-        "foxy": {
-            "manager": "npm",
-            "root-package-json-dir": "web"
-        }
+  "config": {
+    "allow-plugins": {
+      "php-forge/foxy": true
+    },
+    "foxy": {
+      "manager": "npm",
+      "root-package-json-dir": "web"
     }
+  }
 }
 ```
+
+Foxy reads and writes `web/package.json` and runs the selected manager from `web/`. Relative paths are resolved from
+the Composer project directory.
 
 ## Documentation
 
-- 📚 [Guide](resources/doc/index.md)
-- 💡 [Usage](resources/doc/usage.md)
-- ⚙️ [Configuration](resources/doc/config.md)
-- 📅 [Events](resources/doc/events.md)
-- ❓ [FAQs](resources/doc/faqs.md)
-- 🧪 [Testing Guide](docs/testing.md)
-- 🛠️ [Development Guide](docs/development.md)
+- [Getting started](docs/index.md)
+- [Configuration reference](docs/config.md)
+- [Usage guide](docs/usage.md)
+- [Events reference](docs/events.md)
+- [Frequently asked questions](docs/faqs.md)
+- [Upgrade guide](UPGRADE.md)
+- [Testing guide](docs/testing.md)
 
 ## Package information
 
-[![PHP](https://img.shields.io/badge/%3E%3D8.1-777BB4.svg?style=for-the-badge&logo=php&logoColor=white)](https://www.php.net/releases/8.1/en.php)
+[![PHP](https://img.shields.io/badge/%3E%3D8.3-777BB4.svg?style=for-the-badge&logo=php&logoColor=white)](https://www.php.net/releases/8.3/en.php)
 [![Latest Stable Version](https://img.shields.io/packagist/v/php-forge/foxy.svg?style=for-the-badge&logo=packagist&logoColor=white&label=Stable)](https://packagist.org/packages/php-forge/foxy)
 [![Total Downloads](https://img.shields.io/packagist/dt/php-forge/foxy.svg?style=for-the-badge&logo=composer&logoColor=white&label=Downloads)](https://packagist.org/packages/php-forge/foxy)
 
-## Quality code
+## Code quality
 
 [![Codecov](https://img.shields.io/codecov/c/github/php-forge/foxy.svg?style=for-the-badge&logo=codecov&logoColor=white&label=Coverage)](https://codecov.io/gh/php-forge/foxy)
-[![PHPStan Level Max](https://img.shields.io/badge/PHPStan-Level%205-4F5D95.svg?style=for-the-badge&logo=github&logoColor=white)](https://github.com/php-forge/foxy/actions/workflows/static.yml)
-[![Super-Linter](https://img.shields.io/github/actions/workflow/status/php-forge/foxy/linter.yml?style=for-the-badge&label=Super-Linter&logo=github)](https://github.com/php-forge/foxy/actions/workflows/linter.yml)
+[![PHPStan Level 5](https://img.shields.io/badge/PHPStan-Level%205-4F5D95.svg?style=for-the-badge&logo=github&logoColor=white)](https://github.com/php-forge/foxy/actions/workflows/static.yml)
+[![Quality](https://img.shields.io/github/actions/workflow/status/php-forge/foxy/quality.yml?style=for-the-badge&label=Quality&logo=github)](https://github.com/php-forge/foxy/actions/workflows/quality.yml)
 [![Dependency Check](https://img.shields.io/github/actions/workflow/status/php-forge/foxy/dependency-check.yml?style=for-the-badge&label=Dependency%20Check&logo=github)](https://github.com/php-forge/foxy/actions/workflows/dependency-check.yml)
+[![Security](https://img.shields.io/github/actions/workflow/status/php-forge/foxy/security.yml?style=for-the-badge&label=Security&logo=github)](https://github.com/php-forge/foxy/actions/workflows/security.yml)
 
-## Our social networks
+## Community
 
 [![Follow on X](https://img.shields.io/badge/-Follow%20on%20X-1DA1F2.svg?style=for-the-badge&logo=x&logoColor=white&labelColor=000000)](https://x.com/Terabytesoftw)
 

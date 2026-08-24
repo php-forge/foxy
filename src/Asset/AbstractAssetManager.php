@@ -15,6 +15,7 @@ use Foxy\Exception\RuntimeException;
 use Foxy\Fallback\FallbackInterface;
 use Foxy\Json\JsonFile;
 use Seld\JsonLint\ParsingException;
+use Throwable;
 
 use function is_dir;
 use function is_string;
@@ -65,17 +66,25 @@ abstract class AbstractAssetManager implements AssetManagerInterface
      */
     public function addDependencies(RootPackageInterface $rootPackage, array $dependencies): AssetPackageInterface
     {
-        $assetPackage = new AssetPackage(
-            $rootPackage,
-            new JsonFile($this->getPackageJsonPath(), null, $this->io),
-        );
-        $assetPackage->removeUnusedDependencies($dependencies);
-        $alreadyInstalledDependencies = $assetPackage->addNewDependencies($dependencies);
+        try {
+            $assetPackage = new AssetPackage(
+                $rootPackage,
+                new JsonFile($this->getPackageJsonPath(), null, $this->io),
+            );
 
-        $this->actionWhenComposerDependenciesAreAlreadyInstalled($alreadyInstalledDependencies);
-        $this->io->write('<info>Merging Composer dependencies in the asset package</info>');
+            $assetPackage->removeUnusedDependencies($dependencies);
 
-        return $assetPackage->write();
+            $alreadyInstalledDependencies = $assetPackage->addNewDependencies($dependencies);
+
+            $this->actionWhenComposerDependenciesAreAlreadyInstalled($alreadyInstalledDependencies);
+            $this->io->write('<info>Merging Composer dependencies in the asset package</info>');
+
+            return $assetPackage->write();
+        } catch (Throwable $exception) {
+            $this->restoreAfterFailure($exception);
+
+            throw $exception;
+        }
     }
 
     public function getPackageJsonPath(): string
@@ -95,6 +104,8 @@ abstract class AbstractAssetManager implements AssetManagerInterface
 
     public function isAvailable(): bool
     {
+        $this->config->setResolvedManager($this->getName());
+
         return null !== $this->getVersion();
     }
 
@@ -120,6 +131,7 @@ abstract class AbstractAssetManager implements AssetManagerInterface
         }
 
         $rootPackageDir = $this->config->get('root-package-json-dir');
+
         $originalDir = null;
         $changedDir = false;
 
@@ -145,27 +157,36 @@ abstract class AbstractAssetManager implements AssetManagerInterface
 
         try {
             $updatable = $this->isUpdatable();
+
             $info = sprintf('<info>%s %s dependencies</info>', $updatable ? 'Updating' : 'Installing', $this->getName());
+
             $this->io->write($info);
 
             $timeout = ProcessExecutor::getTimeout();
 
             /** @var int $managerTimeout */
             $managerTimeout = $this->config->get('manager-timeout', PHP_INT_MAX);
+
             ProcessExecutor::setTimeout($managerTimeout);
 
             try {
                 $cmd = $updatable ? $this->getUpdateCommand() : $this->getInstallCommand();
                 $res = $this->executor->execute($cmd);
+            } catch (Throwable $exception) {
+                $this->restoreAfterFailure($exception);
+
+                throw $exception;
             } finally {
                 ProcessExecutor::setTimeout($timeout);
             }
 
-            if ($res > 0 && null !== $this->fallback) {
-                $this->fallback->restore();
+            if (0 !== $res && null !== $this->fallback) {
+                $this->restoreAfterFailure(
+                    new RuntimeException(sprintf('The asset manager exited with status code %d.', $res), $res),
+                );
             }
         } finally {
-            if ($changedDir && null !== $originalDir && chdir($originalDir) === false) {
+            if ($changedDir && chdir($originalDir) === false) {
                 throw new RuntimeException(
                     sprintf('Unable to restore working directory to "%s".', $originalDir),
                 );
@@ -192,6 +213,7 @@ abstract class AbstractAssetManager implements AssetManagerInterface
     public function validate(): void
     {
         $version = $this->getVersion();
+
         /** @var string|null $constraintVersion */
         $constraintVersion = $this->config->get('manager-version');
 
@@ -217,11 +239,7 @@ abstract class AbstractAssetManager implements AssetManagerInterface
     }
 
     /**
-     * Action when the composer dependencies are already installed.
-     *
-     * @param array $names the asset package name of composer dependencies.
-     *
-     * @psalm-param list<string> $names
+     * @param list<string> $names the asset package name of composer dependencies.
      */
     protected function actionWhenComposerDependenciesAreAlreadyInstalled(array $names): void
     {
@@ -238,7 +256,9 @@ abstract class AbstractAssetManager implements AssetManagerInterface
     protected function buildCommand(string $defaultBin, string $action, array|string $command): string
     {
         $bin = $this->config->get('manager-bin', $defaultBin);
+
         $bin = Platform::isWindows() ? str_replace('/', '\\', (string) $bin) : $bin;
+
         $gOptions = trim((string) $this->config->get('manager-options', ''));
         $options = trim((string) $this->config->get('manager-' . $action . '-options', ''));
 
@@ -300,6 +320,7 @@ abstract class AbstractAssetManager implements AssetManagerInterface
     {
         if ($this->version === '' && $this->versionConverter !== null) {
             $this->executor->execute($this->getVersionCommand(), $version);
+
             $this->version = '' !== trim((string) $version)
                 ? $this->versionConverter->convertVersion(trim((string) $version))
                 : null;
@@ -315,5 +336,28 @@ abstract class AbstractAssetManager implements AssetManagerInterface
         }
 
         return (bool) preg_match('/^[A-Za-z]:[\\\\\/]/', $path);
+    }
+
+    /**
+     * Restore the asset manifest without hiding the manager failure.
+     */
+    private function restoreAfterFailure(Throwable $exception): void
+    {
+        if (null === $this->fallback) {
+            return;
+        }
+
+        try {
+            $this->fallback->restore();
+        } catch (Throwable $fallbackException) {
+            throw new RuntimeException(
+                sprintf(
+                    'The asset manager failed and its fallback could not be restored: %s',
+                    $fallbackException->getMessage(),
+                ),
+                0,
+                $exception,
+            );
+        }
     }
 }

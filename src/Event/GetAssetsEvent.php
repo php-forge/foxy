@@ -11,10 +11,8 @@ final class GetAssetsEvent extends AbstractSolveEvent
 {
     /**
      * @param string $assetDir The directory of mock assets.
-     * @param array $packages All installed Composer packages.
-     * @param array $assets The map of asset package name and the asset package path.
-     *
-     * @psalm-param PackageInterface[] $packages All installed Composer packages.
+     * @param PackageInterface[] $packages All installed Composer packages.
+     * @param array<mixed> $assets The map of asset package name and the asset package path.
      */
     public function __construct(string $assetDir, array $packages, private array $assets = [])
     {
@@ -25,13 +23,13 @@ final class GetAssetsEvent extends AbstractSolveEvent
      * Add the asset package.
      *
      * @param string $name The asset package name.
-     * @param string $path The asset package path (relative path form root project and started with `file:`).
+     * @param string $path A project-relative package manifest path or a ready `file:` directory reference.
      *
      * Example:
      *
      * For the Composer package `foo/bar`.
      *
-     * $event->addAsset('@composer-asset/foo--bar', 'file:./vendor/php-forge/foxy/composer-asset/foo/bar');
+     * $event->addAsset('@composer-asset/foo--bar', 'vendor/foo/bar/package.json');
      */
     public function addAsset(string $name, string $path): self
     {

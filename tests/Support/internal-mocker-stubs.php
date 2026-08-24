@@ -5,7 +5,6 @@ declare(strict_types=1);
 /**
  * Overrides internal-mocker stubs for specific functions.
  */
-
 $stubs = require __DIR__ . '/../../vendor/xepozz/internal-mocker/src/stubs.php';
 
 $stubs['file_get_contents'] = [

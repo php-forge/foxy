@@ -11,16 +11,31 @@ use Composer\IO\IOInterface;
 use Composer\Util\Filesystem;
 use Exception;
 use Foxy\Config\Config;
+use Foxy\Exception\RuntimeException;
 use Foxy\Util\{ConsoleUtil, LockerUtil, PackageUtil};
-use LogicException;
 use Symfony\Component\Console\Input\InputInterface;
+use Throwable;
 
-use function is_array;
+use function is_link;
+use function sprintf;
 
 final class ComposerFallback implements FallbackInterface
 {
     private readonly Filesystem $fs;
+
+    private array|null $hydratedLock = null;
+
     private array $lock = [];
+
+    private string|null $lockFile = null;
+
+    private bool $lockFileExisted = false;
+
+    private bool $snapshotSaved = false;
+
+    private string|null $vendorDir = null;
+
+    private bool $vendorDirExisted = false;
 
     /**
      * @param Composer $composer The composer.
@@ -46,89 +61,143 @@ final class ComposerFallback implements FallbackInterface
      */
     public function restore(): void
     {
-        $fallbackComposer = $this->config->get('fallback-composer');
-
-        if ($fallbackComposer !== true && $fallbackComposer !== 1 && $fallbackComposer !== '1') {
+        if (!$this->isEnabled() || !$this->snapshotSaved) {
             return;
         }
 
         $this->io->write('<info>Fallback to previous state for Composer</info>');
-        $hasLock = $this->restoreLockData();
 
-        if ($hasLock) {
-            $this->restorePreviousLockFile();
-        } else {
-            /** @var string $vendorDir */
-            $vendorDir = $this->composer->getConfig()->get('vendor-dir');
+        if (!$this->lockFileExisted) {
+            $this->removeCreatedState();
 
-            $this->fs->remove($vendorDir);
+            return;
         }
+
+        $this->restoreLockData();
+        $this->restorePreviousLockFile();
     }
 
     public function save(): self
     {
+        $this->resetSnapshot();
+
+        if (!$this->isEnabled()) {
+            return $this;
+        }
+
+        $vendorDir = $this->composer->getConfig()->get('vendor-dir');
+
+        $this->vendorDir = '' !== $vendorDir ? $vendorDir : null;
+
+        $this->vendorDirExisted = null !== $this->vendorDir && file_exists($this->vendorDir);
+
         $im = $this->composer->getInstallationManager();
+
         $composerFile = Factory::getComposerFile();
         $locker = LockerUtil::getLocker($this->io, $im, $composerFile);
 
-        try {
-            $lock = $locker->getLockData();
-            $this->lock = PackageUtil::loadLockPackages($lock);
-        } catch (LogicException) {
-            $this->lock = [];
+        $lockFile = $locker->getJsonFile();
+
+        $this->lockFile = $lockFile->getPath();
+        $this->lockFileExisted = $lockFile->exists();
+
+        if ($this->lockFileExisted) {
+            $this->lock = $locker->getLockData();
         }
+
+        $this->snapshotSaved = true;
 
         return $this;
     }
 
-    /**
-     * Get the installer.
-     */
+    private function getHydratedLock(): array
+    {
+        return $this->hydratedLock ??= PackageUtil::loadLockPackages($this->lock, false);
+    }
+
+
     private function getInstaller(): Installer
     {
         return $this->installer ?? Installer::create($this->io, $this->composer);
     }
 
-    /**
-     * Get the lock value.
-     *
-     * @param string $key The key.
-     * @param mixed $default The default value.
-     */
-    private function getLockValue(string $key, mixed $default = null): mixed
+    private function isEnabled(): bool
     {
-        return $this->lock[$key] ?? $default;
+        $fallbackComposer = $this->config->get('fallback-composer');
+
+        return $fallbackComposer === true || $fallbackComposer === 1 || $fallbackComposer === '1';
+    }
+
+    private function pathExists(string $path): bool
+    {
+        return file_exists($path) || is_link($path);
+    }
+
+    private function removeCreatedPath(string $path): void
+    {
+        try {
+            $removed = $this->fs->remove($path);
+        } catch (Throwable $exception) {
+            throw new RuntimeException(
+                sprintf('Unable to remove Composer fallback path "%s".', $path),
+                0,
+                $exception,
+            );
+        }
+
+        if (!$removed && $this->pathExists($path)) {
+            throw new RuntimeException(
+                sprintf('Unable to remove Composer fallback path "%s".', $path),
+            );
+        }
+    }
+
+    private function removeCreatedState(): void
+    {
+        if (null !== $this->lockFile && $this->pathExists($this->lockFile)) {
+            $this->removeCreatedPath($this->lockFile);
+        }
+
+        if (
+            !$this->vendorDirExisted
+            && null !== $this->vendorDir
+            && $this->pathExists($this->vendorDir)
+        ) {
+            $this->removeCreatedPath($this->vendorDir);
+        }
+    }
+
+    private function resetSnapshot(): void
+    {
+        $this->hydratedLock = null;
+        $this->lock = [];
+        $this->lockFile = null;
+        $this->lockFileExisted = false;
+        $this->snapshotSaved = false;
+        $this->vendorDir = null;
+        $this->vendorDirExisted = false;
     }
 
     /**
      * Restore the data of lock file.
      */
-    private function restoreLockData(): bool
+    private function restoreLockData(): void
     {
+        $lock = $this->getHydratedLock();
+
         /** @psalm-suppress MixedArgument */
         $this->composer->getLocker()->setLockData(
-            $this->getLockValue('packages', []),
-            $this->getLockValue('packages-dev'),
-            $this->getLockValue('platform', []),
-            $this->getLockValue('platform-dev', []),
-            $this->getLockValue('aliases', []),
-            $this->getLockValue('minimum-stability', ''),
-            $this->getLockValue('stability-flags', []),
-            $this->getLockValue('prefer-stable', false),
-            $this->getLockValue('prefer-lowest', false),
-            $this->getLockValue('platform-overrides', []),
+            $lock['packages'] ?? [],
+            $lock['packages-dev'] ?? null,
+            $lock['platform'] ?? [],
+            $lock['platform-dev'] ?? [],
+            $lock['aliases'] ?? [],
+            $lock['minimum-stability'] ?? '',
+            $lock['stability-flags'] ?? [],
+            $lock['prefer-stable'] ?? false,
+            $lock['prefer-lowest'] ?? false,
+            $lock['platform-overrides'] ?? [],
         );
-
-        $isLocked = $this->composer->getLocker()->isLocked();
-        $lockData = $isLocked ? $this->composer->getLocker()->getLockData() : null;
-
-        $hasPackage = is_array($lockData)
-            && (
-                (isset($lockData['packages']) && $lockData['packages'] !== [])
-                || (isset($lockData['packages-dev']) && $lockData['packages-dev'] !== [])
-            );
-
-        return $isLocked && $hasPackage;
     }
 
     /**
@@ -163,7 +232,8 @@ final class ComposerFallback implements FallbackInterface
             ->setDumpAutoloader($dumpAutoloader)
             ->setOptimizeAutoloader($optimize)
             ->setClassMapAuthoritative($authoritative)
-            ->setApcuAutoloader($apcu);
+            ->setApcuAutoloader($apcu)
+            ->setRunScripts(false);
 
         $ignorePlatformReqs = false;
 
@@ -180,9 +250,13 @@ final class ComposerFallback implements FallbackInterface
         }
 
         $installer->setPlatformRequirementFilter(PlatformRequirementFilterFactory::fromBoolOrList($ignorePlatformReqs));
-        $runScripts = $isOptionTrue($this->input->getOption('no-scripts')) === false;
-        $dispatcher = $this->composer->getEventDispatcher();
-        $dispatcher->setRunScripts($runScripts);
-        $installer->run();
+
+        $result = $installer->run();
+
+        if (0 !== $result) {
+            throw new RuntimeException(
+                sprintf('Unable to restore Composer dependencies, installer exited with code %d.', $result),
+            );
+        }
     }
 }

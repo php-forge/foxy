@@ -17,6 +17,7 @@ use Foxy\Fallback\AssetFallback;
 use Foxy\Foxy;
 use Foxy\Solver\SolverInterface;
 use Foxy\Tests\Fixtures\Asset\StubAssetManager;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
@@ -99,6 +100,25 @@ final class FoxyTest extends TestCase
     }
 
     /**
+     * @throws ParsingException
+     */
+    public function testActivateSkipsManagerDiscoveryWhenDisabled(): void
+    {
+        $this->package
+            ->expects(self::any())
+            ->method('getConfig')
+            ->willReturn(['foxy' => ['enabled' => false, 'manager' => 'invalid_manager']]);
+
+        $foxy = new Foxy();
+        $foxy->activate($this->composer, $this->io);
+        $foxy->init();
+
+        $assetManager = (new ReflectionClass($foxy))->getProperty('assetManager');
+
+        self::assertFalse($assetManager->isInitialized($foxy));
+    }
+
+    /**
      * @throws ParsingException|ReflectionException
      */
     public function testActivateUsesPackageNameForNonAbstractAssetManager(): void
@@ -163,9 +183,7 @@ final class FoxyTest extends TestCase
         self::assertCount(4, Foxy::getSubscribedEvents());
     }
 
-    /**
-     * @dataProvider getSolveAssetsData
-     */
+    #[DataProvider('getSolveAssetsData')]
     public function testSolveAssets(string $eventName, bool $expectedUpdatable): void
     {
         $event = new Event($eventName, $this->composer, $this->io);
@@ -194,6 +212,11 @@ final class FoxyTest extends TestCase
     {
         $this->composer = $this->createMock(Composer::class);
         $composerConfig = $this->createMock(Config::class);
+        $composerConfig
+            ->method('get')
+            ->willReturnCallback(
+                static fn($key, $flags = 0): string|null => 'vendor-dir' === $key ? getcwd() . '/vendor' : null,
+            );
         $this->io = $this->createMock(IOInterface::class);
         $this->package = $this->createMock(RootPackageInterface::class);
 
