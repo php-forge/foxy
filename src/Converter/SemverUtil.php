@@ -36,7 +36,6 @@ abstract class SemverUtil
         return $version;
     }
 
-
     public static function convertVersionMetadata(string $version): string
     {
         $pattern = self::createPattern('([a-zA-Z]+|(\-|\+)[a-zA-Z]+|(\-|\+)[0-9]+)');

@@ -40,6 +40,7 @@ final class AssetManagerFinderTest extends TestCase
 
         (new AssetManagerFinder([$am]))->findManager();
     }
+
     public function testFindManagerWithAutoManagerAndAvailableManagerByAvailability(): void
     {
         $am = $this->createMock(AssetManagerInterface::class);

@@ -25,10 +25,8 @@ use ReflectionClass;
 use Symfony\Component\Console\Input\InputInterface;
 
 use function chdir;
-use function file_exists;
 use function file_get_contents;
 use function file_put_contents;
-use function is_array;
 use function json_decode;
 
 use const DIRECTORY_SEPARATOR;
@@ -170,7 +168,7 @@ final class ComposerFallbackTest extends TestCase
 
         $this->composerFallback->restore();
 
-        self::assertTrue(file_exists($sentinel));
+        self::assertFileExists($sentinel);
     }
 
     /**
@@ -203,8 +201,8 @@ final class ComposerFallbackTest extends TestCase
         $this->composerFallback->restore();
 
         self::assertSame(['./composer.lock', $vendorDir], $removed);
-        self::assertFalse(file_exists($this->cwd . '/composer.lock'));
-        self::assertFalse(file_exists($vendorDir));
+        self::assertFileNotExists($this->cwd . '/composer.lock');
+        self::assertFileNotExists($vendorDir);
     }
 
     /**
@@ -388,7 +386,7 @@ final class ComposerFallbackTest extends TestCase
         $rawLock = $lockProperty->getValue($this->composerFallback);
 
         self::assertIsArray($rawLock);
-        self::assertTrue(is_array($rawLock['packages'][0]));
+        self::assertIsArray($rawLock['packages'][0]);
         self::assertNull($hydratedLockProperty->getValue($this->composerFallback));
 
         $this->composerFallback->restore();

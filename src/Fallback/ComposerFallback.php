@@ -115,7 +115,6 @@ final class ComposerFallback implements FallbackInterface
         return $this->hydratedLock ??= PackageUtil::loadLockPackages($this->lock, false);
     }
 
-
     private function getInstaller(): Installer
     {
         return $this->installer ?? Installer::create($this->io, $this->composer);

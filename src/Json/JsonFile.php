@@ -139,7 +139,6 @@ final class JsonFile extends \Composer\Json\JsonFile
         return $this->mapKeys;
     }
 
-
     private function parseOriginalContent(): void
     {
         $content = '';
