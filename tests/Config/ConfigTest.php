@@ -15,6 +15,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Seld\JsonLint\ParsingException;
+use Symfony\Component\Filesystem\Filesystem;
 
 use function getenv;
 use function putenv;
@@ -22,6 +23,8 @@ use function sprintf;
 use function str_starts_with;
 use function strpos;
 use function substr;
+
+use const DIRECTORY_SEPARATOR;
 
 final class ConfigTest extends TestCase
 {
@@ -51,13 +54,49 @@ final class ConfigTest extends TestCase
             ['env-boolean-uppercase', true, false, 'FOXY__ENV_BOOLEAN_UPPERCASE=TRUE'],
             ['env-integer', -32, 0, 'FOXY__ENV_INTEGER=-32'],
             ['env-invalid-integer', '--1', 0, 'FOXY__ENV_INVALID_INTEGER=--1'],
+            ['env-integer-suffix', '32px', 0, 'FOXY__ENV_INTEGER_SUFFIX=32px'],
             ['env-json', ['foo' => 'bar'], [], 'FOXY__ENV_JSON="{"foo": "bar"}"'],
             ['env-json-array', [['foo' => 'bar']], [], 'FOXY__ENV_JSON_ARRAY="[{"foo": "bar"}]"'],
+            [
+                'env-json-multiple',
+                ['foo' => 'bar', 'baz' => 'qux'],
+                [],
+                'FOXY__ENV_JSON_MULTIPLE={"foo":"bar","baz":"qux"}',
+            ],
             ['env-string', 'baz', 'foo', 'FOXY__ENV_STRING=baz'],
+            ['env-padded-string', 'baz', 'foo', 'FOXY__ENV_PADDED_STRING=  baz  '],
+            ['env-single-quoted-string', 'baz', 'foo', "FOXY__ENV_SINGLE_QUOTED_STRING='baz'"],
+            ['env-double-quoted-string', 'baz', 'foo', 'FOXY__ENV_DOUBLE_QUOTED_STRING="baz"'],
             ['test-p1', 'def', 'def', null, []],
             ['test-p1', 'def', 'def', null, ['test-p1' => 'ok']],
             ['test-p1', 'ok', null, null, ['test-p1' => 'ok']],
         ];
+    }
+
+    /**
+     * @throws ParsingException
+     */
+    public function testBuildIgnoresNonArrayGlobalConfig(): void
+    {
+        $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . uniqid('foxy_config_test_', true);
+        $filesystem = new Filesystem();
+        $filesystem->mkdir($directory);
+        file_put_contents($directory . '/composer.json', '{"config":{"foxy":"invalid"}}');
+
+        $this->composerConfig
+            ->expects(self::exactly(2))
+            ->method('get')
+            ->with('home')
+            ->willReturn($directory);
+        $this->package->expects(self::once())->method('getConfig')->willReturn([]);
+
+        try {
+            $config = ConfigBuilder::build($this->composer, [], $this->io);
+
+            self::assertSame('fallback', $config->get('missing', 'fallback'));
+        } finally {
+            $filesystem->remove($directory);
+        }
     }
 
     /**

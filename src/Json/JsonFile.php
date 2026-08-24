@@ -7,14 +7,14 @@ namespace Foxy\Json;
 use Foxy\Exception\RuntimeException;
 
 use function array_diff;
-use function array_unique;
-use function array_values;
 use function is_array;
 use function is_string;
 use function sprintf;
 
 final class JsonFile extends \Composer\Json\JsonFile
 {
+    private const int DEFAULT_OPTIONS = JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE;
+
     private const array PACKAGE_MAP_KEYS = [
         'dependencies',
         'devDependencies',
@@ -41,8 +41,11 @@ final class JsonFile extends \Composer\Json\JsonFile
 
     private bool $parsed = false;
 
-    public static function encode(mixed $data, int $options = 448, string $indent = self::INDENT_DEFAULT): string
-    {
+    public static function encode(
+        mixed $data,
+        int $options = self::DEFAULT_OPTIONS,
+        string $indent = self::INDENT_DEFAULT,
+    ): string {
         $result = parent::encode([] === $data ? (object) [] : $data, $options);
 
         return JsonFormatter::format($result, self::$encodeArrayKeys, JsonFormatter::DEFAULT_INDENT, false);
@@ -83,15 +86,13 @@ final class JsonFile extends \Composer\Json\JsonFile
         return is_array($data) ? $data : [];
     }
 
-    public function write(array $hash, int $options = 448): void
+    public function write(array $hash, int $options = self::DEFAULT_OPTIONS): void
     {
         $arrayKeys = $this->collectEmptyArrayKeys($hash);
 
         $mapKeys = [...$this->getMapKeys(), ...self::PACKAGE_MAP_KEYS];
 
-        self::$encodeArrayKeys = array_values(
-            array_unique([...$this->getArrayKeys(), ...array_diff($arrayKeys, $mapKeys)]),
-        );
+        self::$encodeArrayKeys = array_diff($arrayKeys, $mapKeys);
 
         try {
             parent::write($hash, $options);

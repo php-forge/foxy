@@ -11,6 +11,7 @@ use function in_array;
 use function preg_match;
 use function preg_match_all;
 use function sprintf;
+use function str_starts_with;
 use function strlen;
 use function strpos;
 use function strtolower;
@@ -100,7 +101,7 @@ abstract class SemverUtil
 
         $version = $matches[1][0][0] . '-';
 
-        if (preg_match('/^([-+])/', $end, $matches)) {
+        if (str_starts_with($end, '-') || str_starts_with($end, '+')) {
             $end = substr($end, 1);
         }
 
@@ -109,8 +110,6 @@ abstract class SemverUtil
         $rawType = $matches[0] ?? '';
 
         $type = '' !== $rawType ? self::normalizeStability($rawType) : '';
-
-        $end = substr($end, strlen($rawType));
 
         return [$type, $version, $end];
     }
@@ -126,7 +125,7 @@ abstract class SemverUtil
 
         $minor = $split[0];
 
-        $revision = isset($split[1]) ? (int) $split[1] : 0;
+        $revision = $split[1] ?? 0;
 
         return '.' . sprintf('%03d', $minor) . sprintf('%03d', $revision);
     }
@@ -140,7 +139,7 @@ abstract class SemverUtil
     private static function matchVersion(string $version, string $type): array
     {
         $type = match ($type) {
-            'dev', 'snapshot' => 'dev',
+            'dev' => 'dev',
             default => in_array($type, ['alpha', 'beta', 'RC'], true) ? $type : 'patch',
         };
 
@@ -161,8 +160,7 @@ abstract class SemverUtil
             'a' => 'alpha',
             'b', 'pre' => 'beta',
             'build' => 'patch',
-            'rc' => 'RC',
-            'dev', 'snapshot' => 'dev',
+            'snapshot' => 'dev',
             default => VersionParser::normalizeStability($stability),
         };
     }

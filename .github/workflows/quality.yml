@@ -17,6 +17,5 @@ jobs:
       codespell-config: .github/linters/.codespellrc
       editorconfig-checker-config: .github/linters/.editorconfig-checker.json
       markdownlint-config: .github/linters/.markdown-lint.yml
-      prettier-config: .prettierrc.json
-      prettier-ignore-path: .prettierignore
+      prettier-ignore-path: .gitignore
       yamllint-targets: .github

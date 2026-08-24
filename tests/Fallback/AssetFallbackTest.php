@@ -43,6 +43,21 @@ final class AssetFallbackTest extends TestCase
         return [[true], [false]];
     }
 
+    public function testIntegerOneEnablesFallback(): void
+    {
+        $path = $this->cwd . '/package.json';
+        file_put_contents($path, '{"original":true}');
+
+        $config = new Config(['fallback-asset' => 1]);
+        $assetFallback = new AssetFallback($this->io, $config, 'package.json', $this->fs);
+
+        $assetFallback->save();
+        file_put_contents($path, '{"changed":true}');
+        $assetFallback->restore();
+
+        self::assertSame('{"original":true}', file_get_contents($path));
+    }
+
     #[DataProvider('getRestoreData')]
     public function testRestore(string|null $originalContent): void
     {
@@ -140,6 +155,7 @@ final class AssetFallbackTest extends TestCase
 
             self::assertInstanceOf(\RuntimeException::class, $previous);
             self::assertSame('Remove failed.', $previous->getMessage());
+            self::assertSame(0, $exception->getCode());
 
             throw $exception;
         }
@@ -287,6 +303,18 @@ final class AssetFallbackTest extends TestCase
         $this->expectExceptionMessage('Unable to read fallback asset file "package.json".');
 
         $this->assetFallback->save();
+    }
+
+    public function testSaveWithDisabledOptionIgnoresInvalidManifestPath(): void
+    {
+        $path = $this->cwd . '/package.json';
+        $this->sfs->mkdir($path);
+
+        $config = new Config(['fallback-asset' => false]);
+        $assetFallback = new AssetFallback($this->io, $config, 'package.json', $this->fs);
+
+        self::assertSame($assetFallback, $assetFallback->save());
+        self::assertDirectoryExists($path);
     }
 
     protected function setUp(): void

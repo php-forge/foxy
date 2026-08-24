@@ -6,6 +6,7 @@ namespace Foxy\Tests\Asset;
 
 use Composer\Json\JsonFile;
 use Composer\Package\RootPackageInterface;
+use Composer\Util\Filesystem as ComposerFilesystem;
 use Exception;
 use Foxy\Asset\AssetPackage;
 use JsonException;
@@ -14,6 +15,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Seld\JsonLint\ParsingException;
 use Symfony\Component\Filesystem\Filesystem;
+use Xepozz\InternalMocker\MockerState;
 
 use function chdir;
 use function file_put_contents;
@@ -78,6 +80,10 @@ final class AssetPackageTest extends TestCase
                 '@composer-asset/foo--bar' => 'file:./path/foo/bar',
                 '@composer-asset/new--dependency' => 'file:./path/new/dependency',
             ],
+            'devDependencies' => [
+                '@dev/bar' => '^1.0.0',
+                '@dev/foo' => '^1.0.0',
+            ],
         ];
         $expectedExisting = [
             '@composer-asset/foo--bar',
@@ -88,6 +94,10 @@ final class AssetPackageTest extends TestCase
                 '@composer-asset/foo--bar' => 'file:./path/foo/bar',
                 '@bar/foo' => '^1.0.0',
                 '@composer-asset/baz--bar' => 'file:./path/baz/bar',
+            ],
+            'devDependencies' => [
+                '@dev/foo' => '^1.0.0',
+                '@dev/bar' => '^1.0.0',
             ],
         ];
         $dependencies = [
@@ -146,6 +156,42 @@ final class AssetPackageTest extends TestCase
         self::assertSame(['@composer-asset/foo--bar'], $existing);
         self::assertSame(
             'file:./fresh/path',
+            $assetPackage->getPackage()['dependencies']['@composer-asset/foo--bar'],
+        );
+    }
+
+    public function testDependencyPathUsesInjectedFilesystemForPortableRelativePath(): void
+    {
+        $path = 'asset/foo/package.json';
+        $consumerPath = '/consumer/package.json';
+        $relativePath = '..\\asset\\foo';
+        $fs = $this->createMock(ComposerFilesystem::class);
+
+        $this->jsonFile->expects(self::once())->method('exists')->willReturn(false);
+        $this->jsonFile->expects(self::once())->method('getPath')->willReturn($consumerPath);
+        $fs
+            ->expects(self::exactly(3))
+            ->method('isAbsolutePath')
+            ->willReturnMap(
+                [
+                    [$path, false],
+                    [$consumerPath, true],
+                    [$relativePath, false],
+                ],
+            );
+        $fs
+            ->expects(self::once())
+            ->method('findShortestPath')
+            ->with('/consumer', '/asset/foo', true, true)
+            ->willReturn($relativePath);
+
+        MockerState::addCondition('Foxy\\Asset', 'getcwd', [], DIRECTORY_SEPARATOR);
+
+        $assetPackage = new AssetPackage($this->rootPackage, $this->jsonFile, $fs);
+        $assetPackage->addNewDependencies(['@composer-asset/foo--bar' => $path]);
+
+        self::assertSame(
+            'file:../asset/foo',
             $assetPackage->getPackage()['dependencies']['@composer-asset/foo--bar'],
         );
     }

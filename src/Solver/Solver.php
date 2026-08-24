@@ -33,6 +33,7 @@ use function realpath;
 use function rtrim;
 use function scandir;
 use function sprintf;
+use function str_ends_with;
 use function str_starts_with;
 use function trim;
 
@@ -75,9 +76,10 @@ final readonly class Solver implements SolverInterface
 
         try {
             $vendorDir = $composer->getConfig()->get('vendor-dir');
+            $vendorDir = '' !== $vendorDir ? $vendorDir : 'vendor';
             $configuredAssetDir = $this->config->get(
                 'composer-asset-dir',
-                ('' !== $vendorDir ? $vendorDir : 'vendor') . '/php-forge/composer-asset/',
+                $vendorDir . '/php-forge/composer-asset/',
             );
 
             if (!is_string($configuredAssetDir)) {
@@ -192,7 +194,7 @@ final readonly class Solver implements SolverInterface
     {
         $packageName = AssetUtil::getName($package);
 
-        $packagePath = rtrim($assetDir, '/') . '/' . $package->getName();
+        $packagePath = $assetDir . '/' . $package->getName();
 
         $newFilename = "{$packagePath}/" . basename($filename);
 
@@ -234,8 +236,6 @@ final readonly class Solver implements SolverInterface
             );
         }
 
-        $vendorDir = '' !== $vendorDir ? $vendorDir : "{$projectDir}/vendor";
-
         $defaultAssetDir = $this->canonicalizePath("{$vendorDir}/php-forge/composer-asset", $projectDir);
 
         if (is_link($assetDir)) {
@@ -271,7 +271,9 @@ final readonly class Solver implements SolverInterface
                 );
             }
 
-            if (!$this->fs->remove($assetDir) && file_exists($assetDir)) {
+            $this->fs->remove($assetDir);
+
+            if (file_exists($assetDir)) {
                 throw new RuntimeException(
                     sprintf('Unable to reset Composer asset directory "%s".', $assetDir),
                 );
@@ -336,9 +338,7 @@ final readonly class Solver implements SolverInterface
             );
         }
 
-        $configuredAssetDir = $this->fs->isAbsolutePath($assetDir)
-            ? $this->fs->normalizePath($assetDir)
-            : $this->fs->normalizePath(rtrim($projectDir, '/\\') . '/' . $assetDir);
+        $configuredAssetDir = $this->fs->normalizePath($assetDir);
 
         if (is_link($configuredAssetDir)) {
             throw new RuntimeException(
@@ -348,22 +348,21 @@ final readonly class Solver implements SolverInterface
 
         $projectDir = $this->canonicalizePath($projectDir, $projectDir);
         $assetDir = $this->canonicalizePath($assetDir, $projectDir);
-        $vendorDir = '' !== $vendorDir
-            ? $this->canonicalizePath($vendorDir, $projectDir)
-            : $this->canonicalizePath($projectDir . '/vendor', $projectDir);
-
-        foreach ([$projectDir, $vendorDir] as $protectedPath) {
-            if ($assetDir === $protectedPath || str_starts_with($protectedPath . '/', rtrim($assetDir, '/') . '/')) {
-                throw new RuntimeException(
-                    sprintf('The Composer asset directory "%s" overlaps a protected project path.', $assetDir),
-                );
-            }
-        }
+        $vendorDir = $this->canonicalizePath($vendorDir, $projectDir);
+        $assetDirPrefix = str_ends_with($assetDir, '/') ? $assetDir : "{$assetDir}/";
 
         if (dirname($assetDir) === $assetDir) {
             throw new RuntimeException(
                 'The Composer asset directory must not be a filesystem root.',
             );
+        }
+
+        foreach ([$projectDir, $vendorDir] as $protectedPath) {
+            if ($assetDir === $protectedPath || str_starts_with($protectedPath, $assetDirPrefix)) {
+                throw new RuntimeException(
+                    sprintf('The Composer asset directory "%s" overlaps a protected project path.', $assetDir),
+                );
+            }
         }
 
         return $assetDir;

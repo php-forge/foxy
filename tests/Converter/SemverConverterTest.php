@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Foxy\Tests\Converter;
 
-use Foxy\Converter\{SemverConverter, VersionConverterInterface};
+use Foxy\Converter\{SemverConverter, SemverUtil, VersionConverterInterface};
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -54,6 +54,9 @@ final class SemverConverterTest extends TestCase
             ['1.2.3-build.2012', '1.2.3-patch.2012'],
             ['1.3.0–rc30.79', '1.3.0-RC30.79'],
             ['1.2.3-SNAPSHOT', '1.2.3-dev'],
+            ['1.2.3alpha-foo', '1.2.3-alpha1'],
+            ['1.2.3-1alpha', '1.2.3-patch1'],
+            ['1.2.3rc.2foo', '1.2.3-RC2'],
             ['1.2.3-20123131.3246', '1.2.3-patch20123131.3246'],
             ['1.x.x-dev', '1.x-dev'],
             ['1.x.x.x.x-dev', '1.x-dev'],
@@ -84,6 +87,14 @@ final class SemverConverterTest extends TestCase
                 $this->converter->convertVersion('v' . $semver),
             );
         }
+    }
+
+    public function testCreatePatternIsPublicAndMatchesVersionPrefixes(): void
+    {
+        $pattern = SemverUtil::createPattern('[a-z]+');
+
+        self::assertSame(1, preg_match($pattern, '1.2.3beta'));
+        self::assertSame(0, preg_match($pattern, 'beta1.2.3'));
     }
 
     protected function setUp(): void

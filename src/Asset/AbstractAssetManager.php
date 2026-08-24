@@ -273,12 +273,12 @@ abstract class AbstractAssetManager implements AssetManagerInterface
 
     protected function getLockFilePath(): string
     {
-        return rtrim($this->getRootPackageDir(), '/\\') . DIRECTORY_SEPARATOR . $this->getLockPackageName();
+        return $this->getRootPackagePath($this->getLockPackageName());
     }
 
     protected function getNodeModulesPath(): string
     {
-        return rtrim($this->getRootPackageDir(), '/\\') . DIRECTORY_SEPARATOR . ltrim(self::NODE_MODULES_PATH, './');
+        return $this->getRootPackagePath(ltrim(self::NODE_MODULES_PATH, './'));
     }
 
     protected function getRootPackageDir(): string
@@ -316,13 +316,20 @@ abstract class AbstractAssetManager implements AssetManagerInterface
         return $currentDir;
     }
 
+    protected function getRootPackagePath(string $path): string
+    {
+        return rtrim($this->getRootPackageDir(), '/\\') . DIRECTORY_SEPARATOR . $path;
+    }
+
     protected function getVersion(): string|null
     {
         if ($this->version === '' && $this->versionConverter !== null) {
             $this->executor->execute($this->getVersionCommand(), $version);
 
-            $this->version = '' !== trim((string) $version)
-                ? $this->versionConverter->convertVersion(trim((string) $version))
+            $version = trim((string) $version);
+
+            $this->version = '' !== $version
+                ? $this->versionConverter->convertVersion($version)
                 : null;
         }
 
@@ -355,8 +362,7 @@ abstract class AbstractAssetManager implements AssetManagerInterface
                     'The asset manager failed and its fallback could not be restored: %s',
                     $fallbackException->getMessage(),
                 ),
-                0,
-                $exception,
+                previous: $exception,
             );
         }
     }

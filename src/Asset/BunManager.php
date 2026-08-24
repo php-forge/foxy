@@ -6,8 +6,6 @@ namespace Foxy\Asset;
 
 use Composer\Util\Platform;
 
-use function rtrim;
-
 final class BunManager extends AbstractAssetManager
 {
     public function getLockPackageName(): string
@@ -23,7 +21,7 @@ final class BunManager extends AbstractAssetManager
     public function hasLockFile(): bool
     {
         return parent::hasLockFile()
-            || file_exists(rtrim($this->getRootPackageDir(), '/\\') . DIRECTORY_SEPARATOR . 'bun.lockb');
+            || file_exists($this->getRootPackagePath('bun.lockb'));
     }
 
     public function isInstalled(): bool

@@ -32,7 +32,7 @@ abstract class AssetManager extends TestCase
     protected ProcessExecutorMock|ThrowingProcessExecutorMock|null $executor = null;
     protected FallbackInterface|MockObject|null $fallback = null;
     protected Filesystem|MockObject|null $fs = null;
-    protected IOInterface|null $io = null;
+    protected IOInterface|MockObject|null $io = null;
     protected AssetManagerInterface|null $manager = null;
     protected string|null $oldCwd = '';
     protected \Symfony\Component\Filesystem\Filesystem|null $sfs = null;
@@ -320,6 +320,14 @@ abstract class AssetManager extends TestCase
         );
     }
 
+    public function testIsInstalledRequiresNodeModulesDirectory(): void
+    {
+        file_put_contents($this->cwd . DIRECTORY_SEPARATOR . $this->manager->getPackageName(), '{}');
+        file_put_contents($this->cwd . DIRECTORY_SEPARATOR . $this->manager->getLockPackageName(), '{}');
+
+        self::assertFalse($this->manager->isInstalled());
+    }
+
     public function testIsUpdatable(): void
     {
         self::assertFalse(
@@ -370,6 +378,17 @@ abstract class AssetManager extends TestCase
         } else {
             $this->fallback->expects(self::once())->method('restore');
         }
+
+        $this->io
+            ->expects(self::once())
+            ->method('write')
+            ->with(
+                sprintf(
+                    '<info>%s %s dependencies</info>',
+                    'update' === $action ? 'Updating' : 'Installing',
+                    $this->getValidName(),
+                ),
+            );
 
         $this->executor->addExpectedValues($expectedRes, 'ASSET MANAGER OUTPUT');
 
@@ -474,6 +493,29 @@ abstract class AssetManager extends TestCase
         }
     }
 
+    public function testRunRestoresWorkingDirectoryWhenExecutorThrows(): void
+    {
+        $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'root-package';
+        $this->sfs->mkdir($rootPackageDir);
+        $originalCwd = getcwd();
+
+        $this->executor = new ThrowingProcessExecutorMock($this->io);
+        $this->config = new Config(
+            [],
+            ['run-asset-manager' => true, 'root-package-json-dir' => $rootPackageDir],
+        );
+        $this->fallback->expects(self::once())->method('restore');
+        $this->manager = $this->getManager();
+
+        try {
+            $this->manager->run();
+            self::fail('Expected the process execution to fail.');
+        } catch (\RuntimeException $exception) {
+            self::assertSame('Process execution failed.', $exception->getMessage());
+            self::assertSame($originalCwd, getcwd());
+        }
+    }
+
     public function testRunWithChdirFailure(): void
     {
         $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'root-package';
@@ -548,10 +590,13 @@ abstract class AssetManager extends TestCase
     {
         $this->config = new Config([], ['run-asset-manager' => false]);
 
+        $this->io->expects(self::never())->method('write');
+
         self::assertSame(
             0,
             $this->getManager()->run(),
         );
+        self::assertNull($this->executor->getLastCommand());
     }
 
     public function testRunWithGetcwdFailure(): void
@@ -581,6 +626,20 @@ abstract class AssetManager extends TestCase
                 getcwd(),
             );
         }
+    }
+
+    public function testRunWithoutCustomDirectoryDoesNotChangeWorkingDirectory(): void
+    {
+        $this->config = new Config([], ['run-asset-manager' => true]);
+        $this->manager = $this->getManager();
+
+        MockerState::addCondition('Foxy\\Asset', 'chdir', [$this->cwd], false);
+
+        $this->actionForTestRunForInstallCommand('install');
+        $this->executor->addExpectedValues(0, 'ASSET MANAGER OUTPUT');
+
+        self::assertSame(0, $this->manager->run());
+        self::assertSame($this->getValidInstallCommand(), $this->executor->getLastCommand());
     }
 
     public function testSetUpdatable(): void

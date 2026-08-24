@@ -15,12 +15,16 @@ use Composer\Util\{Filesystem, HttpDownloader};
 use Exception;
 use Foxy\Asset\AssetManagerInterface;
 use Foxy\Config\Config;
+use Foxy\Event\{GetAssetsEvent, PostSolveEvent, PreSolveEvent};
 use Foxy\Exception\RuntimeException;
 use Foxy\Fallback\FallbackInterface;
+use Foxy\FoxyEvents;
 use Foxy\Solver\{Solver, SolverInterface};
+use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
 
 use function chdir;
 use function dirname;
@@ -35,6 +39,7 @@ class SolverTest extends TestCase
     private FallbackInterface|MockObject|null $composerFallback = null;
     private Config|null $config = null;
     private string|null $cwd = '';
+    private EventDispatcher|MockObject|null $dispatcher = null;
     private Filesystem|null $fs = null;
     private InstallationManager|MockObject|null $im = null;
     private IOInterface|MockObject|null $io = null;
@@ -44,10 +49,40 @@ class SolverTest extends TestCase
     private MockObject|RootPackageInterface|null $package = null;
     private \Symfony\Component\Filesystem\Filesystem|MockObject|null $sfs = null;
     private SolverInterface|null $solver = null;
+    private string $vendorDir = '';
 
     public static function getSolveData(): array
     {
         return [[0], [1]];
+    }
+
+    public function testCanonicalizePathPreservesSingleFilesystemRootSeparator(): void
+    {
+        $relativePath = uniqid('foxy_nonexistent_path_', true);
+        $path = DIRECTORY_SEPARATOR . $relativePath;
+        $method = (new ReflectionClass(Solver::class))->getMethod('canonicalizePath');
+
+        self::assertSame($path, $method->invoke($this->solver, $path, DIRECTORY_SEPARATOR));
+        self::assertSame($path, $method->invoke($this->solver, $relativePath, DIRECTORY_SEPARATOR));
+    }
+
+    public function testIntegerOneEnablesSolver(): void
+    {
+        $this->addInstalledPackages();
+        $assetDir = $this->cwd . '/integer-enabled-assets';
+        $solver = new Solver(
+            $this->manager,
+            new Config(['enabled' => 1, 'composer-asset-dir' => $assetDir]),
+            $this->fs,
+            $this->composerFallback,
+        );
+
+        $this->manager->expects(self::once())->method('addDependencies')->with($this->package, []);
+        $this->manager->expects(self::once())->method('run')->willReturn(0);
+
+        $solver->solve($this->composer, $this->io);
+
+        self::assertFileExists($assetDir . '/.foxy-managed');
     }
 
     public function testSetUpdatable(): void
@@ -80,7 +115,15 @@ class SolverTest extends TestCase
 
         $this->im->expects(self::once())->method('getInstallPath')->willReturn($requirePackagePath);
         $this->manager->expects(self::exactly(2))->method('getPackageName')->willReturn('package.json');
-        $this->manager->expects(self::once())->method('addDependencies');
+        $mockPackageFilename = $this->cwd . '/composer-asset-dir/foo/bar/package.json';
+
+        $this->manager
+            ->expects(self::once())
+            ->method('addDependencies')
+            ->with(
+                $this->package,
+                ['@composer-asset/foo--bar' => $mockPackageFilename],
+            );
         $this->manager->expects(self::once())->method('run')->willReturn($resRunManager);
 
         if (0 === $resRunManager) {
@@ -99,6 +142,66 @@ class SolverTest extends TestCase
         file_put_contents($requirePackageFilename, '{}');
 
         $this->solver->solve($this->composer, $this->io);
+
+        self::assertJsonStringEqualsJsonString(
+            '{"name":"@composer-asset/foo--bar","version":"1.0.0"}',
+            (string) file_get_contents($mockPackageFilename),
+        );
+    }
+
+    public function testSolveAcceptsAlreadyRemovedDirectoryWhenFilesystemReportsFailure(): void
+    {
+        $this->addInstalledPackages();
+        $assetDir = $this->cwd . '/already-removed-assets';
+        $this->sfs->mkdir($assetDir);
+        file_put_contents($assetDir . '/.foxy-managed', 'marker');
+
+        $fs = $this->getMockBuilder(Filesystem::class)->onlyMethods(['remove'])->getMock();
+        $fs
+            ->expects(self::once())
+            ->method('remove')
+            ->with($assetDir)
+            ->willReturnCallback(function (string $path): bool {
+                $this->sfs->remove($path);
+
+                return false;
+            });
+
+        $solver = new Solver(
+            $this->manager,
+            new Config(['enabled' => true, 'composer-asset-dir' => $assetDir]),
+            $fs,
+            $this->composerFallback,
+        );
+
+        $this->manager->expects(self::once())->method('addDependencies')->with($this->package, []);
+        $this->manager->expects(self::once())->method('run')->willReturn(0);
+
+        $solver->solve($this->composer, $this->io);
+
+        self::assertFileExists($assetDir . '/.foxy-managed');
+    }
+
+    public function testSolveAcceptsEmptyUnmanagedAssetDirectory(): void
+    {
+        $this->addInstalledPackages();
+        $assetDir = $this->cwd . '/empty-assets';
+        $this->sfs->mkdir($assetDir);
+
+        $solver = new Solver(
+            $this->manager,
+            new Config(['enabled' => true, 'composer-asset-dir' => $assetDir]),
+            $this->fs,
+            $this->composerFallback,
+        );
+
+        $this->manager->expects(self::once())->method('addDependencies')->with($this->package, []);
+        $this->manager->expects(self::once())->method('run')->willReturn(0);
+        $this->composerFallback->expects(self::never())->method('restore');
+
+        $solver->solve($this->composer, $this->io);
+
+        self::assertFileExists($assetDir . '/.foxy-managed');
     }
 
     public function testSolveAcceptsOwnedAssetDirectoryOnSubsequentRuns(): void
@@ -120,6 +223,101 @@ class SolverTest extends TestCase
         $solver->solve($this->composer, $this->io);
 
         self::assertFileExists($assetDir . '/.foxy-managed');
+    }
+
+    public function testSolveAllowsDirectoryWhoseNamePrefixesConfiguredVendorDirectory(): void
+    {
+        $this->addInstalledPackages();
+        $assetDir = $this->cwd . '-ven';
+        $this->vendorDir = $this->cwd . '-vendor';
+
+        $solver = new Solver(
+            $this->manager,
+            new Config(['enabled' => true, 'composer-asset-dir' => $assetDir]),
+            $this->fs,
+            $this->composerFallback,
+        );
+
+        $this->manager->expects(self::once())->method('addDependencies')->with($this->package, []);
+        $this->manager->expects(self::once())->method('run')->willReturn(0);
+        $this->composerFallback->expects(self::never())->method('restore');
+
+        $solver->solve($this->composer, $this->io);
+
+        self::assertFileExists($assetDir . '/.foxy-managed');
+    }
+
+    public function testSolveDispatchesLifecycleEvents(): void
+    {
+        $this->addInstalledPackages();
+
+        $assetDir = $this->cwd . '/composer-asset-dir';
+        $observedEvents = [];
+        $this->dispatcher = $this->createMock(EventDispatcher::class);
+        $this->dispatcher
+            ->expects(self::exactly(3))
+            ->method('dispatch')
+            ->willReturnCallback(
+                static function (string $name, object $event) use (&$observedEvents): int {
+                    if ($event instanceof GetAssetsEvent) {
+                        $observedEvents[] = [$name, $event->getAssetDir(), $event->getPackages()];
+                        $event->addAsset('@injected/package', 'file:injected/package');
+
+                        return 0;
+                    }
+
+                    if ($event instanceof PostSolveEvent) {
+                        $observedEvents[] = [
+                            $name,
+                            $event->getAssetDir(),
+                            $event->getPackages(),
+                            $event->getRunResult(),
+                        ];
+
+                        return 0;
+                    }
+
+                    self::assertInstanceOf(PreSolveEvent::class, $event);
+                    $observedEvents[] = [$name, $event->getAssetDir(), $event->getPackages()];
+
+                    return 0;
+                },
+            );
+
+        $this->manager
+            ->expects(self::once())
+            ->method('addDependencies')
+            ->with($this->package, ['@injected/package' => 'file:injected/package']);
+        $this->manager->expects(self::once())->method('run')->willReturn(0);
+        $this->composerFallback->expects(self::never())->method('restore');
+
+        $this->solver->solve($this->composer, $this->io);
+
+        self::assertSame(
+            [
+                [FoxyEvents::PRE_SOLVE, $assetDir, []],
+                [FoxyEvents::GET_ASSETS, $assetDir, []],
+                [FoxyEvents::POST_SOLVE, $assetDir, [], 0],
+            ],
+            $observedEvents,
+        );
+    }
+
+    public function testSolveIgnoresPackageWithoutAssetActivation(): void
+    {
+        $package = $this->createMock(PackageInterface::class);
+        $package->method('getName')->willReturn('vendor/package');
+        $package->method('getExtra')->willReturn([]);
+        $package->method('getRequires')->willReturn([]);
+        $package->method('getDevRequires')->willReturn([]);
+
+        $this->addInstalledPackages([$package]);
+
+        $this->im->expects(self::never())->method('getInstallPath');
+        $this->manager->expects(self::once())->method('addDependencies')->with($this->package, []);
+        $this->manager->expects(self::once())->method('run')->willReturn(0);
+
+        $this->solver->solve($this->composer, $this->io);
     }
 
     public function testSolvePreservesFailureWhenComposerFallbackThrows(): void
@@ -144,12 +342,84 @@ class SolverTest extends TestCase
             self::fail('Expected fallback restoration to fail.');
         } catch (RuntimeException $exception) {
             self::assertStringContainsString('Composer fallback restoration failed', $exception->getMessage());
+            self::assertSame(0, $exception->getCode());
             self::assertSame('Manager failed.', $exception->getPrevious()?->getMessage());
         }
     }
 
+    public function testSolveRejectsAssetDirectoryThatRemainsAfterSuccessfulRemoval(): void
+    {
+        $this->addInstalledPackages();
+        $assetDir = $this->cwd . '/reported-removed-assets';
+        $this->sfs->mkdir($assetDir);
+        file_put_contents($assetDir . '/.foxy-managed', 'marker');
+
+        $fs = $this->getMockBuilder(Filesystem::class)->onlyMethods(['remove'])->getMock();
+        $fs->expects(self::once())->method('remove')->with($assetDir)->willReturn(true);
+
+        $solver = new Solver(
+            $this->manager,
+            new Config(['enabled' => true, 'composer-asset-dir' => $assetDir]),
+            $fs,
+            $this->composerFallback,
+        );
+
+        $this->manager->expects(self::never())->method('addDependencies');
+        $this->manager->expects(self::never())->method('run');
+        $this->composerFallback->expects(self::once())->method('restore');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Unable to reset Composer asset directory');
+
+        $solver->solve($this->composer, $this->io);
+    }
+
+    public function testSolveRejectsDirectoryContainingConfiguredVendorDirectory(): void
+    {
+        $this->addInstalledPackages();
+        $assetDir = $this->cwd . '-vendor';
+        $this->vendorDir = $assetDir . '/nested';
+        $this->sfs->mkdir($this->vendorDir);
+
+        $solver = new Solver(
+            $this->manager,
+            new Config(['enabled' => true, 'composer-asset-dir' => $assetDir]),
+            $this->fs,
+            $this->composerFallback,
+        );
+
+        $this->manager->expects(self::never())->method('addDependencies');
+        $this->composerFallback->expects(self::once())->method('restore');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('overlaps a protected project path');
+
+        $solver->solve($this->composer, $this->io);
+    }
+
+    public function testSolveRejectsFilesystemRootAsAssetDirectory(): void
+    {
+        $solver = new Solver(
+            $this->manager,
+            new Config(['enabled' => true, 'composer-asset-dir' => DIRECTORY_SEPARATOR]),
+            $this->fs,
+            $this->composerFallback,
+        );
+
+        $this->manager->expects(self::never())->method('addDependencies');
+        $this->composerFallback->expects(self::once())->method('restore');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('must not be a filesystem root');
+
+        $solver->solve($this->composer, $this->io);
+    }
+
     public function testSolveRejectsProjectRootAsAssetDirectory(): void
     {
+        $this->vendorDir = $this->cwd . '-vendor';
+        $this->sfs->mkdir($this->vendorDir);
+
         $solver = new Solver(
             $this->manager,
             new Config(['enabled' => true, 'composer-asset-dir' => $this->cwd]),
@@ -162,6 +432,56 @@ class SolverTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('overlaps a protected project path');
+
+        $solver->solve($this->composer, $this->io);
+    }
+
+    public function testSolveRejectsRegularFileAsAssetDirectory(): void
+    {
+        $this->addInstalledPackages();
+        $assetDir = $this->cwd . '/asset-file';
+        file_put_contents($assetDir, 'not a directory');
+
+        $solver = new Solver(
+            $this->manager,
+            new Config(['enabled' => true, 'composer-asset-dir' => $assetDir]),
+            $this->fs,
+            $this->composerFallback,
+        );
+
+        $this->manager->expects(self::never())->method('addDependencies');
+        $this->composerFallback->expects(self::once())->method('restore');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('is not a directory');
+
+        $solver->solve($this->composer, $this->io);
+    }
+
+    public function testSolveRejectsRelativeSymbolicLinkAssetDirectory(): void
+    {
+        $this->addInstalledPackages();
+        $targetDir = $this->cwd . '/relative-symlink-target';
+        $linkName = 'relative-symlink-assets';
+        $linkDir = $this->cwd . '/' . $linkName;
+        $this->sfs->mkdir($targetDir);
+
+        if (!@symlink($targetDir, $linkDir)) {
+            self::markTestSkipped('Symbolic links are not available.');
+        }
+
+        $solver = new Solver(
+            $this->manager,
+            new Config(['enabled' => true, 'composer-asset-dir' => $linkName]),
+            $this->fs,
+            $this->composerFallback,
+        );
+
+        $this->manager->expects(self::never())->method('addDependencies');
+        $this->composerFallback->expects(self::once())->method('restore');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('must not be a symbolic link');
 
         $solver->solve($this->composer, $this->io);
     }
@@ -223,15 +543,40 @@ class SolverTest extends TestCase
         }
     }
 
-    public function testSolveRejectsVendorRootAsAssetDirectory(): void
+    public function testSolveRejectsUnresolvableVendorSymbolicLink(): void
     {
         $this->addInstalledPackages();
-        $vendorDir = $this->cwd . '/vendor';
-        $this->sfs->mkdir($vendorDir);
+        $this->vendorDir = $this->cwd . '/broken-vendor';
+
+        if (!@symlink($this->cwd . '/missing-vendor', $this->vendorDir)) {
+            self::markTestSkipped('Symbolic links are not available.');
+        }
 
         $solver = new Solver(
             $this->manager,
-            new Config(['enabled' => true, 'composer-asset-dir' => $vendorDir]),
+            new Config(['enabled' => true, 'composer-asset-dir' => $this->cwd . '/safe-assets']),
+            $this->fs,
+            $this->composerFallback,
+        );
+
+        $this->manager->expects(self::never())->method('addDependencies');
+        $this->composerFallback->expects(self::once())->method('restore');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Unable to resolve path');
+
+        $solver->solve($this->composer, $this->io);
+    }
+
+    public function testSolveRejectsVendorRootAsAssetDirectory(): void
+    {
+        $this->addInstalledPackages();
+        $this->vendorDir = $this->cwd . '-vendor';
+        $this->sfs->mkdir($this->vendorDir);
+
+        $solver = new Solver(
+            $this->manager,
+            new Config(['enabled' => true, 'composer-asset-dir' => $this->vendorDir]),
             $this->fs,
             $this->composerFallback,
         );
@@ -241,6 +586,24 @@ class SolverTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('overlaps a protected project path');
+
+        $solver->solve($this->composer, $this->io);
+    }
+
+    public function testSolveRejectsWhitespaceOnlyAssetDirectory(): void
+    {
+        $solver = new Solver(
+            $this->manager,
+            new Config(['enabled' => true, 'composer-asset-dir' => " \t\n"]),
+            $this->fs,
+            $this->composerFallback,
+        );
+
+        $this->manager->expects(self::never())->method('addDependencies');
+        $this->composerFallback->expects(self::once())->method('restore');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('must not be empty');
 
         $solver->solve($this->composer, $this->io);
     }
@@ -286,6 +649,48 @@ class SolverTest extends TestCase
         $solver->solve($this->composer, $this->io);
     }
 
+    public function testSolveUsesConfiguredVendorDirectoryForDefaultAssetDirectory(): void
+    {
+        $this->addInstalledPackages();
+        $this->vendorDir = $this->cwd . '-vendor';
+
+        $solver = new Solver(
+            $this->manager,
+            new Config(['enabled' => true]),
+            $this->fs,
+            $this->composerFallback,
+        );
+
+        $this->manager->expects(self::once())->method('addDependencies')->with($this->package, []);
+        $this->manager->expects(self::once())->method('run')->willReturn(0);
+        $this->composerFallback->expects(self::never())->method('restore');
+
+        $solver->solve($this->composer, $this->io);
+
+        self::assertFileExists($this->vendorDir . '/php-forge/composer-asset/.foxy-managed');
+    }
+
+    public function testSolveUsesProjectVendorDirectoryWhenComposerVendorDirectoryIsEmpty(): void
+    {
+        $this->addInstalledPackages();
+        $this->vendorDir = '';
+
+        $solver = new Solver(
+            $this->manager,
+            new Config(['enabled' => true]),
+            $this->fs,
+            $this->composerFallback,
+        );
+
+        $this->manager->expects(self::once())->method('addDependencies')->with($this->package, []);
+        $this->manager->expects(self::once())->method('run')->willReturn(0);
+        $this->composerFallback->expects(self::never())->method('restore');
+
+        $solver->solve($this->composer, $this->io);
+
+        self::assertFileExists($this->cwd . '/vendor/php-forge/composer-asset/.foxy-managed');
+    }
+
     /**
      * @throws Exception
      */
@@ -309,6 +714,7 @@ class SolverTest extends TestCase
         $this->composer = $this->createMock(Composer::class);
         $this->composerConfig = $this->createMock(\Composer\Config::class);
         $this->io = $this->createMock(IOInterface::class);
+        $this->dispatcher = new EventDispatcher($this->composer, $this->io);
         $this->fs = new Filesystem();
         $this->im = $this->createMock(InstallationManager::class);
         $this->sfs = new \Symfony\Component\Filesystem\Filesystem();
@@ -316,10 +722,16 @@ class SolverTest extends TestCase
         $this->manager = $this->createMock(AssetManagerInterface::class);
         $this->composerFallback = $this->createMock(FallbackInterface::class);
         $this->sfs->mkdir($this->cwd);
-        $vendorDir = $this->cwd . '/vendor';
+        $this->vendorDir = $this->cwd . '/vendor';
         $this->composerConfig
             ->method('get')
-            ->willReturnCallback(static fn($key, $flags = 0): string|null => 'vendor-dir' === $key ? $vendorDir : null);
+            ->willReturnCallback(
+                fn($key, $flags = 0): string|null => match ($key) {
+                    'vendor-dir' => $this->vendorDir,
+                    'bin-dir' => $this->cwd . '/vendor/bin',
+                    default => null,
+                },
+            );
 
         chdir($this->cwd);
 
@@ -340,7 +752,9 @@ class SolverTest extends TestCase
         $this->composer
             ->expects(self::any())
             ->method('getEventDispatcher')
-            ->willReturn(new EventDispatcher($this->composer, $this->io));
+            ->willReturnCallback(
+                fn(): EventDispatcher => $this->dispatcher ?? throw new LogicException('Missing event dispatcher.'),
+            );
 
         $this->solver = new Solver($this->manager, $this->config, $this->fs, $this->composerFallback);
     }
@@ -350,10 +764,11 @@ class SolverTest extends TestCase
         parent::tearDown();
 
         chdir($this->oldCwd);
-        $this->sfs->remove($this->cwd);
+        $this->sfs->remove([$this->cwd, $this->cwd . '-vendor', $this->cwd . '-ven']);
         $this->config = null;
         $this->composer = null;
         $this->composerConfig = null;
+        $this->dispatcher = null;
         $this->localRepo = null;
         $this->io = null;
         $this->fs = null;

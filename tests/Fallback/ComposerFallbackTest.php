@@ -6,6 +6,7 @@ namespace Foxy\Tests\Fallback;
 
 use Composer\Composer;
 use Composer\EventDispatcher\EventDispatcher;
+use Composer\Filter\PlatformRequirementFilter\PlatformRequirementFilterInterface;
 use Composer\Installer;
 use Composer\Installer\InstallationManager;
 use Composer\IO\IOInterface;
@@ -60,6 +61,19 @@ final class ComposerFallbackTest extends TestCase
         ];
     }
 
+    public static function getInstallerBooleanOptionsData(): array
+    {
+        return [
+            'both disabled' => [false, false, false],
+            'input enabled' => [true, false, true],
+            'config enabled' => [false, true, true],
+            'both enabled' => [true, true, true],
+            'integer one enabled' => [1, false, true],
+            'string one enabled' => ['1', false, true],
+            'other integer disabled' => [2, false, false],
+        ];
+    }
+
     public static function getRestoreData(): array
     {
         return [[[]], [[['name' => 'foo/bar', 'version' => '1.0.0.0']]]];
@@ -68,6 +82,83 @@ final class ComposerFallbackTest extends TestCase
     public static function getSaveData(): array
     {
         return [[true], [false]];
+    }
+
+    public function testFailedSubsequentSaveInvalidatesPreviousSnapshot(): void
+    {
+        file_put_contents($this->cwd . '/composer.json', '{}');
+
+        $vendorDir = $this->cwd . '/vendor';
+        $composerConfig = $this->createMock(\Composer\Config::class);
+        $composerConfig->method('get')->willReturnCallback(
+            static fn($key, $default = null) => 'vendor-dir' === $key ? $vendorDir : $default,
+        );
+
+        $configCalls = 0;
+        $this->composer
+            ->expects(self::exactly(2))
+            ->method('getConfig')
+            ->willReturnCallback(
+                static function () use (&$configCalls, $composerConfig): \Composer\Config {
+                    if (2 === ++$configCalls) {
+                        throw new \RuntimeException('Unable to read Composer configuration.');
+                    }
+
+                    return $composerConfig;
+                },
+            );
+
+        $installationManager = $this->createMock(InstallationManager::class);
+        $this->composer->expects(self::once())->method('getInstallationManager')->willReturn($installationManager);
+        $this->composer->expects(self::never())->method('getLocker');
+
+        $this->composerFallback->save();
+
+        try {
+            $this->composerFallback->save();
+            self::fail('Expected the subsequent snapshot to fail.');
+        } catch (\RuntimeException $exception) {
+            self::assertSame('Unable to read Composer configuration.', $exception->getMessage());
+        }
+
+        file_put_contents($this->cwd . '/composer.lock', '{}');
+
+        $this->io->expects(self::never())->method('write');
+        $this->fs->expects(self::never())->method('remove');
+
+        $this->composerFallback->restore();
+
+        self::assertFileExists($this->cwd . '/composer.lock');
+    }
+
+    public function testIntegerOneEnablesFallback(): void
+    {
+        $config = new Config(['fallback-composer' => 1]);
+        $this->composerFallback = new ComposerFallback(
+            $this->composer,
+            $this->io,
+            $config,
+            $this->input,
+            $this->fs,
+            $this->installer,
+        );
+
+        $this->setupNoLockEnvironment();
+        $this->composerFallback->save();
+        file_put_contents($this->cwd . '/composer.lock', '{}');
+
+        $this->fs
+            ->expects(self::once())
+            ->method('remove')
+            ->willReturnCallback(function (string $path): bool {
+                $this->sfs->remove($path);
+
+                return true;
+            });
+
+        $this->composerFallback->restore();
+
+        self::assertFileDoesNotExist($this->cwd . '/composer.lock');
     }
 
     /**
@@ -88,6 +179,28 @@ final class ComposerFallbackTest extends TestCase
         $this->composerFallback->restore();
     }
 
+    public function testRestoreAcceptsAnAlreadyRemovedPathWhenFilesystemReportsFailure(): void
+    {
+        $this->setupNoLockEnvironment();
+        $this->composerFallback->save();
+
+        file_put_contents($this->cwd . '/composer.lock', '{}');
+
+        $this->fs
+            ->expects(self::once())
+            ->method('remove')
+            ->with('./composer.lock')
+            ->willReturnCallback(function (string $path): bool {
+                $this->sfs->remove($path);
+
+                return false;
+            });
+
+        $this->composerFallback->restore();
+
+        self::assertFileDoesNotExist($this->cwd . '/composer.lock');
+    }
+
     /**
      * @throws Exception
      */
@@ -100,6 +213,25 @@ final class ComposerFallbackTest extends TestCase
         $this->installer->expects(self::never())->method('run');
 
         $this->composerFallback->restore();
+    }
+
+    /**
+     * @throws Exception|JsonException
+     */
+    public function testRestoreCombinesOptimizeAutoloaderSourcesIndependently(): void
+    {
+        $this->setupRestoreEnvironment(
+            [],
+            static fn(string $option): bool|null => 'optimize-autoloader' === $option ? true : null,
+            configOptions: ['optimize-autoloader' => false],
+        );
+
+        $this->expectInstallerRun();
+        $this->composerFallback->save();
+        $this->composerFallback->restore();
+
+        self::assertFalse($this->getInstallerProperty('classMapAuthoritative'));
+        self::assertTrue($this->getInstallerProperty('optimizeAutoloader'));
     }
 
     /**
@@ -172,6 +304,56 @@ final class ComposerFallbackTest extends TestCase
     }
 
     /**
+     * @throws Exception|JsonException
+     */
+    #[DataProvider('getInstallerBooleanOptionsData')]
+    public function testRestorePropagatesInstallerBooleanOptions(
+        mixed $inputValue,
+        mixed $configValue,
+        bool $expected,
+    ): void {
+        $optionNames = ['apcu-autoloader', 'classmap-authoritative', 'optimize-autoloader'];
+        $configOptions = array_fill_keys($optionNames, $configValue);
+
+        $this->setupRestoreEnvironment(
+            [],
+            static fn(string $option): mixed => in_array($option, $optionNames, true) ? $inputValue : null,
+            configOptions: $configOptions,
+        );
+
+        $this->expectInstallerRun();
+        $this->composerFallback->save();
+        $this->composerFallback->restore();
+
+        self::assertSame($expected, $this->getInstallerProperty('apcuAutoloader'));
+        self::assertSame($expected, $this->getInstallerProperty('classMapAuthoritative'));
+        self::assertSame($expected, $this->getInstallerProperty('optimizeAutoloader'));
+    }
+
+    /**
+     * @throws Exception|JsonException
+     */
+    public function testRestorePropagatesInverseAndScalarInstallerOptions(): void
+    {
+        $this->setupRestoreEnvironment(
+            [],
+            static fn(string $option): mixed => match ($option) {
+                'no-autoloader', 'no-dev' => 1,
+                'verbose' => 1,
+                default => null,
+            },
+        );
+
+        $this->expectInstallerRun();
+        $this->composerFallback->save();
+        $this->composerFallback->restore();
+
+        self::assertFalse($this->getInstallerProperty('devMode'));
+        self::assertFalse($this->getInstallerProperty('dumpAutoloader'));
+        self::assertTrue($this->getInstallerProperty('verbose'));
+    }
+
+    /**
      * @throws Exception
      */
     public function testRestoreRemovesOnlyStateCreatedAfterSavingWithoutLock(): void
@@ -201,8 +383,8 @@ final class ComposerFallbackTest extends TestCase
         $this->composerFallback->restore();
 
         self::assertSame(['./composer.lock', $vendorDir], $removed);
-        self::assertFileNotExists($this->cwd . '/composer.lock');
-        self::assertFileNotExists($vendorDir);
+        self::assertFileDoesNotExist($this->cwd . '/composer.lock');
+        self::assertDirectoryDoesNotExist($vendorDir);
     }
 
     /**
@@ -274,6 +456,38 @@ final class ComposerFallbackTest extends TestCase
     }
 
     /**
+     * @throws Exception|JsonException
+     */
+    public function testRestoreUsesDisabledDefaultsForMissingLockAndPlatformOptions(): void
+    {
+        $this->setupRestoreEnvironment(
+            [],
+            static fn(string $option): null => null,
+        );
+
+        $lockPath = $this->cwd . '/composer.lock';
+        $lock = json_decode(file_get_contents($lockPath), true, 512, JSON_THROW_ON_ERROR);
+        unset($lock['prefer-lowest'], $lock['prefer-stable']);
+        file_put_contents($lockPath, json_encode($lock, JSON_THROW_ON_ERROR));
+
+        $this->expectInstallerRun();
+        $this->composerFallback->save();
+        $this->composerFallback->restore();
+
+        $restoredLock = json_decode(file_get_contents($lockPath), true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertFalse($restoredLock['prefer-lowest']);
+        self::assertFalse($restoredLock['prefer-stable']);
+        self::assertTrue($this->getInstallerProperty('devMode'));
+        self::assertTrue($this->getInstallerProperty('dumpAutoloader'));
+
+        $filter = $this->getInstallerProperty('platformRequirementFilter');
+
+        self::assertInstanceOf(PlatformRequirementFilterInterface::class, $filter);
+        self::assertFalse($filter->isIgnored('php'));
+    }
+
+    /**
      * @throws Exception
      */
     public function testRestoreWithDisableOption(): void
@@ -307,6 +521,12 @@ final class ComposerFallbackTest extends TestCase
         $this->expectInstallerRun();
         $this->composerFallback->save();
         $this->composerFallback->restore();
+
+        $filter = $this->getInstallerProperty('platformRequirementFilter');
+
+        self::assertInstanceOf(PlatformRequirementFilterInterface::class, $filter);
+        self::assertTrue($filter->isIgnored('php'));
+        self::assertTrue($filter->isIgnored('ext-json'));
     }
 
     /**
@@ -329,6 +549,12 @@ final class ComposerFallbackTest extends TestCase
         $this->expectInstallerRun();
         $this->composerFallback->save();
         $this->composerFallback->restore();
+
+        $filter = $this->getInstallerProperty('platformRequirementFilter');
+
+        self::assertInstanceOf(PlatformRequirementFilterInterface::class, $filter);
+        self::assertTrue($filter->isIgnored('php'));
+        self::assertTrue($filter->isIgnored('ext-json'));
     }
 
     /**
@@ -481,6 +707,11 @@ final class ComposerFallbackTest extends TestCase
             ->willReturn($result);
     }
 
+    private function getInstallerProperty(string $name): mixed
+    {
+        return (new ReflectionClass(Installer::class))->getProperty($name)->getValue($this->installer);
+    }
+
     private function setupNoLockEnvironment(int $restoreCount = 1): string
     {
         $vendorDir = $this->cwd . '/vendor';
@@ -506,6 +737,7 @@ final class ComposerFallbackTest extends TestCase
         callable $optionCallback,
         array $aliases = [],
         int $restoreCount = 1,
+        array $configOptions = [],
     ): void {
         $composerFile = 'composer.json';
         $composerContent = '{}';
@@ -558,6 +790,10 @@ final class ComposerFallbackTest extends TestCase
         $config
             ->expects(self::atLeastOnce())
             ->method('get')
-            ->willReturnCallback(fn($key, $default = null) => 'vendor-dir' === $key ? $vendorDir : $default);
+            ->willReturnCallback(
+                fn($key, $default = null) => 'vendor-dir' === $key
+                    ? $vendorDir
+                    : ($configOptions[$key] ?? $default),
+            );
     }
 }

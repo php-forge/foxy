@@ -9,6 +9,9 @@ use JsonException;
 use PHPForge\Support\LineEndingNormalizer;
 use PHPUnit\Framework\TestCase;
 
+use function file_get_contents;
+use function rtrim;
+
 final class JsonFormatterTest extends TestCase
 {
     /**
@@ -16,17 +19,6 @@ final class JsonFormatterTest extends TestCase
      */
     public function testFormat(): void
     {
-        $expected = <<<JSON
-        {
-          "name": "test",
-          "contributors": [],
-          "dependencies": {
-            "@foo/bar": "^1.0.0"
-          },
-          "devDependencies": {}
-        }
-        JSON;
-
         $data = [
             'name' => 'test',
             'contributors' => [],
@@ -36,7 +28,7 @@ final class JsonFormatterTest extends TestCase
         $content = json_encode($data, JSON_THROW_ON_ERROR);
 
         self::assertSame(
-            LineEndingNormalizer::normalize($expected),
+            LineEndingNormalizer::normalize(self::fixtureWithoutFinalNewline('formatter-output-two-space.json')),
             LineEndingNormalizer::normalize(JsonFormatter::format($content, ['contributors'], 2)),
         );
     }
@@ -53,13 +45,7 @@ final class JsonFormatterTest extends TestCase
 
     public function testGetArrayKeys(): void
     {
-        $content = <<<JSON
-        {
-          "name": "test",
-          "contributors": [],
-          "dependencies": {}
-        }
-        JSON;
+        $content = self::fixture('package-two-space.json');
         $expected = ['contributors'];
 
         self::assertSame(
@@ -81,16 +67,26 @@ final class JsonFormatterTest extends TestCase
 
     public function testGetIndent(): void
     {
-        $content = <<<JSON
-        {
-          "name": "test",
-          "dependencies": {}
-        }
-        JSON;
+        $content = self::fixture('package-two-space.json');
 
         self::assertSame(
             2,
             JsonFormatter::getIndent($content),
+        );
+    }
+
+    public function testGetIndentIgnoresSurroundingWhitespace(): void
+    {
+        $content = "\n  " . self::fixture('name-two-space.json');
+
+        self::assertSame(2, JsonFormatter::getIndent($content));
+    }
+
+    public function testGetMapKeys(): void
+    {
+        self::assertSame(
+            ['dependencies', 'metadata'],
+            JsonFormatter::getMapKeys('{"dependencies":{},"metadata": { }}'),
         );
     }
 
@@ -103,14 +99,10 @@ final class JsonFormatterTest extends TestCase
 
         $content = json_encode($data, JSON_THROW_ON_ERROR);
 
-        $expected = <<<JSON
-        {
-            "url": "https:\\\\/\\\\/example.com"
-        }
-        JSON;
-
         self::assertSame(
-            LineEndingNormalizer::normalize($expected),
+            LineEndingNormalizer::normalize(
+                self::fixtureWithoutFinalNewline('literal-slashes-four-space.json'),
+            ),
             LineEndingNormalizer::normalize(JsonFormatter::format($content, [], 4)),
         );
     }
@@ -124,14 +116,10 @@ final class JsonFormatterTest extends TestCase
 
         $content = json_encode($data, JSON_THROW_ON_ERROR);
 
-        $expected = <<<JSON
-        {
-          "name": "\\\\u0048\\\\u0065\\\\u006c\\\\u006c\\\\u006f"
-        }
-        JSON;
-
         self::assertSame(
-            LineEndingNormalizer::normalize($expected),
+            LineEndingNormalizer::normalize(
+                self::fixtureWithoutFinalNewline('literal-unicode-two-space.json'),
+            ),
             LineEndingNormalizer::normalize(JsonFormatter::format($content, [], 2)),
         );
     }
@@ -146,5 +134,15 @@ final class JsonFormatterTest extends TestCase
             '"value": "left    right"',
             JsonFormatter::format('{"value":"left    right"}', [], 2),
         );
+    }
+
+    private static function fixture(string $filename): string
+    {
+        return (string) file_get_contents(__DIR__ . '/../Fixtures/Json/' . $filename);
+    }
+
+    private static function fixtureWithoutFinalNewline(string $filename): string
+    {
+        return rtrim(self::fixture($filename), "\r\n");
     }
 }

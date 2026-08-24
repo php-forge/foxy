@@ -14,7 +14,6 @@ use JsonException;
 
 use function array_flip;
 use function array_intersect_key;
-use function count;
 use function explode;
 use function fnmatch;
 use function is_bool;
@@ -28,6 +27,7 @@ use function realpath;
 use function sprintf;
 use function str_replace;
 use function str_starts_with;
+use function strtr;
 
 final class AssetUtil
 {
@@ -215,13 +215,7 @@ final class AssetUtil
     private static function formatVersion(string $version): string
     {
         $version = str_replace(['x', 'X', '*'], '0', $version);
-        $exp = explode('.', $version);
-
-        if (($size = count($exp)) < 3) {
-            for ($i = $size; $i < 3; ++$i) {
-                $exp[] = '0';
-            }
-        }
+        $exp = [...explode('.', $version), '0', '0'];
 
         return "{$exp[0]}.{$exp[1]}.{$exp[2]}";
     }
@@ -269,10 +263,11 @@ final class AssetUtil
             return null;
         }
 
-        $normalizedRoot = rtrim(str_replace('\\', '/', $installRoot), '/');
-        $normalizedPath = str_replace('\\', '/', $resolvedPath);
+        $normalizedRoot = strtr($installRoot, '\\', '/');
+        $normalizedPath = strtr($resolvedPath, '\\', '/');
+        $normalizedRootPrefix = rtrim($normalizedRoot, '/') . '/';
 
-        if ($normalizedPath !== $normalizedRoot && !str_starts_with($normalizedPath, "{$normalizedRoot}/")) {
+        if ($normalizedPath !== $normalizedRoot && !str_starts_with($normalizedPath, $normalizedRootPrefix)) {
             throw new RuntimeException(
                 sprintf('The asset package path "%s" escapes its Composer install directory.', $normalizedPath),
             );

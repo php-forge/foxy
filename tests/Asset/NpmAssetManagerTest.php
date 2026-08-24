@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Foxy\Tests\Asset;
 
 use Composer\Package\RootPackageInterface;
+use Composer\Util\ProcessExecutor;
 use Foxy\Asset\NpmManager;
 use Foxy\Config\Config;
 
@@ -38,6 +39,37 @@ final class NpmAssetManagerTest extends AssetManager
             $rootPackage,
             ['@composer-asset/foo--bar' => $this->cwd . '/asset/foo/bar/package.json'],
         );
+    }
+
+    public function testRunAppliesConfiguredTimeoutDuringExecution(): void
+    {
+        $originalTimeout = ProcessExecutor::getTimeout();
+        $configuredTimeout = 900;
+        $observedTimeout = null;
+        $executor = $this->createMock(ProcessExecutor::class);
+        $executor
+            ->expects(self::once())
+            ->method('execute')
+            ->willReturnCallback(
+                static function () use (&$observedTimeout): int {
+                    $observedTimeout = ProcessExecutor::getTimeout();
+
+                    return 0;
+                },
+            );
+        $this->config = new Config(['run-asset-manager' => true, 'manager-timeout' => $configuredTimeout]);
+
+        try {
+            ProcessExecutor::setTimeout(42);
+
+            $manager = new NpmManager($this->io, $this->config, $executor, $this->fs, $this->fallback);
+
+            self::assertSame(0, $manager->run());
+            self::assertSame($configuredTimeout, $observedTimeout);
+            self::assertSame(42, ProcessExecutor::getTimeout());
+        } finally {
+            ProcessExecutor::setTimeout($originalTimeout);
+        }
     }
 
     protected function getManager(): NpmManager

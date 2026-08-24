@@ -9,6 +9,7 @@
     source: {
         directories: ["src"],
     },
+    timeout: 30,
     timeoutsAsEscaped: true,
     maxTimeouts: 0,
 }

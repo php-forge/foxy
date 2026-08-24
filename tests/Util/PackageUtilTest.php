@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Foxy\Tests\Util;
 
 use Composer\Package\CompletePackage;
+use Composer\Package\Loader\ArrayLoader;
 use Foxy\Util\PackageUtil;
 use PHPUnit\Framework\TestCase;
 
@@ -13,6 +14,7 @@ final class PackageUtilTest extends TestCase
     public function testConvertLockAlias(): void
     {
         $lockData = [
+            'content-hash' => 'HASH_VALUE',
             'aliases' => [
                 [
                     'alias' => '1.0.0',
@@ -48,7 +50,25 @@ final class PackageUtilTest extends TestCase
         $convertedAliases = PackageUtil::convertLockAlias($lockData);
 
         self::assertArrayHasKey('aliases', $convertedAliases);
+        self::assertSame('HASH_VALUE', $convertedAliases['content-hash']);
         self::assertEquals($expectedAliases, $convertedAliases['aliases']);
+    }
+
+    public function testLoadLockPackageLoadsOnlyRequestedSection(): void
+    {
+        $lockData = [
+            'packages' => [
+                ['name' => 'foo/bar', 'version' => '1.0.0.0'],
+            ],
+            'packages-dev' => [
+                ['name' => 'bar/foo', 'version' => '2.0.0.0'],
+            ],
+        ];
+
+        $loaded = PackageUtil::loadLockPackage(new ArrayLoader(), $lockData, true);
+
+        self::assertIsArray($loaded['packages'][0]);
+        self::assertInstanceOf(CompletePackage::class, $loaded['packages-dev'][0]);
     }
 
     public function testLoadLockPackages(): void
@@ -100,6 +120,35 @@ final class PackageUtilTest extends TestCase
 
         self::assertInstanceOf(CompletePackage::class, $lockDataLoaded['packages'][0]);
         self::assertSame($aliases, $lockDataLoaded['aliases']);
+    }
+
+    public function testLoadLockPackagesConvertsAliasesByDefault(): void
+    {
+        $lockData = [
+            'packages' => [
+                ['name' => 'foo/bar', 'version' => 'dev-feature'],
+            ],
+            'aliases' => [
+                [
+                    'package' => 'foo/bar',
+                    'version' => 'dev-feature',
+                    'alias' => '1.0.x-dev',
+                    'alias_normalized' => '1.0.9999999.9999999-dev',
+                ],
+            ],
+        ];
+
+        $loaded = PackageUtil::loadLockPackages($lockData);
+
+        self::assertSame(
+            [
+                'dev-feature' => [
+                    'alias' => '1.0.x-dev',
+                    'alias_normalized' => '1.0.9999999.9999999-dev',
+                ],
+            ],
+            $loaded['aliases']['foo/bar'],
+        );
     }
 
     public function testLoadLockPackagesWithoutPackages(): void

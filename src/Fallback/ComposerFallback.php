@@ -169,12 +169,7 @@ final class ComposerFallback implements FallbackInterface
     private function resetSnapshot(): void
     {
         $this->hydratedLock = null;
-        $this->lock = [];
-        $this->lockFile = null;
-        $this->lockFileExisted = false;
         $this->snapshotSaved = false;
-        $this->vendorDir = null;
-        $this->vendorDirExisted = false;
     }
 
     /**

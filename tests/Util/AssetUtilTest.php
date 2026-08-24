@@ -17,6 +17,7 @@ use Symfony\Component\Filesystem\Filesystem;
 
 use function count;
 use function file_put_contents;
+use function ltrim;
 use function realpath;
 use function str_replace;
 
@@ -140,6 +141,21 @@ final class AssetUtilTest extends TestCase
         self::assertEquals($expected, $res);
     }
 
+    public function testFormatPackageIgnoresBranchAliasForTaggedVersion(): void
+    {
+        $package = $this->createMock(PackageInterface::class);
+        $package->expects(self::once())->method('getPrettyVersion')->willReturn('1.2.3');
+        $package
+            ->expects(self::once())
+            ->method('getExtra')
+            ->willReturn(['branch-alias' => ['1.2.3' => '9.9.x-dev']]);
+
+        self::assertSame(
+            ['name' => '@composer-asset/foo--bar', 'version' => '1.2.3'],
+            AssetUtil::formatPackage($package, '@composer-asset/foo--bar', []),
+        );
+    }
+
     public function testFormatPackageStripsExecutableAndUnneededMetadata(): void
     {
         $package = $this->createMock(PackageInterface::class);
@@ -173,6 +189,65 @@ final class AssetUtilTest extends TestCase
         $package->expects(self::once())->method('getName')->willReturn('foo/bar');
 
         self::assertSame('@composer-asset/foo--bar', AssetUtil::getName($package));
+    }
+
+    /**
+     * @throws JsonException
+     */
+    public function testGetPathAcceptsInstallPathWithTrailingSeparator(): void
+    {
+        $installPath = $this->cwd . '/trailing-separator-package';
+        $this->sfs->mkdir($installPath);
+        file_put_contents($installPath . '/package.json', '{}');
+
+        $installationManager = $this->createMock(InstallationManager::class);
+        $installationManager
+            ->expects(self::once())
+            ->method('getInstallPath')
+            ->willReturn($installPath . DIRECTORY_SEPARATOR);
+
+        $assetManager = $this->createMock(AssetManagerInterface::class);
+        $assetManager->expects(self::once())->method('getPackageName')->willReturn('package.json');
+
+        $package = $this->createMock(PackageInterface::class);
+        $package->method('getExtra')->willReturn(['foxy' => true]);
+        $package->method('getRequires')->willReturn([]);
+        $package->method('getDevRequires')->willReturn([]);
+
+        self::assertSame(
+            str_replace('\\', '/', (string) realpath($installPath . '/package.json')),
+            AssetUtil::getPath($installationManager, $assetManager, $package),
+        );
+    }
+
+    /**
+     * @throws JsonException
+     */
+    public function testGetPathAcceptsManifestWithinFilesystemRoot(): void
+    {
+        if ('/' !== DIRECTORY_SEPARATOR) {
+            self::markTestSkipped('This filesystem-root regression is specific to Unix paths.');
+        }
+
+        $manifest = $this->cwd . '/root-install-package.json';
+        file_put_contents($manifest, '{}');
+
+        $installationManager = $this->createMock(InstallationManager::class);
+        $installationManager->expects(self::once())->method('getInstallPath')->willReturn(DIRECTORY_SEPARATOR);
+
+        $assetManager = $this->createMock(AssetManagerInterface::class);
+        $assetManager->expects(self::once())->method('getPackageName')->willReturn(ltrim($manifest, '/'));
+
+        $package = $this->createMock(PackageInterface::class);
+        $package->method('getName')->willReturn('root/package');
+        $package->method('getExtra')->willReturn(['foxy' => true]);
+        $package->method('getRequires')->willReturn([]);
+        $package->method('getDevRequires')->willReturn([]);
+
+        self::assertSame(
+            str_replace('\\', '/', (string) realpath($manifest)),
+            AssetUtil::getPath($installationManager, $assetManager, $package),
+        );
     }
 
     /**
@@ -399,6 +474,14 @@ final class AssetUtilTest extends TestCase
         self::assertStringContainsString($expectedPath, $res);
     }
 
+    public function testHasExtraActivation(): void
+    {
+        $package = $this->createMock(PackageInterface::class);
+        $package->expects(self::once())->method('getExtra')->willReturn(['foxy' => true]);
+
+        self::assertTrue(AssetUtil::hasExtraActivation($package));
+    }
+
     public function testHasNoPluginDependency(): void
     {
         self::assertFalse(
@@ -417,6 +500,17 @@ final class AssetUtilTest extends TestCase
                 ],
             ),
         );
+    }
+
+    public function testIsAsset(): void
+    {
+        $package = $this->createMock(PackageInterface::class);
+        $package->expects(self::once())->method('getName')->willReturn('foo/bar');
+        $package->expects(self::once())->method('getExtra')->willReturn([]);
+        $package->expects(self::once())->method('getRequires')->willReturn([]);
+        $package->expects(self::once())->method('getDevRequires')->willReturn([]);
+
+        self::assertTrue(AssetUtil::isAsset($package, ['foo/bar' => true]));
     }
 
     #[DataProvider('getIsProjectActivationData')]
@@ -456,6 +550,14 @@ final class AssetUtilTest extends TestCase
         $res = AssetUtil::isProjectActivation($package, $enablePackages);
 
         self::assertSame($expected, $res);
+    }
+
+    public function testProjectActivationRejectsStringValueForNamedPattern(): void
+    {
+        $package = $this->createMock(PackageInterface::class);
+        $package->expects(self::once())->method('getName')->willReturn('foo/bar');
+
+        self::assertFalse(AssetUtil::isProjectActivation($package, ['foo/bar' => 'foo/bar']));
     }
 
     protected function setUp(): void

@@ -47,8 +47,7 @@ Explicit selection and a committed native lockfile are recommended for CI.
 Check the following:
 
 1. The package uses one of the documented activation methods.
-2. Its `package.json` exists in the package root or in the directory declared by its own
-   `config.foxy.root-package-json-dir` option.
+2. Its `package.json` exists at the package root or configured Foxy root.
 3. The root application's `enable-packages` configuration does not exclude it.
 4. The selected frontend manager is installed and allowed by its configured version constraint.
 

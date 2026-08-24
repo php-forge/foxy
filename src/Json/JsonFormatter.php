@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace Foxy\Json;
 
+use Composer\Pcre\Preg;
 use JsonException;
 
 use function in_array;
+use function intdiv;
 use function json_decode;
 use function json_encode;
 use function preg_match;
 use function preg_match_all;
-use function preg_replace;
-use function preg_replace_callback;
 use function str_repeat;
 use function str_replace;
 use function strlen;
@@ -45,12 +45,15 @@ final class JsonFormatter
             $json = self::formatInternal($json);
         }
 
-        if (4 !== $indent) {
-            $json = preg_replace_callback(
+        if (self::DEFAULT_INDENT !== $indent) {
+            $json = Preg::replaceCallback(
                 '/^( {4})+/m',
-                static fn(array $match): string => str_repeat(' ', (int) (strlen($match[0]) / 4) * $indent),
+                static fn(array $match): string => str_repeat(
+                    ' ',
+                    intdiv(strlen($match[0]), self::DEFAULT_INDENT) * $indent,
+                ),
                 $json,
-            ) ?? $json;
+            );
         }
 
         return self::replaceArrayByMap($json, $arrayKeys);
@@ -65,7 +68,7 @@ final class JsonFormatter
      */
     public static function getArrayKeys(string $content): array
     {
-        preg_match_all(self::ARRAY_KEYS_REGEX, trim($content), $matches);
+        preg_match_all(self::ARRAY_KEYS_REGEX, $content, $matches);
 
         return $matches[1];
     }
@@ -77,15 +80,11 @@ final class JsonFormatter
      */
     public static function getIndent(string $content): int
     {
-        $indent = self::DEFAULT_INDENT;
-
-        preg_match(self::INDENT_REGEX, trim($content), $matches);
-
-        if (isset($matches[1])) {
-            $indent = strlen($matches[1]);
+        if (1 !== preg_match(self::INDENT_REGEX, trim($content), $matches)) {
+            return self::DEFAULT_INDENT;
         }
 
-        return $indent;
+        return strlen($matches[1]);
     }
 
     /**
@@ -95,7 +94,7 @@ final class JsonFormatter
      */
     public static function getMapKeys(string $content): array
     {
-        preg_match_all(self::MAP_KEYS_REGEX, trim($content), $matches);
+        preg_match_all(self::MAP_KEYS_REGEX, $content, $matches);
 
         return $matches[1];
     }
@@ -133,10 +132,8 @@ final class JsonFormatter
 
         foreach ($matches as $match) {
             if (!in_array($match[1], $arrayKeys, true)) {
-                $replace = preg_replace('/\[\s*]/', '{}', $match[0]);
-                if (null !== $replace) {
-                    $json = str_replace($match[0], $replace, $json);
-                }
+                $replace = Preg::replace('/\[\s*]/', '{}', $match[0]);
+                $json = str_replace($match[0], $replace, $json);
             }
         }
 

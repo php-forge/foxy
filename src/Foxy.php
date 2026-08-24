@@ -42,6 +42,7 @@ final class Foxy implements PluginInterface, EventSubscriberInterface
     ];
 
     private ComposerFallback $composerFallback;
+    private string $composerVersion = Composer::VERSION;
     private Config $config;
 
     /**
@@ -77,7 +78,7 @@ final class Foxy implements PluginInterface, EventSubscriberInterface
      */
     public function activate(Composer $composer, IOInterface $io): void
     {
-        ComposerUtil::validateVersion(self::REQUIRED_COMPOSER_VERSION, Composer::VERSION);
+        ComposerUtil::validateVersion(self::REQUIRED_COMPOSER_VERSION, $this->composerVersion);
 
         $input = ConsoleUtil::getInput($io);
 
@@ -91,7 +92,6 @@ final class Foxy implements PluginInterface, EventSubscriberInterface
         }
 
         $this->assetManager = $this->getAssetManager($io, $this->config, $executor, $fs);
-        $this->config->setResolvedManager($this->assetManager->getName());
         $packageJsonPath = $this->assetManager instanceof AbstractAssetManager
             ? $this->assetManager->getPackageJsonPath()
             : $this->assetManager->getPackageName();

@@ -11,10 +11,12 @@ use PHPForge\Support\LineEndingNormalizer;
 use PHPUnit\Framework\TestCase;
 use Seld\JsonLint\ParsingException;
 use Symfony\Component\Filesystem\Filesystem;
+use UnexpectedValueException;
 use Xepozz\InternalMocker\MockerState;
 
 use function chdir;
 use function file_get_contents;
+use function rtrim;
 
 use const DIRECTORY_SEPARATOR;
 
@@ -23,6 +25,22 @@ final class JsonFileTest extends TestCase
     private string|null $cwd = '';
     private string|null $oldCwd = '';
     private Filesystem|null $sfs = null;
+
+    public function testEncodeUsesCustomOptionsWithoutReformatting(): void
+    {
+        self::assertSame(
+            '{"url":"https://example.com"}',
+            JsonFile::encode(['url' => 'https://example.com'], JSON_UNESCAPED_SLASHES),
+        );
+    }
+
+    public function testEncodeUsesDefaultOptions(): void
+    {
+        self::assertSame(
+            self::fixtureWithoutFinalNewline('encoded-default-four-space.json'),
+            JsonFile::encode(['html' => '<tag>', 'url' => 'https://example.com/é']),
+        );
+    }
 
     public function testGetArrayKeysThrowsWhenFileCannotBeRead(): void
     {
@@ -45,13 +63,7 @@ final class JsonFileTest extends TestCase
     public function testGetArrayKeysWithExistingFile(): void
     {
         $expected = ['contributors'];
-        $content = <<<JSON
-        {
-          "name": "test",
-          "contributors": [],
-          "dependencies": {}
-        }
-        JSON;
+        $content = self::fixture('package-two-space.json');
 
         $filename = './package.json';
 
@@ -75,11 +87,7 @@ final class JsonFileTest extends TestCase
 
     public function testGetIndentWithExistingFile(): void
     {
-        $content = <<<JSON
-        {
-          "name": "test"
-        }
-        JSON;
+        $content = self::fixture('name-two-space.json');
 
         $filename = './package.json';
 
@@ -101,6 +109,43 @@ final class JsonFileTest extends TestCase
     }
 
     /**
+     * @throws Exception|ParsingException
+     */
+    public function testReadCachesOriginalCollectionRepresentations(): void
+    {
+        file_put_contents('./package.json', '{"metadata":{}}');
+
+        $jsonFile = new JsonFile('./package.json');
+        $data = $jsonFile->read();
+
+        file_put_contents('./package.json', '{"metadata":[]}');
+        $jsonFile->write($data);
+
+        self::assertStringContainsString(
+            '"metadata": {}',
+            (string) file_get_contents('./package.json'),
+        );
+    }
+
+    public function testWriteClearsEncodingStateAfterFailure(): void
+    {
+        file_put_contents('./not-a-directory', 'blocked');
+
+        $jsonFile = new JsonFile('./not-a-directory/package.json');
+
+        try {
+            $jsonFile->write(['custom' => []]);
+            self::fail('Expected writing below a file path to fail.');
+        } catch (UnexpectedValueException) {
+        }
+
+        self::assertStringContainsString(
+            '"custom": {}',
+            JsonFile::encode(['custom' => []]),
+        );
+    }
+
+    /**
      * @throws Exception
      */
     public function testWriteEmptyManifestAsObject(): void
@@ -117,19 +162,8 @@ final class JsonFileTest extends TestCase
      */
     public function testWriteForcesFourSpacesIndentWithExistingTwoSpaceFile(): void
     {
-        $expected = <<<JSON
-        {
-            "name": "test",
-            "private": true
-        }
-
-        JSON;
-        $content = <<<'JSON'
-        {
-          "name": "test"
-        }
-
-        JSON;
+        $expected = self::fixture('name-private-four-space.json');
+        $content = self::fixture('name-two-space.json');
 
         $filename = './package.json';
 
@@ -152,6 +186,48 @@ final class JsonFileTest extends TestCase
         self::assertSame(
             LineEndingNormalizer::normalize($expected),
             LineEndingNormalizer::normalize($content),
+        );
+    }
+
+    /**
+     * @throws Exception
+     */
+    public function testWritePreservesAllPackageMapKeysAsObjects(): void
+    {
+        $mapKeys = [
+            'dependencies',
+            'devDependencies',
+            'optionalDependencies',
+            'overrides',
+            'peerDependencies',
+            'peerDependenciesMeta',
+            'resolutions',
+        ];
+        $data = array_fill_keys($mapKeys, []);
+
+        $jsonFile = new JsonFile('./package.json');
+        $jsonFile->write($data);
+
+        $content = (string) file_get_contents('./package.json');
+
+        foreach ($mapKeys as $key) {
+            self::assertStringContainsString(sprintf('"%s": {}', $key), $content);
+        }
+    }
+
+    /**
+     * @throws Exception
+     */
+    public function testWritePreservesCustomMapWithoutPriorRead(): void
+    {
+        file_put_contents('./package.json', '{"metadata":{}}');
+
+        $jsonFile = new JsonFile('./package.json');
+        $jsonFile->write(['metadata' => []]);
+
+        self::assertStringContainsString(
+            '"metadata": {}',
+            (string) file_get_contents('./package.json'),
         );
     }
 
@@ -206,27 +282,26 @@ final class JsonFileTest extends TestCase
     }
 
     /**
+     * @throws Exception
+     */
+    public function testWriteUsesDefaultOptions(): void
+    {
+        $jsonFile = new JsonFile('./package.json');
+        $jsonFile->write(['html' => '<tag>']);
+
+        self::assertStringContainsString(
+            '"html": "<tag>"',
+            (string) file_get_contents('./package.json'),
+        );
+    }
+
+    /**
      * @throws Exception|ParsingException
      */
     public function testWriteWithExistingFile(): void
     {
-        $expected = <<<JSON
-        {
-            "name": "test",
-            "contributors": [],
-            "dependencies": {},
-            "private": true
-        }
-
-        JSON;
-        $content = <<<'JSON'
-        {
-          "name": "test",
-          "contributors": [],
-          "dependencies": {}
-        }
-
-        JSON;
+        $expected = self::fixture('package-private-four-space.json');
+        $content = self::fixture('package-two-space.json');
 
         $filename = './package.json';
 
@@ -257,12 +332,7 @@ final class JsonFileTest extends TestCase
      */
     public function testWriteWithoutFile(): void
     {
-        $expected = <<<JSON
-        {
-            "name": "test"
-        }
-
-        JSON;
+        $expected = self::fixture('name-four-space.json');
 
         $filename = './package.json';
         $data = ['name' => 'test'];
@@ -303,5 +373,15 @@ final class JsonFileTest extends TestCase
         $this->sfs = null;
         $this->oldCwd = null;
         $this->cwd = null;
+    }
+
+    private static function fixture(string $filename): string
+    {
+        return (string) file_get_contents(__DIR__ . '/../Fixtures/Json/' . $filename);
+    }
+
+    private static function fixtureWithoutFinalNewline(string $filename): string
+    {
+        return rtrim(self::fixture($filename), "\r\n");
     }
 }
