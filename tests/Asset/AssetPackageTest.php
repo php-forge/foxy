@@ -182,7 +182,7 @@ final class AssetPackageTest extends TestCase
         $fs
             ->expects(self::once())
             ->method('findShortestPath')
-            ->with('/consumer', '/asset/foo', true, true)
+            ->with('/consumer', DIRECTORY_SEPARATOR . 'asset/foo', true, true)
             ->willReturn($relativePath);
 
         MockerState::addCondition('Foxy\\Asset', 'getcwd', [], DIRECTORY_SEPARATOR);

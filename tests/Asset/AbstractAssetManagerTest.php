@@ -20,7 +20,9 @@ use Xepozz\InternalMocker\MockerState;
 
 use function chdir;
 use function define;
+use function defined;
 use function getcwd;
+use function str_replace;
 
 use const DIRECTORY_SEPARATOR;
 
@@ -65,7 +67,9 @@ final class AbstractAssetManagerTest extends TestCase
     #[PreserveGlobalState(false)]
     public function testBuildCommandNormalizesWindowsBinaryPath(): void
     {
-        define('PHP_WINDOWS_VERSION_BUILD', 1);
+        if (!defined('PHP_WINDOWS_VERSION_BUILD')) {
+            define('PHP_WINDOWS_VERSION_BUILD', 1);
+        }
 
         $this->config = new Config(['manager-bin' => 'C:/tools/inspectable.exe']);
 
@@ -86,7 +90,7 @@ final class AbstractAssetManagerTest extends TestCase
         );
 
         self::assertSame(
-            'custom/bin install --global --local',
+            str_replace('/', DIRECTORY_SEPARATOR, 'custom/bin') . ' install --global --local',
             $this->createManager()->buildCommandForTest('inspectable', 'install', 'install'),
         );
     }

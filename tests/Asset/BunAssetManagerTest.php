@@ -10,6 +10,7 @@ use Foxy\Config\Config;
 use PHPUnit\Framework\Attributes\{PreserveGlobalState, RunInSeparateProcess};
 
 use function define;
+use function defined;
 use function file_put_contents;
 
 final class BunAssetManagerTest extends AssetManager
@@ -37,7 +38,9 @@ final class BunAssetManagerTest extends AssetManager
     #[PreserveGlobalState(false)]
     public function testWindowsCommandsUseExecutableNameAndNormalizedCustomPath(): void
     {
-        define('PHP_WINDOWS_VERSION_BUILD', 1);
+        if (!defined('PHP_WINDOWS_VERSION_BUILD')) {
+            define('PHP_WINDOWS_VERSION_BUILD', 1);
+        }
 
         $this->executor->addExpectedValues(0, '1.0.0');
         $this->manager = $this->getManager();

@@ -139,8 +139,12 @@ final readonly class Solver implements SolverInterface
             );
         }
 
+        if ([] === $suffix) {
+            return $this->fs->normalizePath($resolvedPath);
+        }
+
         return $this->fs->normalizePath(
-            rtrim($resolvedPath, '/\\') . ([] === $suffix ? '' : '/' . implode('/', $suffix)),
+            rtrim($resolvedPath, '/\\') . '/' . implode('/', $suffix),
         );
     }
 
@@ -351,7 +355,7 @@ final readonly class Solver implements SolverInterface
         $vendorDir = $this->canonicalizePath($vendorDir, $projectDir);
         $assetDirPrefix = str_ends_with($assetDir, '/') ? $assetDir : "{$assetDir}/";
 
-        if (dirname($assetDir) === $assetDir) {
+        if ($this->fs->normalizePath(dirname($assetDir)) === $assetDir) {
             throw new RuntimeException(
                 'The Composer asset directory must not be a filesystem root.',
             );

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Foxy\Tests\Fallback;
 
 use Composer\Composer;
-use Composer\EventDispatcher\EventDispatcher;
 use Composer\Filter\PlatformRequirementFilter\PlatformRequirementFilterInterface;
 use Composer\Installer;
 use Composer\Installer\InstallationManager;
@@ -764,8 +763,6 @@ final class ComposerFallbackTest extends TestCase
             ->method('getOption')
             ->willReturnCallback($optionCallback);
 
-        $eventDispatcher = $this->createMock(EventDispatcher::class);
-        $eventDispatcher->expects(self::never())->method('setRunScripts');
         $this->composer->expects(self::never())->method('getEventDispatcher');
 
         $repositoryManager = $this->createMock(RepositoryManager::class);

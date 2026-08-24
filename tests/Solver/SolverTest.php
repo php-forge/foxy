@@ -29,6 +29,9 @@ use ReflectionClass;
 use function chdir;
 use function dirname;
 use function file_put_contents;
+use function realpath;
+use function rtrim;
+use function substr;
 
 use const DIRECTORY_SEPARATOR;
 
@@ -58,12 +61,13 @@ class SolverTest extends TestCase
 
     public function testCanonicalizePathPreservesSingleFilesystemRootSeparator(): void
     {
+        $root = $this->getFilesystemRoot();
         $relativePath = uniqid('foxy_nonexistent_path_', true);
-        $path = DIRECTORY_SEPARATOR . $relativePath;
+        $path = $root . $relativePath;
         $method = (new ReflectionClass(Solver::class))->getMethod('canonicalizePath');
 
-        self::assertSame($path, $method->invoke($this->solver, $path, DIRECTORY_SEPARATOR));
-        self::assertSame($path, $method->invoke($this->solver, $relativePath, DIRECTORY_SEPARATOR));
+        self::assertSame($path, $method->invoke($this->solver, $path, $root));
+        self::assertSame($path, $method->invoke($this->solver, $relativePath, $root));
     }
 
     public function testIntegerOneEnablesSolver(): void
@@ -115,7 +119,7 @@ class SolverTest extends TestCase
 
         $this->im->expects(self::once())->method('getInstallPath')->willReturn($requirePackagePath);
         $this->manager->expects(self::exactly(2))->method('getPackageName')->willReturn('package.json');
-        $mockPackageFilename = $this->cwd . '/composer-asset-dir/foo/bar/package.json';
+        $mockPackageFilename = $this->getCanonicalPath('/composer-asset-dir/foo/bar/package.json');
 
         $this->manager
             ->expects(self::once())
@@ -160,7 +164,7 @@ class SolverTest extends TestCase
         $fs
             ->expects(self::once())
             ->method('remove')
-            ->with($assetDir)
+            ->with($this->getCanonicalPath('/already-removed-assets'))
             ->willReturnCallback(function (string $path): bool {
                 $this->sfs->remove($path);
 
@@ -252,6 +256,7 @@ class SolverTest extends TestCase
         $this->addInstalledPackages();
 
         $assetDir = $this->cwd . '/composer-asset-dir';
+        $canonicalAssetDir = $this->getCanonicalPath('/composer-asset-dir');
         $observedEvents = [];
         $this->dispatcher = $this->createMock(EventDispatcher::class);
         $this->dispatcher
@@ -295,9 +300,9 @@ class SolverTest extends TestCase
 
         self::assertSame(
             [
-                [FoxyEvents::PRE_SOLVE, $assetDir, []],
-                [FoxyEvents::GET_ASSETS, $assetDir, []],
-                [FoxyEvents::POST_SOLVE, $assetDir, [], 0],
+                [FoxyEvents::PRE_SOLVE, $canonicalAssetDir, []],
+                [FoxyEvents::GET_ASSETS, $canonicalAssetDir, []],
+                [FoxyEvents::POST_SOLVE, $canonicalAssetDir, [], 0],
             ],
             $observedEvents,
         );
@@ -355,7 +360,11 @@ class SolverTest extends TestCase
         file_put_contents($assetDir . '/.foxy-managed', 'marker');
 
         $fs = $this->getMockBuilder(Filesystem::class)->onlyMethods(['remove'])->getMock();
-        $fs->expects(self::once())->method('remove')->with($assetDir)->willReturn(true);
+        $fs
+            ->expects(self::once())
+            ->method('remove')
+            ->with($this->getCanonicalPath('/reported-removed-assets'))
+            ->willReturn(true);
 
         $solver = new Solver(
             $this->manager,
@@ -399,9 +408,10 @@ class SolverTest extends TestCase
 
     public function testSolveRejectsFilesystemRootAsAssetDirectory(): void
     {
+        $root = $this->getFilesystemRoot();
         $solver = new Solver(
             $this->manager,
-            new Config(['enabled' => true, 'composer-asset-dir' => DIRECTORY_SEPARATOR]),
+            new Config(['enabled' => true, 'composer-asset-dir' => $root]),
             $this->fs,
             $this->composerFallback,
         );
@@ -790,5 +800,23 @@ class SolverTest extends TestCase
     private function addInstalledPackages(array $packages = []): void
     {
         $this->localRepo->expects(self::any())->method('getCanonicalPackages')->willReturn($packages);
+    }
+
+    private function getCanonicalPath(string $suffix = ''): string
+    {
+        $cwd = realpath((string) $this->cwd);
+
+        if (false === $cwd) {
+            self::fail('Unable to resolve the test working directory.');
+        }
+
+        return $this->fs->normalizePath(rtrim($cwd, '/\\') . $suffix);
+    }
+
+    private function getFilesystemRoot(): string
+    {
+        return '\\' === DIRECTORY_SEPARATOR
+            ? substr($this->getCanonicalPath(), 0, 3)
+            : DIRECTORY_SEPARATOR;
     }
 }
