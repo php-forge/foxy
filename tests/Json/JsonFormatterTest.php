@@ -5,15 +5,15 @@ declare(strict_types=1);
 namespace Foxy\Tests\Json;
 
 use Foxy\Json\JsonFormatter;
+use Foxy\Tests\Support\JsonFixture;
 use JsonException;
 use PHPForge\Support\LineEndingNormalizer;
 use PHPUnit\Framework\TestCase;
 
-use function file_get_contents;
-use function rtrim;
-
 final class JsonFormatterTest extends TestCase
 {
+    use JsonFixture;
+
     /**
      * @throws JsonException
      */
@@ -134,15 +134,5 @@ final class JsonFormatterTest extends TestCase
             '"value": "left    right"',
             JsonFormatter::format('{"value":"left    right"}', [], 2),
         );
-    }
-
-    private static function fixture(string $filename): string
-    {
-        return (string) file_get_contents(__DIR__ . '/../Fixtures/Json/' . $filename);
-    }
-
-    private static function fixtureWithoutFinalNewline(string $filename): string
-    {
-        return rtrim(self::fixture($filename), "\r\n");
     }
 }

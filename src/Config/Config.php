@@ -72,6 +72,18 @@ class Config
     }
 
     /**
+     * Check whether a configuration flag is enabled.
+     *
+     * @param string $key The config key.
+     */
+    public function isEnabled(string $key): bool
+    {
+        $value = $this->get($key);
+
+        return true === $value || 1 === $value || '1' === $value;
+    }
+
+    /**
      * Set the manager selected during automatic discovery.
      */
     public function setResolvedManager(string $manager): void

@@ -14,6 +14,7 @@ use JsonException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
+use Xepozz\InternalMocker\MockerState;
 
 use function count;
 use function file_put_contents;
@@ -309,6 +310,25 @@ final class AssetUtilTest extends TestCase
         AssetUtil::getPath($installationManager, $assetManager, $package);
     }
 
+    public function testGetPathRejectsMissingInstallDirectory(): void
+    {
+        $installationManager = $this->createMock(InstallationManager::class);
+        $installationManager
+            ->expects(self::once())
+            ->method('getInstallPath')
+            ->willReturn($this->cwd . '/missing');
+
+        $assetManager = $this->createMock(AssetManagerInterface::class);
+        $assetManager->expects(self::never())->method('getPackageName');
+
+        $package = $this->createMock(PackageInterface::class);
+        $package->method('getExtra')->willReturn(['foxy' => true]);
+        $package->method('getRequires')->willReturn([]);
+        $package->method('getDevRequires')->willReturn([]);
+
+        self::assertNull(AssetUtil::getPath($installationManager, $assetManager, $package));
+    }
+
     /**
      * @throws JsonException
      */
@@ -336,6 +356,38 @@ final class AssetUtilTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('escapes its Composer install directory');
+
+        AssetUtil::getPath($installationManager, $assetManager, $package);
+    }
+
+    public function testGetPathThrowsWhenComposerMetadataCannotBeRead(): void
+    {
+        $installPath = $this->cwd . '/unreadable-composer-package';
+        $composerJsonPath = $installPath . '/composer.json';
+
+        $this->sfs->mkdir($installPath);
+        file_put_contents($composerJsonPath, '{}');
+
+        $installationManager = $this->createMock(InstallationManager::class);
+        $installationManager->expects(self::once())->method('getInstallPath')->willReturn($installPath);
+
+        $assetManager = $this->createMock(AssetManagerInterface::class);
+        $assetManager->expects(self::once())->method('getPackageName')->willReturn('package.json');
+
+        $package = $this->createMock(PackageInterface::class);
+        $package->method('getExtra')->willReturn(['foxy' => true]);
+        $package->method('getRequires')->willReturn([]);
+        $package->method('getDevRequires')->willReturn([]);
+
+        MockerState::addCondition(
+            'Foxy\\Util',
+            'file_get_contents',
+            [$composerJsonPath, false, null, 0, null],
+            false,
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Unable to read Composer package file');
 
         AssetUtil::getPath($installationManager, $assetManager, $package);
     }

@@ -73,6 +73,21 @@ final class ConfigTest extends TestCase
         ];
     }
 
+    public static function getEnabledData(): array
+    {
+        return [
+            'boolean true' => [true, true],
+            'integer one' => [1, true],
+            'string one' => ['1', true],
+            'boolean false' => [false, false],
+            'integer zero' => [0, false],
+            'string zero' => ['0', false],
+            'other integer' => [2, false],
+            'other string' => ['true', false],
+            'null' => [null, false],
+        ];
+    }
+
     /**
      * @throws ParsingException
      */
@@ -254,6 +269,14 @@ final class ConfigTest extends TestCase
         }
 
         throw $ex;
+    }
+
+    #[DataProvider('getEnabledData')]
+    public function testIsEnabled(mixed $value, bool $expected): void
+    {
+        $config = new FoxyConfig(['feature' => $value]);
+
+        self::assertSame($expected, $config->isEnabled('feature'));
     }
 
     public function testResolvedManagerSelectsManagerSpecificDefaults(): void

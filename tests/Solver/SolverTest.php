@@ -25,6 +25,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
+use Xepozz\InternalMocker\MockerState;
 
 use function chdir;
 use function dirname;
@@ -70,6 +71,65 @@ class SolverTest extends TestCase
         self::assertSame($path, $method->invoke($this->solver, $relativePath, $root));
     }
 
+    public function testCanonicalizePathStopsAtFilesystemRootWhenExistenceCheckFails(): void
+    {
+        $root = $this->getFilesystemRoot();
+
+        MockerState::addCondition('Foxy\\Solver', 'file_exists', [$root], false);
+        MockerState::addCondition('Foxy\\Solver', 'is_link', [$root], false);
+
+        self::assertSame(
+            $root,
+            $this->invokeSolverMethod('canonicalizePath', $root, $root),
+        );
+    }
+
+    public function testGetMockPackagePathRejectsCopyFailure(): void
+    {
+        $assetDir = $this->cwd . '/copy-failure-assets';
+        $source = $this->cwd . '/source-package.json';
+        $target = $assetDir . '/foo/bar/source-package.json';
+        $package = $this->createMock(PackageInterface::class);
+        $package->method('getName')->willReturn('foo/bar');
+        file_put_contents($source, '{}');
+
+        $fs = $this->getMockBuilder(Filesystem::class)->onlyMethods(['copy'])->getMock();
+        $fs->expects(self::once())->method('copy')->with($source, $target)->willReturn(false);
+        $solver = new Solver($this->manager, $this->config, $fs, $this->composerFallback);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(sprintf('Unable to copy asset manifest "%s".', $source));
+
+        $this->invokeSolverMethodOn($solver, 'getMockPackagePath', $package, $assetDir, $source);
+    }
+
+    public function testGetMockPackagePathWrapsDirectoryCreationFailure(): void
+    {
+        $assetDir = $this->cwd . '/directory-failure-assets';
+        $source = $this->cwd . '/source-package.json';
+        $packagePath = $assetDir . '/foo/bar';
+        $package = $this->createMock(PackageInterface::class);
+        $package->method('getName')->willReturn('foo/bar');
+        file_put_contents($source, '{}');
+
+        $failure = new \RuntimeException('Directory creation failed.');
+        $fs = $this->getMockBuilder(Filesystem::class)->onlyMethods(['ensureDirectoryExists'])->getMock();
+        $fs
+            ->expects(self::once())
+            ->method('ensureDirectoryExists')
+            ->with($packagePath)
+            ->willThrowException($failure);
+        $solver = new Solver($this->manager, $this->config, $fs, $this->composerFallback);
+
+        try {
+            $this->invokeSolverMethodOn($solver, 'getMockPackagePath', $package, $assetDir, $source);
+            self::fail('Expected directory creation to fail.');
+        } catch (RuntimeException $exception) {
+            self::assertSame(sprintf('Unable to create asset directory "%s".', $packagePath), $exception->getMessage());
+            self::assertSame($failure, $exception->getPrevious());
+        }
+    }
+
     public function testIntegerOneEnablesSolver(): void
     {
         $this->addInstalledPackages();
@@ -87,6 +147,83 @@ class SolverTest extends TestCase
         $solver->solve($this->composer, $this->io);
 
         self::assertFileExists($assetDir . '/.foxy-managed');
+    }
+
+    public function testPrepareAssetDirectoryRejectsSymbolicLinkRace(): void
+    {
+        $assetDir = $this->cwd . '/late-symlink-assets';
+
+        MockerState::addCondition('Foxy\\Solver', 'is_link', [$assetDir], true);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('must not be a symbolic link');
+
+        $this->invokeSolverMethod('prepareAssetDirectory', $assetDir, $this->vendorDir);
+    }
+
+    public function testPrepareAssetDirectoryThrowsWhenDirectoryCannotBeInspected(): void
+    {
+        $assetDir = $this->cwd . '/unreadable-assets';
+        $this->sfs->mkdir($assetDir);
+
+        MockerState::addCondition('Foxy\\Solver', 'scandir', [$assetDir, SCANDIR_SORT_ASCENDING, null], false);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Unable to inspect Composer asset directory');
+
+        $this->invokeSolverMethod('prepareAssetDirectory', $assetDir, $this->vendorDir);
+    }
+
+    public function testPrepareAssetDirectoryThrowsWhenMarkerCannotBeWritten(): void
+    {
+        $assetDir = $this->cwd . '/marker-failure-assets';
+        $marker = $assetDir . '/.foxy-managed';
+
+        MockerState::addCondition(
+            'Foxy\\Solver',
+            'file_put_contents',
+            [$marker, "Managed by php-forge/foxy.\n", 0, null],
+            false,
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Unable to mark Composer asset directory');
+
+        $this->invokeSolverMethod('prepareAssetDirectory', $assetDir, $this->vendorDir);
+    }
+
+    public function testPrepareAssetDirectoryThrowsWhenProjectDirectoryIsUnavailable(): void
+    {
+        MockerState::addCondition('Foxy\\Solver', 'getcwd', [], false);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Unable to get the current working directory.');
+
+        $this->invokeSolverMethod('prepareAssetDirectory', $this->cwd . '/assets', $this->vendorDir);
+    }
+
+    public function testPrepareAssetDirectoryWrapsDirectoryCreationFailure(): void
+    {
+        $assetDir = $this->cwd . '/creation-failure-assets';
+        $failure = new \RuntimeException('Directory creation failed.');
+        $fs = $this->getMockBuilder(Filesystem::class)->onlyMethods(['ensureDirectoryExists'])->getMock();
+        $fs
+            ->expects(self::once())
+            ->method('ensureDirectoryExists')
+            ->with($assetDir)
+            ->willThrowException($failure);
+        $solver = new Solver($this->manager, $this->config, $fs, $this->composerFallback);
+
+        try {
+            $this->invokeSolverMethodOn($solver, 'prepareAssetDirectory', $assetDir, $this->vendorDir);
+            self::fail('Expected directory creation to fail.');
+        } catch (RuntimeException $exception) {
+            self::assertSame(
+                sprintf('Unable to create Composer asset directory "%s".', $assetDir),
+                $exception->getMessage(),
+            );
+            self::assertSame($failure, $exception->getPrevious());
+        }
     }
 
     public function testSetUpdatable(): void
@@ -425,6 +562,24 @@ class SolverTest extends TestCase
         $solver->solve($this->composer, $this->io);
     }
 
+    public function testSolveRejectsNonStringAssetDirectory(): void
+    {
+        $solver = new Solver(
+            $this->manager,
+            new Config(['enabled' => true, 'composer-asset-dir' => []]),
+            $this->fs,
+            $this->composerFallback,
+        );
+
+        $this->manager->expects(self::never())->method('addDependencies');
+        $this->composerFallback->expects(self::once())->method('restore');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('The Composer asset directory must be a string.');
+
+        $solver->solve($this->composer, $this->io);
+    }
+
     public function testSolveRejectsProjectRootAsAssetDirectory(): void
     {
         $this->vendorDir = $this->cwd . '-vendor';
@@ -714,6 +869,16 @@ class SolverTest extends TestCase
         $solver->solve($this->composer, $this->io);
     }
 
+    public function testValidateAssetDirectoryThrowsWhenProjectDirectoryIsUnavailable(): void
+    {
+        MockerState::addCondition('Foxy\\Solver', 'getcwd', [], false);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Unable to get the current working directory.');
+
+        $this->invokeSolverMethod('validateAssetDirectory', $this->cwd . '/assets', $this->vendorDir);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -818,5 +983,15 @@ class SolverTest extends TestCase
         return '\\' === DIRECTORY_SEPARATOR
             ? substr($this->getCanonicalPath(), 0, 3)
             : DIRECTORY_SEPARATOR;
+    }
+
+    private function invokeSolverMethod(string $method, mixed ...$arguments): mixed
+    {
+        return $this->invokeSolverMethodOn($this->solver, $method, ...$arguments);
+    }
+
+    private function invokeSolverMethodOn(SolverInterface $solver, string $method, mixed ...$arguments): mixed
+    {
+        return (new ReflectionClass($solver))->getMethod($method)->invoke($solver, ...$arguments);
     }
 }

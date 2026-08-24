@@ -556,6 +556,35 @@ final class ComposerFallbackTest extends TestCase
         self::assertTrue($filter->isIgnored('ext-json'));
     }
 
+    public function testRestoreWrapsRemoveException(): void
+    {
+        $this->setupNoLockEnvironment();
+        $this->composerFallback->save();
+
+        file_put_contents($this->cwd . '/composer.lock', '{}');
+
+        $failure = new \RuntimeException('Remove failed.');
+        $this->fs
+            ->expects(self::once())
+            ->method('remove')
+            ->with('./composer.lock')
+            ->willThrowException($failure);
+        $this->installer->expects(self::never())->method('setRunScripts');
+        $this->installer->expects(self::never())->method('run');
+
+        try {
+            $this->composerFallback->restore();
+            self::fail('Expected the remove exception to be wrapped.');
+        } catch (RuntimeException $exception) {
+            self::assertSame(
+                'Unable to remove Composer fallback path "./composer.lock".',
+                $exception->getMessage(),
+            );
+            self::assertSame(0, $exception->getCode());
+            self::assertSame($failure, $exception->getPrevious());
+        }
+    }
+
     /**
      * @throws JsonException
      */

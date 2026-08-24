@@ -133,9 +133,7 @@ final class Foxy implements PluginInterface, EventSubscriberInterface
             $this->assetFallback->save();
             $this->composerFallback->save();
 
-            $runAssetManager = $this->config->get('run-asset-manager');
-
-            if (true === $runAssetManager || 1 === $runAssetManager || '1' === $runAssetManager) {
+            if ($this->config->isEnabled('run-asset-manager')) {
                 $this->assetManager->validate();
             }
         }
@@ -212,8 +210,6 @@ final class Foxy implements PluginInterface, EventSubscriberInterface
      */
     private function isEnabled(): bool
     {
-        $enabled = $this->config->get('enabled');
-
-        return true === $enabled || 1 === $enabled || '1' === $enabled;
+        return $this->config->isEnabled('enabled');
     }
 }

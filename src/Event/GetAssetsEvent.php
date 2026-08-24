@@ -23,13 +23,7 @@ final class GetAssetsEvent extends AbstractSolveEvent
      * Add the asset package.
      *
      * @param string $name The asset package name.
-     * @param string $path A project-relative package manifest path or a ready `file:` directory reference.
-     *
-     * Example:
-     *
-     * For the Composer package `foo/bar`.
-     *
-     * $event->addAsset('@composer-asset/foo--bar', 'vendor/foo/bar/package.json');
+     * @param string $path An absolute package manifest path or a ready `file:` directory reference.
      */
     public function addAsset(string $name, string $path): self
     {

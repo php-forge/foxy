@@ -257,6 +257,35 @@ final class AssetFallbackTest extends TestCase
         self::assertFileExists($this->cwd . '/package.json');
     }
 
+    public function testRestoreWrapsWriteException(): void
+    {
+        $content = '{}';
+        $path = $this->cwd . '/package.json';
+        $failure = new \RuntimeException('Write failed.');
+
+        file_put_contents($path, $content);
+        $this->assetFallback->save();
+        file_put_contents($path, '{"current":true}');
+
+        $this->io->expects(self::once())->method('write');
+        MockerState::addCondition(
+            'Foxy\\Fallback',
+            'file_put_contents',
+            ['package.json', $content, 0, null],
+            static fn(): never => throw $failure,
+        );
+
+        try {
+            $this->assetFallback->restore();
+            self::fail('Expected the write exception to be wrapped.');
+        } catch (RuntimeException $exception) {
+            self::assertSame('Unable to write fallback asset file "package.json".', $exception->getMessage());
+            self::assertSame(0, $exception->getCode());
+            self::assertSame($failure, $exception->getPrevious());
+            self::assertSame('{"current":true}', file_get_contents($path));
+        }
+    }
+
     #[DataProvider('getSaveData')]
     public function testSave(bool $withPackageFile): void
     {

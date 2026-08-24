@@ -22,16 +22,13 @@ use Throwable;
 use function array_diff;
 use function array_unshift;
 use function basename;
-use function copy;
 use function dirname;
 use function implode;
 use function is_dir;
 use function is_file;
-use function is_link;
 use function is_string;
 use function realpath;
 use function rtrim;
-use function scandir;
 use function sprintf;
 use function str_ends_with;
 use function str_starts_with;
@@ -190,16 +187,15 @@ final readonly class Solver implements SolverInterface
      * @param string $assetDir The asset directory.
      * @param string $filename The filename of asset package.
      *
-     * @psalm-return string[] The package name and the relative package path from the current directory
+     * @throws Exception if the asset package cannot be copied or written.
      *
-     * @throws Exception
+     * @return array{0: string, 1: string} The package name and absolute generated manifest path.
      */
     private function getMockPackagePath(PackageInterface $package, string $assetDir, string $filename): array
     {
         $packageName = AssetUtil::getName($package);
 
-        $packagePath = $assetDir . '/' . $package->getName();
-
+        $packagePath = "{$assetDir}/" . $package->getName();
         $newFilename = "{$packagePath}/" . basename($filename);
 
         try {
@@ -212,7 +208,7 @@ final readonly class Solver implements SolverInterface
             );
         }
 
-        if (!copy($filename, $newFilename)) {
+        if (!$this->fs->copy($filename, $newFilename)) {
             throw new RuntimeException(
                 sprintf('Unable to copy asset manifest "%s".', $filename),
             );

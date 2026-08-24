@@ -41,6 +41,12 @@ final class JsonFile extends \Composer\Json\JsonFile
 
     private bool $parsed = false;
 
+    /**
+     * Encode package manifest data as JSON.
+     *
+     * Empty root arrays are encoded as objects because package manifests must have an object root.
+     * The `$indent` argument is retained for Composer compatibility; Foxy always uses four spaces.
+     */
     public static function encode(
         mixed $data,
         int $options = self::DEFAULT_OPTIONS,

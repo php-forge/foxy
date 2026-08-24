@@ -15,12 +15,14 @@ use Foxy\Tests\Fixtures\Util\ProcessExecutorMock;
 use PHPUnit\Framework\Attributes\{DataProvider, PreserveGlobalState, RunInSeparateProcess};
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Seld\JsonLint\ParsingException;
 use Symfony\Component\Filesystem\Filesystem as SymfonyFilesystem;
 use Xepozz\InternalMocker\MockerState;
 
 use function chdir;
 use function define;
 use function defined;
+use function file_put_contents;
 use function getcwd;
 use function str_replace;
 
@@ -61,6 +63,32 @@ final class AbstractAssetManagerTest extends TestCase
         );
 
         self::assertSame([], $manager->getHandledDependencies());
+    }
+
+    public function testAddDependenciesPropagatesFailureWithoutFallback(): void
+    {
+        file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'package.json', 'invalid json');
+
+        $manager = new InspectableAssetManager(
+            $this->io,
+            $this->config,
+            $this->executor,
+            $this->fs,
+        );
+
+        $this->expectException(ParsingException::class);
+
+        $manager->addDependencies($this->rootPackage, []);
+    }
+
+    public function testAddDependenciesRestoresFallbackAfterFailure(): void
+    {
+        file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'package.json', 'invalid json');
+
+        $this->fallback->expects(self::once())->method('restore');
+        $this->expectException(ParsingException::class);
+
+        $this->createManager()->addDependencies($this->rootPackage, []);
     }
 
     #[RunInSeparateProcess]
@@ -153,6 +181,13 @@ final class AbstractAssetManagerTest extends TestCase
         $this->config = new Config([], ['root-package-json-dir' => $this->cwd . '///']);
 
         self::assertSame($this->cwd, $this->createManager()->getRootPackageDirForTest());
+    }
+
+    public function testRootPackageDirectoryRestoresDriveRootSeparator(): void
+    {
+        $this->config = new Config([], ['root-package-json-dir' => 'C:']);
+
+        self::assertSame('C:' . DIRECTORY_SEPARATOR, $this->createManager()->getRootPackageDirForTest());
     }
 
     public function testRootPackageDirectoryTrimsCurrentDirectorySeparator(): void

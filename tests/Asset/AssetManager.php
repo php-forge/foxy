@@ -49,6 +49,14 @@ abstract class AssetManager extends TestCase
 
     abstract protected function getValidVersionCommand(): string;
 
+    public static function getEnabledRunAssetManagerData(): array
+    {
+        return [
+            'integer one' => [1],
+            'string one' => ['1'],
+        ];
+    }
+
     public static function getRunData(): array
     {
         return [[0, 'install'], [0, 'update'], [1, 'install'], [1, 'update'], [-1, 'install'], [-1, 'update']];
@@ -584,6 +592,24 @@ abstract class AssetManager extends TestCase
                 $this->executor->getLastOutput(),
             );
         }
+    }
+
+    #[DataProvider('getEnabledRunAssetManagerData')]
+    public function testRunWithCompatibleEnabledOption(int|string $value): void
+    {
+        $this->actionForTestRunForInstallCommand('install');
+
+        $this->config = new Config([], ['run-asset-manager' => $value]);
+        $this->manager = $this->getManager();
+
+        $this->io
+            ->expects(self::once())
+            ->method('write')
+            ->with(sprintf('<info>Installing %s dependencies</info>', $this->getValidName()));
+        $this->executor->addExpectedValues(0, 'ASSET MANAGER OUTPUT');
+
+        self::assertSame(0, $this->manager->run());
+        self::assertSame($this->getValidInstallCommand(), $this->executor->getLastCommand());
     }
 
     public function testRunWithDisableOption(): void

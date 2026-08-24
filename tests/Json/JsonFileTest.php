@@ -7,6 +7,7 @@ namespace Foxy\Tests\Json;
 use Exception;
 use Foxy\Exception\RuntimeException;
 use Foxy\Json\JsonFile;
+use Foxy\Tests\Support\JsonFixture;
 use PHPForge\Support\LineEndingNormalizer;
 use PHPUnit\Framework\TestCase;
 use Seld\JsonLint\ParsingException;
@@ -16,15 +17,30 @@ use Xepozz\InternalMocker\MockerState;
 
 use function chdir;
 use function file_get_contents;
-use function rtrim;
 
 use const DIRECTORY_SEPARATOR;
 
 final class JsonFileTest extends TestCase
 {
+    use JsonFixture;
+
     private string|null $cwd = '';
     private string|null $oldCwd = '';
     private Filesystem|null $sfs = null;
+
+    /**
+     * @throws Exception
+     */
+    public function testEncodeAndWriteEmptyManifestAsObject(): void
+    {
+        self::assertSame('{}', JsonFile::encode([]));
+
+        $jsonFile = new JsonFile('./empty-package.json');
+
+        $jsonFile->write([]);
+
+        self::assertSame("{}\n", file_get_contents('./empty-package.json'));
+    }
 
     public function testEncodeUsesCustomOptionsWithoutReformatting(): void
     {
@@ -143,18 +159,6 @@ final class JsonFileTest extends TestCase
             '"custom": {}',
             JsonFile::encode(['custom' => []]),
         );
-    }
-
-    /**
-     * @throws Exception
-     */
-    public function testWriteEmptyManifestAsObject(): void
-    {
-        $jsonFile = new JsonFile('./empty-package.json');
-
-        $jsonFile->write([]);
-
-        self::assertSame("{}\n", file_get_contents('./empty-package.json'));
     }
 
     /**
@@ -373,15 +377,5 @@ final class JsonFileTest extends TestCase
         $this->sfs = null;
         $this->oldCwd = null;
         $this->cwd = null;
-    }
-
-    private static function fixture(string $filename): string
-    {
-        return (string) file_get_contents(__DIR__ . '/../Fixtures/Json/' . $filename);
-    }
-
-    private static function fixtureWithoutFinalNewline(string $filename): string
-    {
-        return rtrim(self::fixture($filename), "\r\n");
     }
 }

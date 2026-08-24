@@ -126,7 +126,7 @@ abstract class AbstractAssetManager implements AssetManagerInterface
 
     public function run(): int
     {
-        if (true !== $this->config->get('run-asset-manager')) {
+        if (!$this->config->isEnabled('run-asset-manager')) {
             return 0;
         }
 

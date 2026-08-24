@@ -17,4 +17,9 @@ $stubs['file_put_contents'] = [
     'arguments' => '$filename, $data, $flags, $context',
 ];
 
+$stubs['scandir'] = [
+    'signatureArguments' => 'string $directory, int $sorting_order = SCANDIR_SORT_ASCENDING, $context = null',
+    'arguments' => '$directory, $sorting_order, $context',
+];
+
 return $stubs;

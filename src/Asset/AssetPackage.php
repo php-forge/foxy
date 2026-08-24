@@ -59,6 +59,7 @@ final class AssetPackage implements AssetPackageInterface
     public function addNewDependencies(array $dependencies): array
     {
         $installedAssets = $this->getInstalledDependencies();
+
         $existingPackages = [];
 
         /**
@@ -109,6 +110,7 @@ final class AssetPackage implements AssetPackageInterface
     public function removeUnusedDependencies(array $dependencies): self
     {
         $installedAssets = $this->getInstalledDependencies();
+
         $removeDependencies = array_diff_key($installedAssets, $dependencies);
 
         foreach ($removeDependencies as $dependency => $version) {
@@ -176,7 +178,7 @@ final class AssetPackage implements AssetPackageInterface
         $consumerPath = $this->jsonFile->getPath();
         $consumerPath = $this->fs->isAbsolutePath($consumerPath)
             ? $consumerPath
-            : rtrim($currentDirectory, '/\\') . DIRECTORY_SEPARATOR . $consumerPath;
+            : $currentDirectory . DIRECTORY_SEPARATOR . $consumerPath;
         $relativePath = $this->fs->findShortestPath(
             dirname($consumerPath),
             dirname($manifestPath),
@@ -186,10 +188,10 @@ final class AssetPackage implements AssetPackageInterface
         $relativePath = str_replace('\\', '/', $relativePath);
 
         if (!$this->fs->isAbsolutePath($relativePath) && !str_starts_with($relativePath, '.')) {
-            $relativePath = './' . $relativePath;
+            $relativePath = "./{$relativePath}";
         }
 
-        return 'file:' . $relativePath;
+        return "file:{$relativePath}";
     }
 
     /**
