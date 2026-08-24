@@ -6,20 +6,28 @@ namespace Foxy\Asset;
 
 use Composer\Json\JsonFile;
 use Composer\Package\RootPackageInterface;
+use Composer\Util\Filesystem;
 use Exception;
+use Foxy\Exception\RuntimeException;
 use Seld\JsonLint\ParsingException;
 
+use function array_diff_key;
 use function count;
 use function dirname;
 use function is_array;
+use function rtrim;
+use function str_replace;
+use function str_starts_with;
+
+use const DIRECTORY_SEPARATOR;
 
 final class AssetPackage implements AssetPackageInterface
 {
-    public const COMPOSER_PREFIX = '@composer-asset/';
+    public const string COMPOSER_PREFIX = '@composer-asset/';
+    public const string SECTION_DEPENDENCIES = 'dependencies';
+    public const string SECTION_DEV_DEPENDENCIES = 'devDependencies';
 
-    public const SECTION_DEPENDENCIES = 'dependencies';
-
-    public const SECTION_DEV_DEPENDENCIES = 'devDependencies';
+    private readonly Filesystem $fs;
 
     private array $package = [];
 
@@ -29,8 +37,13 @@ final class AssetPackage implements AssetPackageInterface
      *
      * @throws ParsingException
      */
-    public function __construct(RootPackageInterface $rootPackage, private readonly JsonFile $jsonFile)
-    {
+    public function __construct(
+        RootPackageInterface $rootPackage,
+        private readonly JsonFile $jsonFile,
+        Filesystem|null $fs = null,
+    ) {
+        $this->fs = $fs ?? new Filesystem();
+
         if ($jsonFile->exists()) {
             $this->setPackage((array) $jsonFile->read());
         }
@@ -39,19 +52,14 @@ final class AssetPackage implements AssetPackageInterface
     }
 
     /**
-     * Add new dependencies.
-     *
      * @param array $dependencies The dependencies
      *
-     * @return array The existing packages.
-     *
-     * @psalm-return list<string> The existing packages.
-     *
-     * @psalm-suppress MixedArrayAssignment
+     * @return list<string> The existing packages.
      */
     public function addNewDependencies(array $dependencies): array
     {
         $installedAssets = $this->getInstalledDependencies();
+
         $existingPackages = [];
 
         /**
@@ -61,9 +69,9 @@ final class AssetPackage implements AssetPackageInterface
         foreach ($dependencies as $name => $path) {
             if (isset($installedAssets[$name])) {
                 $existingPackages[] = $name;
-            } else {
-                $this->package[self::SECTION_DEPENDENCIES][$name] = 'file:./' . dirname($path);
             }
+
+            $this->package[self::SECTION_DEPENDENCIES][$name] = $this->normalizeDependencyPath($path);
         }
 
         $this->orderPackages(self::SECTION_DEPENDENCIES);
@@ -102,6 +110,7 @@ final class AssetPackage implements AssetPackageInterface
     public function removeUnusedDependencies(array $dependencies): self
     {
         $installedAssets = $this->getInstalledDependencies();
+
         $removeDependencies = array_diff_key($installedAssets, $dependencies);
 
         foreach ($removeDependencies as $dependency => $version) {
@@ -146,6 +155,43 @@ final class AssetPackage implements AssetPackageInterface
                 $this->package['license'] = $license;
             }
         }
+    }
+
+    /**
+     * Normalize an asset path relative to the package manifest that consumes it.
+     */
+    private function normalizeDependencyPath(string $path): string
+    {
+        if (str_starts_with($path, 'file:')) {
+            return $path;
+        }
+
+        $currentDirectory = getcwd();
+
+        if (false === $currentDirectory) {
+            throw new RuntimeException('Unable to get the current working directory.');
+        }
+
+        $manifestPath = $this->fs->isAbsolutePath($path)
+            ? $path
+            : rtrim($currentDirectory, '/\\') . DIRECTORY_SEPARATOR . $path;
+        $consumerPath = $this->jsonFile->getPath();
+        $consumerPath = $this->fs->isAbsolutePath($consumerPath)
+            ? $consumerPath
+            : $currentDirectory . DIRECTORY_SEPARATOR . $consumerPath;
+        $relativePath = $this->fs->findShortestPath(
+            dirname($consumerPath),
+            dirname($manifestPath),
+            true,
+            true,
+        );
+        $relativePath = str_replace('\\', '/', $relativePath);
+
+        if (!$this->fs->isAbsolutePath($relativePath) && !str_starts_with($relativePath, '.')) {
+            $relativePath = "./{$relativePath}";
+        }
+
+        return "file:{$relativePath}";
     }
 
     /**

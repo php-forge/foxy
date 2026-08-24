@@ -5,28 +5,20 @@ declare(strict_types=1);
 namespace Foxy\Tests\Json;
 
 use Foxy\Json\JsonFormatter;
+use Foxy\Tests\Support\JsonFixture;
 use JsonException;
 use PHPForge\Support\LineEndingNormalizer;
 use PHPUnit\Framework\TestCase;
 
 final class JsonFormatterTest extends TestCase
 {
+    use JsonFixture;
+
     /**
      * @throws JsonException
      */
     public function testFormat(): void
     {
-        $expected = <<<JSON
-        {
-          "name": "test",
-          "contributors": [],
-          "dependencies": {
-            "@foo/bar": "^1.0.0"
-          },
-          "devDependencies": {}
-        }
-        JSON;
-
         $data = [
             'name' => 'test',
             'contributors' => [],
@@ -36,7 +28,7 @@ final class JsonFormatterTest extends TestCase
         $content = json_encode($data, JSON_THROW_ON_ERROR);
 
         self::assertSame(
-            LineEndingNormalizer::normalize($expected),
+            LineEndingNormalizer::normalize(self::fixtureWithoutFinalNewline('formatter-output-two-space.json')),
             LineEndingNormalizer::normalize(JsonFormatter::format($content, ['contributors'], 2)),
         );
     }
@@ -53,13 +45,7 @@ final class JsonFormatterTest extends TestCase
 
     public function testGetArrayKeys(): void
     {
-        $content = <<<JSON
-        {
-          "name": "test",
-          "contributors": [],
-          "dependencies": {}
-        }
-        JSON;
+        $content = self::fixture('package-two-space.json');
         $expected = ['contributors'];
 
         self::assertSame(
@@ -81,12 +67,7 @@ final class JsonFormatterTest extends TestCase
 
     public function testGetIndent(): void
     {
-        $content = <<<JSON
-        {
-          "name": "test",
-          "dependencies": {}
-        }
-        JSON;
+        $content = self::fixture('package-two-space.json');
 
         self::assertSame(
             2,
@@ -94,23 +75,34 @@ final class JsonFormatterTest extends TestCase
         );
     }
 
+    public function testGetIndentIgnoresSurroundingWhitespace(): void
+    {
+        $content = "\n  " . self::fixture('name-two-space.json');
+
+        self::assertSame(2, JsonFormatter::getIndent($content));
+    }
+
+    public function testGetMapKeys(): void
+    {
+        self::assertSame(
+            ['dependencies', 'metadata'],
+            JsonFormatter::getMapKeys('{"dependencies":{},"metadata": { }}'),
+        );
+    }
+
     /**
      * @throws JsonException
      */
-    public function testUnescapeSlashes(): void
+    public function testPreservesLiteralEscapedSlashes(): void
     {
         $data = ['url' => 'https:\/\/example.com'];
 
         $content = json_encode($data, JSON_THROW_ON_ERROR);
 
-        $expected = <<<JSON
-        {
-            "url": "https://example.com"
-        }
-        JSON;
-
         self::assertSame(
-            LineEndingNormalizer::normalize($expected),
+            LineEndingNormalizer::normalize(
+                self::fixtureWithoutFinalNewline('literal-slashes-four-space.json'),
+            ),
             LineEndingNormalizer::normalize(JsonFormatter::format($content, [], 4)),
         );
     }
@@ -118,21 +110,29 @@ final class JsonFormatterTest extends TestCase
     /**
      * @throws JsonException
      */
-    public function testUnescapeUnicode(): void
+    public function testPreservesLiteralUnicodeEscapeSequences(): void
     {
         $data = ['name' => '\u0048\u0065\u006c\u006c\u006f'];
 
         $content = json_encode($data, JSON_THROW_ON_ERROR);
 
-        $expected = <<<JSON
-        {
-          "name": "Hello"
-        }
-        JSON;
-
         self::assertSame(
-            LineEndingNormalizer::normalize($expected),
+            LineEndingNormalizer::normalize(
+                self::fixtureWithoutFinalNewline('literal-unicode-two-space.json'),
+            ),
             LineEndingNormalizer::normalize(JsonFormatter::format($content, [], 2)),
+        );
+    }
+
+    /**
+     * @throws JsonException
+     */
+    public function testPreservesRootObjectAndSpacesInsideStrings(): void
+    {
+        self::assertSame('{}', JsonFormatter::format('{}', [], 2));
+        self::assertStringContainsString(
+            '"value": "left    right"',
+            JsonFormatter::format('{"value":"left    right"}', [], 2),
         );
     }
 }

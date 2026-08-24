@@ -9,7 +9,6 @@ use Composer\IO\IOInterface;
 use Composer\Json\JsonFile;
 use Seld\JsonLint\ParsingException;
 
-use function array_merge;
 use function is_array;
 use function is_string;
 
@@ -55,12 +54,18 @@ abstract class ConfigBuilder
     {
         $globalPackageConfig = self::getGlobalConfig($composer, 'composer', $io);
         $globalConfig = self::getGlobalConfig($composer, 'config', $io);
+
         $packageConfig = $composer->getPackage()->getConfig();
+
         $packageConfig = isset($packageConfig['foxy']) && is_array($packageConfig['foxy'])
             ? $packageConfig['foxy']
             : [];
 
-        return array_merge($globalPackageConfig, $globalConfig, $packageConfig);
+        return [
+            ...$globalPackageConfig,
+            ...$globalConfig,
+            ...$packageConfig,
+        ];
     }
 
     /**
@@ -75,7 +80,9 @@ abstract class ConfigBuilder
     private static function getGlobalConfig(Composer $composer, string $filename, IOInterface|null $io = null): array
     {
         $home = self::getComposerHome($composer);
-        $file = new JsonFile($home . '/' . $filename . '.json');
+
+        $file = new JsonFile("{$home}/{$filename}.json");
+
         $config = [];
 
         if ($file->exists()) {

@@ -5,7 +5,6 @@ declare(strict_types=1);
 /**
  * Overrides internal-mocker stubs for specific functions.
  */
-
 $stubs = require __DIR__ . '/../../vendor/xepozz/internal-mocker/src/stubs.php';
 
 $stubs['file_get_contents'] = [
@@ -16,6 +15,11 @@ $stubs['file_get_contents'] = [
 $stubs['file_put_contents'] = [
     'signatureArguments' => 'string $filename, mixed $data, int $flags = 0, $context = null',
     'arguments' => '$filename, $data, $flags, $context',
+];
+
+$stubs['scandir'] = [
+    'signatureArguments' => 'string $directory, int $sorting_order = SCANDIR_SORT_ASCENDING, $context = null',
+    'arguments' => '$directory, $sorting_order, $context',
 ];
 
 return $stubs;

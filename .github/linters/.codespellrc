@@ -1,0 +1,2 @@
+[codespell]
+skip = ./.git,.vscode/*,composer.lock,runtime/*,vendor/*

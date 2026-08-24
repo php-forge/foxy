@@ -64,8 +64,6 @@ interface AssetManagerInterface
     public function run(): int;
 
     /**
-     * Set the fallback.
-     *
      * @param FallbackInterface $fallback The fallback
      */
     public function setFallback(FallbackInterface $fallback): self;

@@ -6,15 +6,22 @@ namespace Foxy\Tests\Asset;
 
 use Composer\Json\JsonFile;
 use Composer\Package\RootPackageInterface;
+use Composer\Util\Filesystem as ComposerFilesystem;
 use Exception;
 use Foxy\Asset\AssetPackage;
+use Foxy\Exception\RuntimeException;
 use JsonException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Seld\JsonLint\ParsingException;
 use Symfony\Component\Filesystem\Filesystem;
+use Xepozz\InternalMocker\MockerState;
 
+use function chdir;
+use function dirname;
 use function file_put_contents;
+use function getcwd;
 
 use const DIRECTORY_SEPARATOR;
 
@@ -22,6 +29,7 @@ final class AssetPackageTest extends TestCase
 {
     protected string|null $cwd = '';
     protected JsonFile|MockObject|null $jsonFile = null;
+    protected string|null $oldCwd = '';
     protected MockObject|RootPackageInterface|null $rootPackage = null;
     protected Filesystem|null $sfs = null;
 
@@ -74,6 +82,10 @@ final class AssetPackageTest extends TestCase
                 '@composer-asset/foo--bar' => 'file:./path/foo/bar',
                 '@composer-asset/new--dependency' => 'file:./path/new/dependency',
             ],
+            'devDependencies' => [
+                '@dev/bar' => '^1.0.0',
+                '@dev/foo' => '^1.0.0',
+            ],
         ];
         $expectedExisting = [
             '@composer-asset/foo--bar',
@@ -84,6 +96,10 @@ final class AssetPackageTest extends TestCase
                 '@composer-asset/foo--bar' => 'file:./path/foo/bar',
                 '@bar/foo' => '^1.0.0',
                 '@composer-asset/baz--bar' => 'file:./path/baz/bar',
+            ],
+            'devDependencies' => [
+                '@dev/foo' => '^1.0.0',
+                '@dev/bar' => '^1.0.0',
             ],
         ];
         $dependencies = [
@@ -104,6 +120,134 @@ final class AssetPackageTest extends TestCase
         self::assertSame(
             $expectedExisting,
             $existing,
+        );
+    }
+
+    /**
+     * @throws ParsingException
+     */
+    public function testAddNewDependenciesPreservesFileUriFromEventListener(): void
+    {
+        $this->jsonFile->expects(self::once())->method('exists')->willReturn(false);
+
+        $assetPackage = new AssetPackage($this->rootPackage, $this->jsonFile);
+        $assetPackage->addNewDependencies(
+            ['@composer-asset/foo--bar' => 'file:../custom/foo/bar'],
+        );
+
+        self::assertSame(
+            'file:../custom/foo/bar',
+            $assetPackage->getPackage()['dependencies']['@composer-asset/foo--bar'],
+        );
+    }
+
+    public function testAddNewDependenciesRejectsUnavailableWorkingDirectory(): void
+    {
+        $this->jsonFile->expects(self::once())->method('exists')->willReturn(false);
+
+        MockerState::addCondition('Foxy\\Asset', 'getcwd', [], false);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Unable to get the current working directory.');
+
+        (new AssetPackage($this->rootPackage, $this->jsonFile))->addNewDependencies(
+            ['@composer-asset/foo--bar' => 'asset/foo/package.json'],
+        );
+    }
+
+    /**
+     * @throws JsonException|ParsingException
+     */
+    public function testAddNewDependenciesUpdatesExistingManagedPath(): void
+    {
+        $this->addPackageFile(
+            ['dependencies' => ['@composer-asset/foo--bar' => 'file:./stale/path']],
+        );
+
+        $assetPackage = new AssetPackage($this->rootPackage, $this->jsonFile);
+        $existing = $assetPackage->addNewDependencies(
+            ['@composer-asset/foo--bar' => $this->cwd . '/fresh/path/package.json'],
+        );
+
+        self::assertSame(['@composer-asset/foo--bar'], $existing);
+        self::assertSame(
+            'file:./fresh/path',
+            $assetPackage->getPackage()['dependencies']['@composer-asset/foo--bar'],
+        );
+    }
+
+    public function testDependencyPathResolvesRelativeConsumerManifest(): void
+    {
+        $path = 'asset/foo/package.json';
+        $consumerPath = 'package.json';
+        $relativePath = 'asset/foo';
+        $currentDirectory = DIRECTORY_SEPARATOR . 'project';
+        $manifestPath = $currentDirectory . DIRECTORY_SEPARATOR . 'asset/foo/package.json';
+        $absoluteConsumerPath = $currentDirectory . DIRECTORY_SEPARATOR . $consumerPath;
+        $fs = $this->createMock(ComposerFilesystem::class);
+
+        $this->jsonFile->expects(self::once())->method('exists')->willReturn(false);
+        $this->jsonFile->expects(self::once())->method('getPath')->willReturn($consumerPath);
+        $fs
+            ->expects(self::exactly(3))
+            ->method('isAbsolutePath')
+            ->willReturnMap(
+                [
+                    [$path, false],
+                    [$consumerPath, false],
+                    [$relativePath, false],
+                ],
+            );
+        $fs
+            ->expects(self::once())
+            ->method('findShortestPath')
+            ->with(dirname($absoluteConsumerPath), dirname($manifestPath), true, true)
+            ->willReturn($relativePath);
+
+        MockerState::addCondition('Foxy\\Asset', 'getcwd', [], $currentDirectory);
+
+        $assetPackage = new AssetPackage($this->rootPackage, $this->jsonFile, $fs);
+        $assetPackage->addNewDependencies(['@composer-asset/foo--bar' => $path]);
+
+        self::assertSame(
+            'file:./asset/foo',
+            $assetPackage->getPackage()['dependencies']['@composer-asset/foo--bar'],
+        );
+    }
+
+    public function testDependencyPathUsesInjectedFilesystemForPortableRelativePath(): void
+    {
+        $path = 'asset/foo/package.json';
+        $consumerPath = '/consumer/package.json';
+        $relativePath = '..\\asset\\foo';
+        $fs = $this->createMock(ComposerFilesystem::class);
+
+        $this->jsonFile->expects(self::once())->method('exists')->willReturn(false);
+        $this->jsonFile->expects(self::once())->method('getPath')->willReturn($consumerPath);
+        $fs
+            ->expects(self::exactly(3))
+            ->method('isAbsolutePath')
+            ->willReturnMap(
+                [
+                    [$path, false],
+                    [$consumerPath, true],
+                    [$relativePath, false],
+                ],
+            );
+        $fs
+            ->expects(self::once())
+            ->method('findShortestPath')
+            ->with('/consumer', DIRECTORY_SEPARATOR . 'asset/foo', true, true)
+            ->willReturn($relativePath);
+
+        MockerState::addCondition('Foxy\\Asset', 'getcwd', [], DIRECTORY_SEPARATOR);
+
+        $assetPackage = new AssetPackage($this->rootPackage, $this->jsonFile, $fs);
+        $assetPackage->addNewDependencies(['@composer-asset/foo--bar' => $path]);
+
+        self::assertSame(
+            'file:../asset/foo',
+            $assetPackage->getPackage()['dependencies']['@composer-asset/foo--bar'],
         );
     }
 
@@ -156,10 +300,9 @@ final class AssetPackageTest extends TestCase
     }
 
     /**
-     * @dataProvider getDataRequiredKeys
-     *
      * @throws JsonException|ParsingException
      */
+    #[DataProvider('getDataRequiredKeys')]
     public function testInjectionOfRequiredKeys(array $expected, array $package, string $license): void
     {
         $this->addPackageFile($package);
@@ -251,6 +394,7 @@ final class AssetPackageTest extends TestCase
         parent::setUp();
 
         $this->cwd = sys_get_temp_dir() . DIRECTORY_SEPARATOR . uniqid('foxy_asset_package_test_', true);
+        $this->oldCwd = getcwd();
 
         $this->sfs = new Filesystem();
 
@@ -264,16 +408,19 @@ final class AssetPackageTest extends TestCase
         $this->rootPackage->expects(self::any())->method('getLicense')->willReturn([]);
 
         $this->sfs->mkdir($this->cwd);
+        chdir($this->cwd);
     }
 
     protected function tearDown(): void
     {
         parent::tearDown();
 
+        chdir($this->oldCwd);
         $this->sfs->remove($this->cwd);
         $this->jsonFile = null;
         $this->rootPackage = null;
         $this->sfs = null;
         $this->cwd = null;
+        $this->oldCwd = null;
     }
 }

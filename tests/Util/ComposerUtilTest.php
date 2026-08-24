@@ -6,7 +6,9 @@ namespace Foxy\Tests\Util;
 
 use Foxy\Exception\RuntimeException;
 use Foxy\Util\ComposerUtil;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use UnexpectedValueException;
 
 final class ComposerUtilTest extends TestCase
 {
@@ -16,6 +18,7 @@ final class ComposerUtilTest extends TestCase
             ['@package_version@', '^1.5.0', true],
             ['@package_version@', '^1.5.0|^2.0.0', true],
             ['d173af2d7ac1408655df2cf6670ea0262e06d137', '^1.5.0|^2.0.0', true],
+            ['D173AF2D7AC1408655DF2CF6670EA0262E06D137', '^1.5.0|^2.0.0', true],
             ['1.6.0', '^1.5.0', true],
             ['1.5.1', '^1.5.0', true],
             ['1.5.0', '^1.5.0', true],
@@ -25,9 +28,7 @@ final class ComposerUtilTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider getValidateVersionData
-     */
+    #[DataProvider('getValidateVersionData')]
     public function testValidateVersion(string $composerVersion, string $requiredVersion, bool $valid): void
     {
         if ($valid) {
@@ -40,5 +41,25 @@ final class ComposerUtilTest extends TestCase
         }
 
         ComposerUtil::validateVersion($requiredVersion, $composerVersion);
+    }
+
+    public function testValidateVersionRejectsHashWithPrefix(): void
+    {
+        $this->expectException(UnexpectedValueException::class);
+
+        ComposerUtil::validateVersion(
+            '^1.5.0|^2.0.0',
+            'prefix-d173af2d7ac1408655df2cf6670ea0262e06d137',
+        );
+    }
+
+    public function testValidateVersionRejectsHashWithSuffix(): void
+    {
+        $this->expectException(UnexpectedValueException::class);
+
+        ComposerUtil::validateVersion(
+            '^1.5.0|^2.0.0',
+            'd173af2d7ac1408655df2cf6670ea0262e06d137-suffix',
+        );
     }
 }

@@ -12,7 +12,7 @@
         "asset",
         "nodejs"
     ],
-    "homepage": "https://github.com/fxpio/foxy",
+    "homepage": "https://github.com/php-forge/foxy",
     "type": "composer-plugin",
     "license": "BSD-3-Clause",
     "funding": [
@@ -22,22 +22,22 @@
         }
     ],
     "require": {
-        "ext-ctype": "*",
-        "ext-mbstring": "*",
-        "php": "^8.1",
-        "composer/composer": "^2.8",
+        "php": "^8.3",
+        "composer/composer": "^2.10.2",
+        "composer/pcre": "^3.3",
         "composer-plugin-api": "^2.0",
         "composer/semver": "^3.4",
-        "symfony/console": "^6.0|^7.0"
+        "symfony/console": "^7.4"
     },
     "require-dev": {
+        "infection/infection": "^0.35",
         "maglnet/composer-require-checker": "^4.7",
-        "php-forge/coding-standard": "^0.1",
+        "php-forge/coding-standard": "^0.3",
         "php-forge/support": "^0.3",
         "phpstan/extension-installer": "^1.4",
-        "phpstan/phpstan": "^2.1",
+        "phpstan/phpstan": "^2.2",
         "phpstan/phpstan-strict-rules": "^2.0.3",
-        "phpunit/phpunit": "^10.5",
+        "phpunit/phpunit": "^11.5",
         "xepozz/internal-mocker": "^1.4"
     },
     "suggest": {
@@ -72,8 +72,8 @@
     "scripts": {
         "check-dependencies": "./vendor/bin/composer-require-checker check",
         "ecs": "./vendor/bin/ecs --fix",
-        "mutation": "./vendor/bin/infection --threads=4 --ignore-msi-with-no-mutations --min-msi=100 --min-covered-msi=100",
-        "mutation-static": "./vendor/bin/infection --threads=4 --ignore-msi-with-no-mutations --min-msi=100 --min-covered-msi=100 --static-analysis-tool=phpstan --static-analysis-tool-options='--memory-limit=-1'",
+        "mutation": "./vendor/bin/infection --threads=4 --min-msi=100 --min-covered-msi=100",
+        "mutation-static": "./vendor/bin/infection --threads=4 --min-msi=100 --min-covered-msi=100 --static-analysis-tool=phpstan --static-analysis-tool-options='--memory-limit=-1 --debug'",
         "rector": "./vendor/bin/rector process",
         "static": "./vendor/bin/phpstan --memory-limit=-1",
         "sync-metadata": [

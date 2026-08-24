@@ -19,7 +19,7 @@ final class NpmManager extends AbstractAssetManager
     protected function actionWhenComposerDependenciesAreAlreadyInstalled(array $names): void
     {
         foreach ($names as $name) {
-            $this->fs->remove(self::NODE_MODULES_PATH . '/' . $name);
+            $this->fs->remove($this->getNodeModulesPath() . '/' . $name);
         }
     }
 

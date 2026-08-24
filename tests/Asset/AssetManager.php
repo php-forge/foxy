@@ -13,7 +13,7 @@ use Foxy\Config\Config;
 use Foxy\Exception\RuntimeException;
 use Foxy\Fallback\FallbackInterface;
 use Foxy\Tests\Fixtures\Util\{ProcessExecutorMock, ThrowingProcessExecutorMock};
-use PHPUnit\Framework\Attributes\RequiresOperatingSystemFamily;
+use PHPUnit\Framework\Attributes\{DataProvider, RequiresOperatingSystemFamily};
 use PHPUnit\Framework\MockObject\{Exception, MockObject};
 use PHPUnit\Framework\TestCase;
 use Xepozz\InternalMocker\MockerState;
@@ -28,21 +28,13 @@ use const DIRECTORY_SEPARATOR;
 abstract class AssetManager extends TestCase
 {
     protected Config|null $config = null;
-
     protected string|null $cwd = '';
-
     protected ProcessExecutorMock|ThrowingProcessExecutorMock|null $executor = null;
-
     protected FallbackInterface|MockObject|null $fallback = null;
-
     protected Filesystem|MockObject|null $fs = null;
-
-    protected IOInterface|null $io = null;
-
+    protected IOInterface|MockObject|null $io = null;
     protected AssetManagerInterface|null $manager = null;
-
     protected string|null $oldCwd = '';
-
     protected \Symfony\Component\Filesystem\Filesystem|null $sfs = null;
 
     abstract protected function getManager(): AssetManagerInterface;
@@ -57,9 +49,17 @@ abstract class AssetManager extends TestCase
 
     abstract protected function getValidVersionCommand(): string;
 
+    public static function getEnabledRunAssetManagerData(): array
+    {
+        return [
+            'integer one' => [1],
+            'string one' => ['1'],
+        ];
+    }
+
     public static function getRunData(): array
     {
-        return [[0, 'install'], [0, 'update'], [1, 'install'], [1, 'update']];
+        return [[0, 'install'], [0, 'update'], [1, 'install'], [1, 'update'], [-1, 'install'], [-1, 'update']];
     }
 
     /**
@@ -79,6 +79,7 @@ abstract class AssetManager extends TestCase
         ];
 
         $rootPackage = $this->createMock(RootPackageInterface::class);
+
         $rootPackage->expects(self::any())->method('getLicense')->willReturn([]);
 
         self::assertFalse(
@@ -209,7 +210,7 @@ abstract class AssetManager extends TestCase
         $updatedContent = (string) file_get_contents($rootPackagePath);
 
         self::assertStringContainsString(
-            '"@composer-asset/new--dependency": "file:./path/new/dependency"',
+            '"@composer-asset/new--dependency": "file:../path/new/dependency"',
             $updatedContent,
         );
         self::assertMatchesRegularExpression(
@@ -217,7 +218,7 @@ abstract class AssetManager extends TestCase
             $updatedContent,
         );
         self::assertMatchesRegularExpression(
-            '/\n {8}"@composer-asset\/new--dependency": "file:\.\/path\/new\/dependency"/',
+            '/\n {8}"@composer-asset\/new--dependency": "file:\.\.\/path\/new\/dependency"/',
             $updatedContent,
         );
     }
@@ -327,6 +328,14 @@ abstract class AssetManager extends TestCase
         );
     }
 
+    public function testIsInstalledRequiresNodeModulesDirectory(): void
+    {
+        file_put_contents($this->cwd . DIRECTORY_SEPARATOR . $this->manager->getPackageName(), '{}');
+        file_put_contents($this->cwd . DIRECTORY_SEPARATOR . $this->manager->getLockPackageName(), '{}');
+
+        self::assertFalse($this->manager->isInstalled());
+    }
+
     public function testIsUpdatable(): void
     {
         self::assertFalse(
@@ -334,9 +343,7 @@ abstract class AssetManager extends TestCase
         );
     }
 
-    /**
-     * @dataProvider getRunData
-     */
+    #[DataProvider('getRunData')]
     public function testRunForInstallCommand(int $expectedRes, string $action): void
     {
         $this->actionForTestRunForInstallCommand($action);
@@ -380,6 +387,17 @@ abstract class AssetManager extends TestCase
             $this->fallback->expects(self::once())->method('restore');
         }
 
+        $this->io
+            ->expects(self::once())
+            ->method('write')
+            ->with(
+                sprintf(
+                    '<info>%s %s dependencies</info>',
+                    'update' === $action ? 'Updating' : 'Installing',
+                    $this->getValidName(),
+                ),
+            );
+
         $this->executor->addExpectedValues($expectedRes, 'ASSET MANAGER OUTPUT');
 
         self::assertSame(
@@ -396,6 +414,60 @@ abstract class AssetManager extends TestCase
         );
     }
 
+    public function testRunPreservesExecutorFailureWhenFallbackThrows(): void
+    {
+        $this->executor = new ThrowingProcessExecutorMock($this->io);
+        $this->config = new Config([], ['run-asset-manager' => true]);
+        $this->fallback
+            ->expects(self::once())
+            ->method('restore')
+            ->willThrowException(new RuntimeException('Fallback failed.'));
+        $this->manager = $this->getManager();
+
+        try {
+            $this->manager->run();
+            self::fail('Expected fallback restoration to fail.');
+        } catch (RuntimeException $exception) {
+            self::assertSame(
+                'The asset manager failed and its fallback could not be restored: Fallback failed.',
+                $exception->getMessage(),
+            );
+            self::assertSame('Process execution failed.', $exception->getPrevious()?->getMessage());
+        }
+    }
+
+    public function testRunPreservesExitStatusWhenFallbackThrows(): void
+    {
+        $exitStatus = 7;
+
+        $this->config = new Config([], ['run-asset-manager' => true]);
+        $this->fallback
+            ->expects(self::once())
+            ->method('restore')
+            ->willThrowException(new RuntimeException('Fallback failed.'));
+        $this->actionForTestRunForInstallCommand('install');
+        $this->executor->addExpectedValues($exitStatus, 'ASSET MANAGER OUTPUT');
+        $this->manager = $this->getManager();
+
+        try {
+            $this->manager->run();
+            self::fail('Expected fallback restoration to fail.');
+        } catch (RuntimeException $exception) {
+            self::assertSame(
+                'The asset manager failed and its fallback could not be restored: Fallback failed.',
+                $exception->getMessage(),
+            );
+            $previous = $exception->getPrevious();
+
+            self::assertInstanceOf(RuntimeException::class, $previous);
+            self::assertSame($exitStatus, $previous->getCode());
+            self::assertSame(
+                'The asset manager exited with status code 7.',
+                $previous->getMessage(),
+            );
+        }
+    }
+
     public function testRunRestoresTimeoutWhenExecutorThrows(): void
     {
         $originalTimeout = ProcessExecutor::getTimeout();
@@ -408,6 +480,7 @@ abstract class AssetManager extends TestCase
             $this->executor = new ThrowingProcessExecutorMock($this->io);
             $this->config = new Config([], ['run-asset-manager' => true, 'manager-timeout' => $managerTimeout]);
             $this->manager = $this->getManager();
+            $this->fallback->expects(self::once())->method('restore');
 
             try {
                 $this->manager->run();
@@ -425,6 +498,29 @@ abstract class AssetManager extends TestCase
             );
         } finally {
             ProcessExecutor::setTimeout($originalTimeout);
+        }
+    }
+
+    public function testRunRestoresWorkingDirectoryWhenExecutorThrows(): void
+    {
+        $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'root-package';
+        $this->sfs->mkdir($rootPackageDir);
+        $originalCwd = getcwd();
+
+        $this->executor = new ThrowingProcessExecutorMock($this->io);
+        $this->config = new Config(
+            [],
+            ['run-asset-manager' => true, 'root-package-json-dir' => $rootPackageDir],
+        );
+        $this->fallback->expects(self::once())->method('restore');
+        $this->manager = $this->getManager();
+
+        try {
+            $this->manager->run();
+            self::fail('Expected the process execution to fail.');
+        } catch (\RuntimeException $exception) {
+            self::assertSame('Process execution failed.', $exception->getMessage());
+            self::assertSame($originalCwd, getcwd());
         }
     }
 
@@ -472,6 +568,7 @@ abstract class AssetManager extends TestCase
         MockerState::addCondition('Foxy\\Asset', 'chdir', [$rootPackageDir], true);
         MockerState::addCondition('Foxy\\Asset', 'chdir', [$originalCwd], false);
 
+        $this->actionForTestRunForInstallCommand('install');
         $this->executor->addExpectedValues(0, 'ASSET MANAGER OUTPUT');
 
         try {
@@ -486,17 +583,46 @@ abstract class AssetManager extends TestCase
                 $originalCwd,
                 getcwd(),
             );
+            self::assertSame(
+                $this->getValidInstallCommand(),
+                $this->executor->getLastCommand(),
+            );
+            self::assertSame(
+                'ASSET MANAGER OUTPUT',
+                $this->executor->getLastOutput(),
+            );
         }
+    }
+
+    #[DataProvider('getEnabledRunAssetManagerData')]
+    public function testRunWithCompatibleEnabledOption(int|string $value): void
+    {
+        $this->actionForTestRunForInstallCommand('install');
+
+        $this->config = new Config([], ['run-asset-manager' => $value]);
+        $this->manager = $this->getManager();
+
+        $this->io
+            ->expects(self::once())
+            ->method('write')
+            ->with(sprintf('<info>Installing %s dependencies</info>', $this->getValidName()));
+        $this->executor->addExpectedValues(0, 'ASSET MANAGER OUTPUT');
+
+        self::assertSame(0, $this->manager->run());
+        self::assertSame($this->getValidInstallCommand(), $this->executor->getLastCommand());
     }
 
     public function testRunWithDisableOption(): void
     {
         $this->config = new Config([], ['run-asset-manager' => false]);
 
+        $this->io->expects(self::never())->method('write');
+
         self::assertSame(
             0,
             $this->getManager()->run(),
         );
+        self::assertNull($this->executor->getLastCommand());
     }
 
     public function testRunWithGetcwdFailure(): void
@@ -526,6 +652,20 @@ abstract class AssetManager extends TestCase
                 getcwd(),
             );
         }
+    }
+
+    public function testRunWithoutCustomDirectoryDoesNotChangeWorkingDirectory(): void
+    {
+        $this->config = new Config([], ['run-asset-manager' => true]);
+        $this->manager = $this->getManager();
+
+        MockerState::addCondition('Foxy\\Asset', 'chdir', [$this->cwd], false);
+
+        $this->actionForTestRunForInstallCommand('install');
+        $this->executor->addExpectedValues(0, 'ASSET MANAGER OUTPUT');
+
+        self::assertSame(0, $this->manager->run());
+        self::assertSame($this->getValidInstallCommand(), $this->executor->getLastCommand());
     }
 
     public function testSetUpdatable(): void

@@ -10,6 +10,37 @@ use PHPUnit\Framework\TestCase;
 
 final class AssetManagerFinderTest extends TestCase
 {
+    public function testFindManagerRejectsMultipleLockFiles(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Multiple asset manager lock files were found');
+
+        $first = $this->createMock(AssetManagerInterface::class);
+        $first->expects(self::once())->method('getName')->willReturn('first');
+        $first->expects(self::once())->method('hasLockFile')->willReturn(true);
+        $first->expects(self::never())->method('isAvailable');
+
+        $second = $this->createMock(AssetManagerInterface::class);
+        $second->expects(self::once())->method('getName')->willReturn('second');
+        $second->expects(self::once())->method('hasLockFile')->willReturn(true);
+        $second->expects(self::never())->method('isAvailable');
+
+        (new AssetManagerFinder([$first, $second]))->findManager();
+    }
+
+    public function testFindManagerRejectsUnavailableManagerSelectedByLockFile(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('The asset manager "foo" selected by its lock file is not available');
+
+        $am = $this->createMock(AssetManagerInterface::class);
+        $am->expects(self::exactly(2))->method('getName')->willReturn('foo');
+        $am->expects(self::once())->method('hasLockFile')->willReturn(true);
+        $am->expects(self::once())->method('isAvailable')->willReturn(false);
+
+        (new AssetManagerFinder([$am]))->findManager();
+    }
+
     public function testFindManagerWithAutoManagerAndAvailableManagerByAvailability(): void
     {
         $am = $this->createMock(AssetManagerInterface::class);
@@ -34,7 +65,7 @@ final class AssetManagerFinderTest extends TestCase
 
         $am->expects(self::once())->method('getName')->willReturn('foo');
         $am->expects(self::once())->method('hasLockFile')->willReturn(true);
-        $am->expects(self::never())->method('isAvailable');
+        $am->expects(self::once())->method('isAvailable')->willReturn(true);
 
         $amf = new AssetManagerFinder([$am]);
 

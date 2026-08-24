@@ -5,9 +5,17 @@ declare(strict_types=1);
 namespace Foxy\Converter;
 
 use Composer\Package\Version\VersionParser;
+use Composer\Pcre\Preg;
 
 use function in_array;
+use function preg_match;
+use function preg_match_all;
+use function sprintf;
+use function str_starts_with;
 use function strlen;
+use function strpos;
+use function strtolower;
+use function substr;
 
 abstract class SemverUtil
 {
@@ -29,9 +37,6 @@ abstract class SemverUtil
         return $version;
     }
 
-    /**
-     * Converts the version metadata.
-     */
     public static function convertVersionMetadata(string $version): string
     {
         $pattern = self::createPattern('([a-zA-Z]+|(\-|\+)[a-zA-Z]+|(\-|\+)[0-9]+)');
@@ -40,8 +45,8 @@ abstract class SemverUtil
             [$type, $version, $end] = self::cleanVersion(strtolower($version), $matches);
             [$version, $patchVersion] = self::matchVersion($version, $type);
 
-            $matches = [];
             $hasPatchNumber = preg_match('/\d+\.\d+|\d+|\.\d+$/', $end, $matches);
+
             $end = $hasPatchNumber ? $matches[0] : '1';
 
             if ($patchVersion) {
@@ -64,10 +69,10 @@ abstract class SemverUtil
     public static function createPattern(string $pattern): string
     {
         $numVer = '([0-9]+|x|\*)';
-        $numVer2 = '(' . $numVer . '\.' . $numVer . ')';
-        $numVer3 = '(' . $numVer . '\.' . $numVer . '\.' . $numVer . ')';
+        $numVer2 = "({$numVer}\.{$numVer})";
+        $numVer3 = "({$numVer}\.{$numVer}\.{$numVer})";
 
-        return '/^(' . $numVer . '|' . $numVer2 . '|' . $numVer3 . ')' . $pattern . '/';
+        return "/^({$numVer}|{$numVer2}|{$numVer3}){$pattern}/";
     }
 
     /**
@@ -79,11 +84,7 @@ abstract class SemverUtil
      */
     protected static function cleanWildcard(string $version): string
     {
-        while (str_contains($version, '.x.x')) {
-            $version = str_replace('.x.x', '.x', $version);
-        }
-
-        return $version;
+        return Preg::replace('/(?:\.x){2,}/', '.x', $version);
     }
 
     /**
@@ -92,28 +93,23 @@ abstract class SemverUtil
      * @param string $version The version.
      * @param array $matches The match of pattern asset version.
      *
-     * @return array The list of $type, $version and $end.
-     *
-     * @psalm-suppress MixedArrayAccess
-     * @psalm-suppress MixedOperand
-     *
-     * @psalm-return array{0: string, 1: string, 2: string}
+     * @return array{0: string, 1: string, 2: string} The list of $type, $version and $end.
      */
     private static function cleanVersion(string $version, array $matches): array
     {
         $end = substr($version, strlen((string) $matches[1][0][0]));
+
         $version = $matches[1][0][0] . '-';
 
-        $matches = [];
-
-        if (preg_match('/^([-+])/', $end, $matches)) {
+        if (str_starts_with($end, '-') || str_starts_with($end, '+')) {
             $end = substr($end, 1);
         }
 
         preg_match('/^[a-z]+/', $end, $matches);
 
-        $type = isset($matches[0]) ? self::normalizeStability($matches[0]) : '';
-        $end = substr($end, strlen($type));
+        $rawType = $matches[0] ?? '';
+
+        $type = '' !== $rawType ? self::normalizeStability($rawType) : '';
 
         return [$type, $version, $end];
     }
@@ -126,26 +122,24 @@ abstract class SemverUtil
     private static function convertDateMinorVersion(string $minor): string
     {
         $split = explode('.', $minor);
+
         $minor = $split[0];
-        $revision = isset($split[1]) ? (int) $split[1] : 0;
+
+        $revision = $split[1] ?? 0;
 
         return '.' . sprintf('%03d', $minor) . sprintf('%03d', $revision);
     }
 
     /**
-     * Match the version.
-     *
      * @param string $version The version.
      * @param string $type The type of version.
      *
-     * @return array The list of $version and $patchVersion.
-     *
-     * @psalm-return array{0: string, 1: bool}
+     * @return array{0: string, 1: bool} The list of $version and $patchVersion.
      */
     private static function matchVersion(string $version, string $type): array
     {
         $type = match ($type) {
-            'dev', 'snapshot' => 'dev',
+            'dev' => 'dev',
             default => in_array($type, ['alpha', 'beta', 'RC'], true) ? $type : 'patch',
         };
 
@@ -156,22 +150,17 @@ abstract class SemverUtil
     }
 
     /**
-     * Normalize the stability.
-     *
      * @param string $stability The stability.
      *
      * @return string The normalized stability.
      */
     private static function normalizeStability(string $stability): string
     {
-        $stability = strtolower($stability);
-
         return match ($stability) {
             'a' => 'alpha',
             'b', 'pre' => 'beta',
             'build' => 'patch',
-            'rc' => 'RC',
-            'dev', 'snapshot' => 'dev',
+            'snapshot' => 'dev',
             default => VersionParser::normalizeStability($stability),
         };
     }

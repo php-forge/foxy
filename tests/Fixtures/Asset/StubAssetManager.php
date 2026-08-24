@@ -12,7 +12,7 @@ use Foxy\Config\Config;
 use Foxy\Exception\RuntimeException;
 use Foxy\Fallback\FallbackInterface;
 
-final class StubAssetManager implements AssetManagerInterface
+final readonly class StubAssetManager implements AssetManagerInterface
 {
     public function __construct(
         /**

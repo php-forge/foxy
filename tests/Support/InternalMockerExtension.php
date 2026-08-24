@@ -53,6 +53,30 @@ final class InternalMockerExtension implements Extension
                 'name' => 'file_get_contents',
             ],
             [
+                'namespace' => 'Foxy\\Solver',
+                'name' => 'file_exists',
+            ],
+            [
+                'namespace' => 'Foxy\\Solver',
+                'name' => 'file_put_contents',
+            ],
+            [
+                'namespace' => 'Foxy\\Solver',
+                'name' => 'getcwd',
+            ],
+            [
+                'namespace' => 'Foxy\\Solver',
+                'name' => 'is_link',
+            ],
+            [
+                'namespace' => 'Foxy\\Solver',
+                'name' => 'scandir',
+            ],
+            [
+                'namespace' => 'Foxy\\Util',
+                'name' => 'file_get_contents',
+            ],
+            [
                 'namespace' => 'Foxy\\Fallback',
                 'name' => 'file_get_contents',
             ],

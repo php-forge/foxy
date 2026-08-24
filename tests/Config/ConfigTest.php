@@ -8,11 +8,14 @@ use Composer\{Composer, Config};
 use Composer\IO\IOInterface;
 use Composer\Package\RootPackageInterface;
 use Exception;
+use Foxy\Config\Config as FoxyConfig;
 use Foxy\Config\ConfigBuilder;
 use Foxy\Exception\RuntimeException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Seld\JsonLint\ParsingException;
+use Symfony\Component\Filesystem\Filesystem;
 
 use function getenv;
 use function putenv;
@@ -20,6 +23,8 @@ use function sprintf;
 use function str_starts_with;
 use function strpos;
 use function substr;
+
+use const DIRECTORY_SEPARATOR;
 
 final class ConfigTest extends TestCase
 {
@@ -46,19 +51,70 @@ final class ConfigTest extends TestCase
             ['global-composer-bar', 70, 0],
             ['global-config-foo', 23, 0],
             ['env-boolean', false, true, 'FOXY__ENV_BOOLEAN=false'],
+            ['env-boolean-uppercase', true, false, 'FOXY__ENV_BOOLEAN_UPPERCASE=TRUE'],
             ['env-integer', -32, 0, 'FOXY__ENV_INTEGER=-32'],
+            ['env-invalid-integer', '--1', 0, 'FOXY__ENV_INVALID_INTEGER=--1'],
+            ['env-integer-suffix', '32px', 0, 'FOXY__ENV_INTEGER_SUFFIX=32px'],
             ['env-json', ['foo' => 'bar'], [], 'FOXY__ENV_JSON="{"foo": "bar"}"'],
             ['env-json-array', [['foo' => 'bar']], [], 'FOXY__ENV_JSON_ARRAY="[{"foo": "bar"}]"'],
+            [
+                'env-json-multiple',
+                ['foo' => 'bar', 'baz' => 'qux'],
+                [],
+                'FOXY__ENV_JSON_MULTIPLE={"foo":"bar","baz":"qux"}',
+            ],
             ['env-string', 'baz', 'foo', 'FOXY__ENV_STRING=baz'],
+            ['env-padded-string', 'baz', 'foo', 'FOXY__ENV_PADDED_STRING=  baz  '],
+            ['env-single-quoted-string', 'baz', 'foo', "FOXY__ENV_SINGLE_QUOTED_STRING='baz'"],
+            ['env-double-quoted-string', 'baz', 'foo', 'FOXY__ENV_DOUBLE_QUOTED_STRING="baz"'],
             ['test-p1', 'def', 'def', null, []],
             ['test-p1', 'def', 'def', null, ['test-p1' => 'ok']],
             ['test-p1', 'ok', null, null, ['test-p1' => 'ok']],
         ];
     }
 
+    public static function getEnabledData(): array
+    {
+        return [
+            'boolean true' => [true, true],
+            'integer one' => [1, true],
+            'string one' => ['1', true],
+            'boolean false' => [false, false],
+            'integer zero' => [0, false],
+            'string zero' => ['0', false],
+            'other integer' => [2, false],
+            'other string' => ['true', false],
+            'null' => [null, false],
+        ];
+    }
+
     /**
-     * @dataProvider getDataForGetArrayConfig
-     *
+     * @throws ParsingException
+     */
+    public function testBuildIgnoresNonArrayGlobalConfig(): void
+    {
+        $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . uniqid('foxy_config_test_', true);
+        $filesystem = new Filesystem();
+        $filesystem->mkdir($directory);
+        file_put_contents($directory . '/composer.json', '{"config":{"foxy":"invalid"}}');
+
+        $this->composerConfig
+            ->expects(self::exactly(2))
+            ->method('get')
+            ->with('home')
+            ->willReturn($directory);
+        $this->package->expects(self::once())->method('getConfig')->willReturn([]);
+
+        try {
+            $config = ConfigBuilder::build($this->composer, [], $this->io);
+
+            self::assertSame('fallback', $config->get('missing', 'fallback'));
+        } finally {
+            $filesystem->remove($directory);
+        }
+    }
+
+    /**
      * @param string $key The key.
      * @param array $expected The expected value.
      * @param array $default The default value.
@@ -66,6 +122,7 @@ final class ConfigTest extends TestCase
      *
      * @throws ParsingException
      */
+    #[DataProvider('getDataForGetArrayConfig')]
     public function testGetArrayConfig(string $key, array $expected, array $default, array $defaults = []): void
     {
         $config = ConfigBuilder::build($this->composer, $defaults, $this->io);
@@ -77,8 +134,6 @@ final class ConfigTest extends TestCase
     }
 
     /**
-     * @dataProvider getDataForGetConfig
-     *
      * @param string $key The key.
      * @param mixed $expected The expected value.
      * @param mixed $default The default value.
@@ -87,6 +142,7 @@ final class ConfigTest extends TestCase
      *
      * @throws ParsingException
      */
+    #[DataProvider('getDataForGetConfig')]
     public function testGetConfig(
         string $key,
         mixed $expected,
@@ -213,6 +269,28 @@ final class ConfigTest extends TestCase
         }
 
         throw $ex;
+    }
+
+    #[DataProvider('getEnabledData')]
+    public function testIsEnabled(mixed $value, bool $expected): void
+    {
+        $config = new FoxyConfig(['feature' => $value]);
+
+        self::assertSame($expected, $config->isEnabled('feature'));
+    }
+
+    public function testResolvedManagerSelectsManagerSpecificDefaults(): void
+    {
+        $config = new FoxyConfig(
+            [],
+            ['manager-version' => ['npm' => '>=10.0.0', 'yarn' => '>=4.0.0']],
+        );
+
+        self::assertNull($config->get('manager-version'));
+
+        $config->setResolvedManager('yarn');
+
+        self::assertSame('>=4.0.0', $config->get('manager-version'));
     }
 
     protected function setUp(): void
