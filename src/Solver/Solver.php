@@ -117,7 +117,7 @@ final readonly class Solver implements SolverInterface
         $existingPath = $path;
 
         while (!file_exists($existingPath) && !is_link($existingPath)) {
-            $parent = dirname($existingPath);
+            $parent = $this->fs->normalizePath(dirname($existingPath));
 
             if ($parent === $existingPath) {
                 break;

@@ -363,10 +363,17 @@ final class AssetUtilTest extends TestCase
     public function testGetPathThrowsWhenComposerMetadataCannotBeRead(): void
     {
         $installPath = $this->cwd . '/unreadable-composer-package';
-        $composerJsonPath = $installPath . '/composer.json';
 
         $this->sfs->mkdir($installPath);
-        file_put_contents($composerJsonPath, '{}');
+        file_put_contents($installPath . '/composer.json', '{}');
+
+        $installRoot = realpath($installPath);
+
+        if (false === $installRoot) {
+            self::fail('Unable to resolve the fixture installation directory.');
+        }
+
+        $composerJsonPath = $installRoot . '/composer.json';
 
         $installationManager = $this->createMock(InstallationManager::class);
         $installationManager->expects(self::once())->method('getInstallPath')->willReturn($installPath);
