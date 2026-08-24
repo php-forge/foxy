@@ -120,7 +120,7 @@ final readonly class Solver implements SolverInterface
             $parent = $this->fs->normalizePath(dirname($existingPath));
 
             if ($parent === $existingPath) {
-                break;
+                return $this->resolveCanonicalPath($existingPath, $path, $suffix);
             }
 
             array_unshift($suffix, basename($existingPath));
@@ -128,21 +128,7 @@ final readonly class Solver implements SolverInterface
             $existingPath = $parent;
         }
 
-        $resolvedPath = realpath($existingPath);
-
-        if (false === $resolvedPath) {
-            throw new RuntimeException(
-                sprintf('Unable to resolve path "%s".', $path),
-            );
-        }
-
-        if ([] === $suffix) {
-            return $this->fs->normalizePath($resolvedPath);
-        }
-
-        return $this->fs->normalizePath(
-            rtrim($resolvedPath, '/\\') . '/' . implode('/', $suffix),
-        );
+        return $this->resolveCanonicalPath($existingPath, $path, $suffix);
     }
 
     /**
@@ -295,6 +281,30 @@ final readonly class Solver implements SolverInterface
                 sprintf('Unable to mark Composer asset directory "%s".', $assetDir),
             );
         }
+    }
+
+    /**
+     * Resolve an existing path and append its non-existing suffix.
+     *
+     * @param string[] $suffix
+     */
+    private function resolveCanonicalPath(string $existingPath, string $path, array $suffix): string
+    {
+        $resolvedPath = realpath($existingPath);
+
+        if (false === $resolvedPath) {
+            throw new RuntimeException(
+                sprintf('Unable to resolve path "%s".', $path),
+            );
+        }
+
+        if ([] === $suffix) {
+            return $this->fs->normalizePath($resolvedPath);
+        }
+
+        return $this->fs->normalizePath(
+            rtrim($resolvedPath, '/\\') . '/' . implode('/', $suffix),
+        );
     }
 
     /**
