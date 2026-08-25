@@ -194,6 +194,7 @@ final class NpmAssetManagerTest extends AssetManager
             ],
         ];
     }
+
     public static function workspaceManifests(): array
     {
         return [
