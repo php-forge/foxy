@@ -1,7 +1,7 @@
 <!-- markdownlint-disable MD041 -->
 <p align="center">
-    <a href="https://github.com/php-forge/support" target="_blank">
-        <img src="https://avatars.githubusercontent.com/u/103309199?s=400&u=ca3561c692f53ed7eb290d3bb226a2828741606f&v=4" height="150px" alt="PHP Forge">
+    <a href="https://github.com/php-forge/foxy" target="_blank">
+      <img src="https://avatars.githubusercontent.com/u/103309199?s=400&u=ca3561c692f53ed7eb290d3bb226a2828741606f&v=4" width="30%" alt="PHP Forge">
     </a>
     <h1 align="center">Foxy</h1>
     <br>
@@ -18,8 +18,8 @@
     <a href="https://github.com/php-forge/foxy/actions/workflows/ecs.yml" target="_blank">
         <img src="https://img.shields.io/github/actions/workflow/status/php-forge/foxy/ecs.yml?style=for-the-badge&label=ECS&logo=github" alt="Easy Coding Standard">
     </a>
-    <a href="https://github.com/php-forge/foxy/actions/workflows/dependency-check.yml" target="_blank">
-        <img src="https://img.shields.io/github/actions/workflow/status/php-forge/foxy/dependency-check.yml?style=for-the-badge&label=Dependency%20Check&logo=github" alt="Dependency Check">
+    <a href="https://github.com/php-forge/foxy/actions/workflows/security.yml" target="_blank">
+        <img src="https://img.shields.io/github/actions/workflow/status/php-forge/foxy/security.yml?style=for-the-badge&label=Security&logo=github" alt="Security">
     </a>
 </p>
 
@@ -74,33 +74,11 @@ contains lockfiles from more than one manager.
 
 ## Quick start
 
-### Yii2 application template 22
+### Composer-based PHP application
 
-The [Yii2 basic application template branch 22](https://github.com/yiisoft/yii2-app-basic/tree/22) requires PHP 8.3
-and targets [Yii2 framework branch 22.0](https://github.com/yiisoft/yii2/tree/22.0). Create the tested development
-version with:
-
-```bash
-composer create-project --prefer-dist yiisoft/yii2-app-basic basic 22.x-dev
-```
-
-The application keeps `package.json` at the project root and configures npm explicitly. Foxy merges frontend
-dependencies from installed Composer packages and runs npm during Composer install and update operations.
-
-For an existing Yii2 22 application, use the installation commands above and ensure its configuration contains:
-
-```json
-{
-  "config": {
-    "allow-plugins": {
-      "php-forge/foxy": true
-    },
-    "foxy": {
-      "manager": "npm"
-    }
-  }
-}
-```
+Foxy is framework agnostic and works with any Composer-based PHP application that meets the requirements above. No
+framework integration or application template is required. Composer packages that opt in contribute their frontend
+dependencies, and Foxy merges them whenever Composer installs or updates the project.
 
 ### Project with package.json under web/
 
@@ -145,7 +123,6 @@ the Composer project directory.
 [![PHPStan Level 5](https://img.shields.io/badge/PHPStan-Level%205-4F5D95.svg?style=for-the-badge&logo=github&logoColor=white)](https://github.com/php-forge/foxy/actions/workflows/static.yml)
 [![Quality](https://img.shields.io/github/actions/workflow/status/php-forge/foxy/quality.yml?style=for-the-badge&label=Quality&logo=github)](https://github.com/php-forge/foxy/actions/workflows/quality.yml)
 [![Dependency Check](https://img.shields.io/github/actions/workflow/status/php-forge/foxy/dependency-check.yml?style=for-the-badge&label=Dependency%20Check&logo=github)](https://github.com/php-forge/foxy/actions/workflows/dependency-check.yml)
-[![Security](https://img.shields.io/github/actions/workflow/status/php-forge/foxy/security.yml?style=for-the-badge&label=Security&logo=github)](https://github.com/php-forge/foxy/actions/workflows/security.yml)
 
 ## Community
 

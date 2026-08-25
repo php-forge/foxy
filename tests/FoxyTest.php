@@ -15,6 +15,7 @@ use Composer\Package\{Package, RootPackageInterface};
 use Composer\Repository\RepositoryManager;
 use Composer\Script\{Event, ScriptEvents};
 use Foxy\Asset\{AbstractAssetManager, AssetManagerInterface};
+use Foxy\Config\Config as FoxyConfig;
 use Foxy\Exception\RuntimeException;
 use Foxy\Fallback\AssetFallback;
 use Foxy\Foxy;
@@ -245,6 +246,31 @@ final class FoxyTest extends TestCase
         $foxy = new Foxy();
 
         $foxy->activate($this->composer, $this->io);
+    }
+
+    public function testConfigurationFlagsRemainCompatibleDuringPluginSelfUpdate(): void
+    {
+        $config = $this
+            ->getMockBuilder(FoxyConfig::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['get', 'isEnabled'])
+            ->getMock();
+
+        $config
+            ->expects(self::exactly(2))
+            ->method('get')
+            ->willReturnCallback(
+                static fn(string $key): bool|int => 'enabled' === $key ? 1 : false,
+            );
+        $config->expects(self::never())->method('isEnabled');
+
+        $foxy = new Foxy();
+        $reflection = new ReflectionClass($foxy);
+        $reflection->getProperty('config')->setValue($foxy, $config);
+        $isEnabled = $reflection->getMethod('isEnabled');
+
+        self::assertTrue($isEnabled->invoke($foxy));
+        self::assertFalse($isEnabled->invoke($foxy, 'run-asset-manager'));
     }
 
     public function testDeactivate(): void
