@@ -17,6 +17,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Output\BufferedOutput;
 
 use function json_decode;
+use function str_replace;
 
 use const JSON_THROW_ON_ERROR;
 
@@ -146,7 +147,7 @@ final class AuditFormatterTest extends TestCase
         self::assertSame(
             "high | lodash | GHSA-35jh-r3h4-6jhm | CVE-2021-23337 | <1.0.0 | Advisory title | https://github.com/advisories/GHSA-35jh-r3h4-6jhm\n"
             . "1 advisory affecting 1 package (high: 1).\n",
-            $output->fetch(),
+            self::normalizeLineEndings($output->fetch()),
         );
     }
 
@@ -166,7 +167,7 @@ final class AuditFormatterTest extends TestCase
 
         self::assertSame(
             "3 advisories affecting 2 packages (critical: 1, high: 1, info: 1).\n",
-            $output->fetch(),
+            self::normalizeLineEndings($output->fetch()),
         );
     }
 
@@ -181,7 +182,10 @@ final class AuditFormatterTest extends TestCase
             $output,
         );
 
-        self::assertSame("No known frontend vulnerabilities found.\n", $output->fetch());
+        self::assertSame(
+            "No known frontend vulnerabilities found.\n",
+            self::normalizeLineEndings($output->fetch()),
+        );
     }
 
     public function testTableFormatEscapesAdvisoryMarkup(): void
@@ -258,5 +262,10 @@ final class AuditFormatterTest extends TestCase
             ['0.9.0'],
             ['project>package'],
         );
+    }
+
+    private static function normalizeLineEndings(string $output): string
+    {
+        return str_replace(["\r\n", "\r"], "\n", $output);
     }
 }

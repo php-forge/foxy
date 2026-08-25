@@ -23,12 +23,12 @@
                 }
             ],
             "id": 1106913,
-            "title": "Prototype pollution in lodash",
+            "title": "Command Injection in lodash",
             "module_name": "lodash",
             "vulnerable_versions": "<4.17.21",
             "patched_versions": ">=4.17.21",
             "severity": "high",
-            "cwe": "CWE-1321",
+            "cwe": "CWE-77",
             "github_advisory_id": "GHSA-35JH-R3H4-6JHM",
             "url": "https://github.com/advisories/GHSA-35jh-r3h4-6jhm"
         },

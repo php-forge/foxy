@@ -68,6 +68,12 @@ final class BunAssetManagerTest extends AssetManager
                 true,
                 'install.optional=false',
             ],
+            'comment after bunfig install table' => [
+                'bunfig.toml',
+                "[install] # comment\noptional = false\n",
+                true,
+                'install.optional=false',
+            ],
             'double-BOM-prefixed bunfig optional exclusion' => [
                 'bunfig.toml',
                 "\xEF\xBB\xBF\xEF\xBB\xBF[install]\noptional = false\n",
@@ -163,6 +169,21 @@ final class BunAssetManagerTest extends AssetManager
         self::assertSame($this->getValidAuditCommand(true), $this->executor->getExecutedCommand(1));
     }
 
+    public function testAuditPreservesQuotedTomlCharactersDuringPreflight(): void
+    {
+        file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'bun.lock', '{}');
+        file_put_contents(
+            $this->cwd . DIRECTORY_SEPARATOR . 'bunfig.toml',
+            "[install]\nnote = [\"]\", '}#', \"escaped \\\"#\"] # comment\noptional = true\n",
+        );
+        $this->executor->addExpectedValues(0, $this->getValidVersion());
+        $this->executor->addExpectedValues(0, '{}');
+
+        $this->getManager()->audit(false);
+
+        self::assertSame($this->getValidAuditCommand(false), $this->executor->getExecutedCommand(1));
+    }
+
     public function testAuditUsesTheSameEnvironmentPrecedenceAsTheManagerProcess(): void
     {
         $environmentConfig = $this->cwd . DIRECTORY_SEPARATOR . 'environment-config';
@@ -231,12 +252,12 @@ final class BunAssetManagerTest extends AssetManager
             ],
             'escaped dependency key' => [
                 'bunfig.toml',
-                "[install]\n\"optio\\u006eal\" = false\n",
+                "[install]\n\"option\\u0061l\" = false\n",
                 'escape sequences in TOML keys are not supported; use canonical keys',
             ],
             'hex-escaped table and dependency keys' => [
                 'bunfig.toml',
-                "[\"in\\x73tall\"]\n\"optio\\x6eal\" = false\n",
+                "[\"in\\x73tall\"]\n\"option\\x61l\" = false\n",
                 'escape sequences in TOML keys are not supported; use canonical keys',
             ],
             'single-line inline install table' => [
@@ -267,6 +288,16 @@ final class BunAssetManagerTest extends AssetManager
             'multiline array in install table' => [
                 'bunfig.toml',
                 "[install]\nnote = [\n  [1],\n]\noptional = false\n",
+                'multiline container values in [install] are not supported',
+            ],
+            'unterminated string in an install container' => [
+                'bunfig.toml',
+                "[install]\nnote = [\"unterminated]\noptional = false\n",
+                'multiline container values in [install] are not supported',
+            ],
+            'unterminated literal string in an install container' => [
+                'bunfig.toml',
+                "[install]\nnote = ['unterminated]\noptional = false\n",
                 'multiline container values in [install] are not supported',
             ],
             'UTF-16LE bunfig' => [

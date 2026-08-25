@@ -240,6 +240,24 @@ final class AuditCommandTest extends TestCase
         self::assertSame('', $tester->getDisplay(true));
     }
 
+    public function testRunnerFailurePreservesMessageWithInvalidUtf8(): void
+    {
+        $runner = $this->createMock(AuditRunnerInterface::class);
+        $runner
+            ->expects(self::once())
+            ->method('audit')
+            ->willThrowException(new RuntimeException(" Process \xFF\nfailed "));
+        $io = $this->createMock(IOInterface::class);
+        $io
+            ->expects(self::once())
+            ->method('writeError')
+            ->with("<error>Foxy audit failed: Process \xFF failed</error>");
+        $tester = $this->createTester($runner, io: $io);
+
+        self::assertSame(AuditCommand::STATUS_FAILED, $tester->execute([]));
+        self::assertSame('', $tester->getDisplay(true));
+    }
+
     public static function thresholdStatuses(): array
     {
         return [

@@ -100,7 +100,7 @@ abstract class AbstractAuditParser
             }
         }
 
-        return array_map(strtoupper(...), $cves);
+        return $this->uniqueStrings(array_map(strtoupper(...), $cves));
     }
 
     final protected function getGhsaId(string|null $value): string|null

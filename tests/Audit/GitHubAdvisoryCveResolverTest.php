@@ -16,15 +16,19 @@ final class GitHubAdvisoryCveResolverTest extends TestCase
     use AuditFixture;
 
     private const string GHSA_ID = 'GHSA-35jh-r3h4-6jhm';
-    private const string URL = 'https://api.github.com/advisories/GHSA-35jh-r3h4-6jhm';
+    private const string GHSA_WITH_CVES_ID = 'GHSA-aaaa-bbbb-cccc';
+    private const string GHSA_WITHOUT_CVE_ID = 'GHSA-dddd-eeee-ffff';
 
     public function testResolverCollectsDeduplicatesAndSortsCves(): void
     {
         $resolver = new GitHubAdvisoryCveResolver(
-            $this->downloader(self::fixture('github-advisory-with-cves.json')),
+            $this->downloader(
+                self::fixture('github-advisory-with-cves.json'),
+                self::GHSA_WITH_CVES_ID,
+            ),
         );
 
-        $resolution = $resolver->resolve('ghsa-35JH-r3H4-6JHm');
+        $resolution = $resolver->resolve('ghsa-AAaa-bBBb-CccC');
 
         self::assertSame(CveStatus::RESOLVED, $resolution->status);
         self::assertSame(['CVE-2020-8203', 'CVE-2021-23337'], $resolution->cves);
@@ -33,10 +37,13 @@ final class GitHubAdvisoryCveResolverTest extends TestCase
     public function testResolverDistinguishesAdvisoryWithoutAssignedCve(): void
     {
         $resolver = new GitHubAdvisoryCveResolver(
-            $this->downloader(self::fixture('github-advisory-without-cve.json')),
+            $this->downloader(
+                self::fixture('github-advisory-without-cve.json'),
+                self::GHSA_WITHOUT_CVE_ID,
+            ),
         );
 
-        $resolution = $resolver->resolve(self::GHSA_ID);
+        $resolution = $resolver->resolve(self::GHSA_WITHOUT_CVE_ID);
 
         self::assertSame(CveStatus::NONE_ASSIGNED, $resolution->status);
         self::assertSame([], $resolution->cves);
@@ -57,7 +64,10 @@ final class GitHubAdvisoryCveResolverTest extends TestCase
     public function testResolverRejectsMismatchedAdvisoryDocument(): void
     {
         $resolver = new GitHubAdvisoryCveResolver(
-            $this->downloader('{"ghsa_id":"GHSA-aaaa-bbbb-cccc","identifiers":[]}'),
+            $this->downloader(
+                '{"ghsa_id":"GHSA-aaaa-bbbb-cccc","identifiers":[]}',
+                self::GHSA_ID,
+            ),
         );
 
         $this->expectException(RuntimeException::class);
@@ -68,14 +78,15 @@ final class GitHubAdvisoryCveResolverTest extends TestCase
         $resolver->resolve(self::GHSA_ID);
     }
 
-    private function downloader(string $body): HttpDownloader&MockObject
+    private function downloader(string $body, string $ghsaId): HttpDownloader&MockObject
     {
+        $url = 'https://api.github.com/advisories/' . $ghsaId;
         $downloader = $this->createMock(HttpDownloader::class);
         $downloader
             ->expects(self::once())
             ->method('get')
             ->with(
-                self::URL,
+                $url,
                 [
                     'http' => [
                         'header' => [
@@ -85,7 +96,7 @@ final class GitHubAdvisoryCveResolverTest extends TestCase
                     ],
                 ],
             )
-            ->willReturn(new Response(['url' => self::URL], 200, [], $body));
+            ->willReturn(new Response(['url' => $url], 200, [], $body));
 
         return $downloader;
     }

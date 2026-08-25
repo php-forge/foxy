@@ -112,6 +112,47 @@ final class BunManager extends AbstractAssetManager
         }
     }
 
+    private function consumeTomlStringCharacter(
+        string $character,
+        bool &$inDoubleQuote,
+        bool &$inSingleQuote,
+        bool &$escaped,
+    ): bool {
+        if ($inDoubleQuote) {
+            if ($escaped) {
+                $escaped = false;
+            } elseif ('\\' === $character) {
+                $escaped = true;
+            } elseif ('"' === $character) {
+                $inDoubleQuote = false;
+            }
+
+            return true;
+        }
+
+        if ($inSingleQuote) {
+            if ('\'' === $character) {
+                $inSingleQuote = false;
+            }
+
+            return true;
+        }
+
+        if ('"' === $character) {
+            $inDoubleQuote = true;
+
+            return true;
+        }
+
+        if ('\'' === $character) {
+            $inSingleQuote = true;
+
+            return true;
+        }
+
+        return false;
+    }
+
     /**
      * Read the environment using the same merge order as Symfony Process.
      */
@@ -232,35 +273,7 @@ final class BunManager extends AbstractAssetManager
         for ($position = 0, $length = strlen($value); $position < $length; ++$position) {
             $character = $value[$position];
 
-            if ($inDoubleQuote) {
-                if ($escaped) {
-                    $escaped = false;
-                } elseif ('\\' === $character) {
-                    $escaped = true;
-                } elseif ('"' === $character) {
-                    $inDoubleQuote = false;
-                }
-
-                continue;
-            }
-
-            if ($inSingleQuote) {
-                if ('\'' === $character) {
-                    $inSingleQuote = false;
-                }
-
-                continue;
-            }
-
-            if ('"' === $character) {
-                $inDoubleQuote = true;
-
-                continue;
-            }
-
-            if ('\'' === $character) {
-                $inSingleQuote = true;
-
+            if ($this->consumeTomlStringCharacter($character, $inDoubleQuote, $inSingleQuote, $escaped)) {
                 continue;
             }
 
@@ -336,35 +349,7 @@ final class BunManager extends AbstractAssetManager
         for ($position = 0, $length = strlen($line); $position < $length; ++$position) {
             $character = $line[$position];
 
-            if ($inDoubleQuote) {
-                if ($escaped) {
-                    $escaped = false;
-                } elseif ('\\' === $character) {
-                    $escaped = true;
-                } elseif ('"' === $character) {
-                    $inDoubleQuote = false;
-                }
-
-                continue;
-            }
-
-            if ($inSingleQuote) {
-                if ('\'' === $character) {
-                    $inSingleQuote = false;
-                }
-
-                continue;
-            }
-
-            if ('"' === $character) {
-                $inDoubleQuote = true;
-
-                continue;
-            }
-
-            if ('\'' === $character) {
-                $inSingleQuote = true;
-
+            if ($this->consumeTomlStringCharacter($character, $inDoubleQuote, $inSingleQuote, $escaped)) {
                 continue;
             }
 

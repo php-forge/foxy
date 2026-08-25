@@ -182,7 +182,7 @@ final class NpmManager extends AbstractAssetManager
     private function workspaceEnumerationFailure(): RuntimeException
     {
         return new RuntimeException(
-            'The npm workspace graph couldn\'t be enumerated from package-lock.json. '
+            'The npm workspace graph could not be enumerated from package-lock.json. '
             . 'Regenerate the lock file with a supported npm version.',
         );
     }

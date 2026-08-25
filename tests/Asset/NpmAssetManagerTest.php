@@ -31,7 +31,7 @@ final class NpmAssetManagerTest extends AssetManager
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            'The npm workspace graph couldn\'t be enumerated from package-lock.json. '
+            'The npm workspace graph could not be enumerated from package-lock.json. '
             . 'Regenerate the lock file with a supported npm version.',
         );
 
