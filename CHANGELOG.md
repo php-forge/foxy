@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - docs: update command syntax in `development.md` and `testing.md` for clarity and consistency.
 - fix: remove the unnecessary `src` argument from the Rector command in `composer.json`.
 - feat: prepare Foxy `0.3` for PHP `8.3`, faster execution, safer fallbacks, updated tooling, and clearer docs.
+- fix: preserve plugin self-updates and clarify framework-agnostic Composer application support.
 
 ## 0.2.0 January 24, 2026
 
