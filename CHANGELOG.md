@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - feat: prepare Foxy `0.3` for PHP `8.3`, faster execution, safer fallbacks, updated tooling, and clearer docs.
 - fix: preserve plugin self-updates and clarify framework-agnostic Composer application support.
 - feat!: require Bun `^1.4.0`, npm `^12.0.2`, pnpm `^11.23.0`, or Yarn `^4.18.0` and remove legacy manager support.
+- fix: run manager commands in the configured root directory without changing the PHP working directory, and prevent manager probes and npm dependency cleanup when manager execution is disabled.
 
 ## 0.2.0 January 24, 2026
 

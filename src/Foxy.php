@@ -197,7 +197,7 @@ final class Foxy implements PluginInterface, EventSubscriberInterface
         /** @var string|null $manager */
         $manager = $config->get('manager');
 
-        return $amf->findManager($manager);
+        return $amf->findManager($manager, $this->isEnabled('run-asset-manager'));
     }
 
     /**

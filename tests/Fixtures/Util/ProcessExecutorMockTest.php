@@ -16,23 +16,27 @@ final class ProcessExecutorMockTest extends TestCase
         $executor->addExpectedValues(42, 'TEST 2');
 
         $executor->execute('run', $output);
-        $executor->execute('run2', $output2);
+        $executor->execute('run2', $output2, '/project');
 
         self::assertSame('run', $executor->getExecutedCommand(0));
         self::assertSame(0, $executor->getExecutedReturnedCode(0));
         self::assertSame('TEST', $executor->getExecutedOutput(0));
+        self::assertNull($executor->getExecutedWorkingDirectory(0));
 
         self::assertSame('run2', $executor->getExecutedCommand(1));
         self::assertSame(42, $executor->getExecutedReturnedCode(1));
         self::assertSame('TEST 2', $executor->getExecutedOutput(1));
+        self::assertSame('/project', $executor->getExecutedWorkingDirectory(1));
 
         self::assertNull($executor->getExecutedCommand(2));
         self::assertNull($executor->getExecutedReturnedCode(2));
         self::assertNull($executor->getExecutedOutput(2));
+        self::assertNull($executor->getExecutedWorkingDirectory(2));
 
         self::assertSame('run2', $executor->getLastCommand());
         self::assertSame(42, $executor->getLastReturnedCode());
         self::assertSame('TEST 2', $executor->getLastOutput());
+        self::assertSame('/project', $executor->getLastWorkingDirectory());
 
         self::assertSame('TEST', $output);
         self::assertSame('TEST 2', $output2);
@@ -47,14 +51,17 @@ final class ProcessExecutorMockTest extends TestCase
         self::assertSame('run', $executor->getExecutedCommand(0));
         self::assertEquals(0, $executor->getExecutedReturnedCode(0));
         self::assertNull($executor->getExecutedOutput(0));
+        self::assertNull($executor->getExecutedWorkingDirectory(0));
 
         self::assertNull($executor->getExecutedCommand(1));
         self::assertNull($executor->getExecutedReturnedCode(1));
         self::assertNull($executor->getExecutedOutput(1));
+        self::assertNull($executor->getExecutedWorkingDirectory(1));
 
         self::assertSame('run', $executor->getLastCommand());
         self::assertEquals(0, $executor->getLastReturnedCode());
         self::assertNull($executor->getLastOutput());
+        self::assertNull($executor->getLastWorkingDirectory());
 
         self::assertNull($output);
     }

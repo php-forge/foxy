@@ -32,7 +32,7 @@ abstract class AbstractProcessExecutorMock extends ProcessExecutor
         $expected = $this->expectedValues[$this->position] ?? [0, $output];
 
         [$returnedCode, $output] = $expected;
-        $this->executedCommands[] = [$command, $returnedCode, $output];
+        $this->executedCommands[] = [$command, $returnedCode, $output, $cwd];
         ++$this->position;
 
         return $returnedCode;
@@ -65,6 +65,14 @@ abstract class AbstractProcessExecutorMock extends ProcessExecutor
     }
 
     /**
+     * Get the working directory of an executed command.
+     */
+    public function getExecutedWorkingDirectory(int $position): string|null
+    {
+        return $this->getExecutedValue($position, 3);
+    }
+
+    /**
      * Get the last executed command.
      */
     public function getLastCommand(): int|string|null
@@ -86,6 +94,14 @@ abstract class AbstractProcessExecutorMock extends ProcessExecutor
     public function getLastReturnedCode(): int|string|null
     {
         return $this->getExecutedReturnedCode(count($this->executedCommands) - 1);
+    }
+
+    /**
+     * Get the working directory of the last executed command.
+     */
+    public function getLastWorkingDirectory(): string|null
+    {
+        return $this->getExecutedWorkingDirectory(count($this->executedCommands) - 1);
     }
 
     /**

@@ -36,9 +36,10 @@ different location.
 
 ## How does Foxy select a frontend manager?
 
-Set `config.foxy.manager` to `bun`, `npm`, `pnpm`, or `yarn` for deterministic selection. When it is omitted, Foxy first
-looks for one recognized native lockfile and then for an available manager executable. Multiple recognized lockfiles
-require explicit selection.
+Set `config.foxy.manager` to `bun`, `npm`, `pnpm`, or `yarn` for deterministic selection. When it is omitted and manager
+execution is enabled, Foxy first looks for one recognized native lockfile and then for an available manager executable.
+With execution disabled, it uses a single recognized lockfile or npm as the manifest adapter without probing binaries.
+Multiple recognized lockfiles require explicit selection in either mode.
 
 Explicit selection and a committed native lockfile are recommended for CI.
 
@@ -49,7 +50,7 @@ Check the following:
 1. The package uses one of the documented activation methods.
 2. Its `package.json` exists at the package root or configured Foxy root.
 3. The root application's `enable-packages` configuration does not exclude it.
-4. The selected frontend manager is installed and allowed by its configured version constraint.
+4. When manager execution is enabled, the selected frontend manager is installed and allowed by its configured version constraint.
 
 Composer must run before a standalone frontend manager command because Foxy creates the local package representations
 during Composer install and update operations.
@@ -76,8 +77,9 @@ operation; enabled fallbacks restore their captured state when asset solving fai
 
 ## Can Foxy update package.json without installing frontend dependencies?
 
-Yes. Set `config.foxy.run-asset-manager=false`. Foxy will update the package definition but skip the external manager
-validation and command.
+Yes. Set `config.foxy.run-asset-manager=false`. Foxy will update the package definition without probing or validating
+the external manager, running its commands, or removing existing `node_modules/@composer-asset/*` installations during
+npm reconciliation.
 
 ## Why are a dependency's scripts or devDependencies not copied?
 

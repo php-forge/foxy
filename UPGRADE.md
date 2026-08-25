@@ -10,7 +10,7 @@ Before updating, ensure the environment provides:
 
 - PHP 8.3 or later.
 - Composer 2.10.2 or later.
-- One supported frontend manager: Bun `^1.4.0`, npm `^12.0.2`, pnpm `^11.23.0`, or Yarn `^4.18.0`.
+- One supported frontend manager when manager execution is enabled: Bun `^1.4.0`, npm `^12.0.2`, pnpm `^11.23.0`, or Yarn `^4.18.0`.
 - For npm, Node.js `^22.22.2 || ^24.15.0 || >=26.0.0`.
 - For pnpm, Node.js `>=22.13.0`.
 - For Yarn, Node.js `>=18.12.0` on a release that still receives security updates.
@@ -48,9 +48,9 @@ Library authors that keep Foxy in `require-dev` should update that constraint to
 
 ### Frontend manager selection
 
-Foxy can select a manager automatically from one recognized native lockfile or an available executable. Multiple
-recognized lockfiles require explicit selection. For predictable upgrades and CI runs, configure the manager and
-commit its native lockfile:
+When manager execution is enabled, Foxy can select a manager automatically from one recognized native lockfile or an
+available executable. Multiple recognized lockfiles require explicit selection. For predictable upgrades and CI runs,
+configure the manager and commit its native lockfile:
 
 ```json
 {
@@ -186,4 +186,5 @@ pre-command contents of the root `composer.json`, which Composer may already hav
 when necessary, revert the root manifest after a failed operation.
 
 Setting `enabled=false` now bypasses manager discovery, fallback snapshots, package merging, and manager execution.
-Setting `run-asset-manager=false` retains package merging but skips manager version validation and execution.
+Setting `run-asset-manager=false` retains package merging but skips manager binary probing, version validation,
+execution, and npm cleanup of existing `node_modules/@composer-asset/*` installations.

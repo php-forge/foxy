@@ -27,6 +27,9 @@ package version only when the embedded package does not declare its own version.
 | Yarn        | `^4.18.0`; Node.js `>=18.12.0` on a release that still receives security fixes |
 | Git         | Required only for Git-based dependencies                                       |
 
+The frontend manager requirements apply only when manager execution is enabled. Manifest-only mode does not require a
+manager binary.
+
 ## Installation
 
 Composer plugins execute code during Composer operations. Authorize Foxy explicitly before installing it:
@@ -40,9 +43,12 @@ The plugin is installed in the configured Composer vendor directory, normally `v
 
 ## Manager selection
 
-Set `config.foxy.manager` to `bun`, `npm`, `pnpm`, or `yarn` when reproducible manager selection is required. When the
-option is omitted, Foxy looks for one recognized native lockfile and then for an available manager executable. Multiple
-recognized lockfiles require explicit selection.
+Set `config.foxy.manager` to `bun`, `npm`, `pnpm`, or `yarn` when reproducible manager selection is required. When
+manager execution is enabled and the option is omitted, Foxy looks for one recognized native lockfile and then for an
+available manager executable. Multiple recognized lockfiles require explicit selection.
+
+When `run-asset-manager` is `false`, Foxy selects from a single lockfile or uses npm as the manifest adapter without
+probing executables.
 
 Commit the selected manager's native lockfile and use the same explicit manager in local development and CI.
 

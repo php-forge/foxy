@@ -491,6 +491,29 @@ abstract class AssetManager extends TestCase
         }
     }
 
+    public function testRunPreservesWorkingDirectoryWhenExecutorThrows(): void
+    {
+        $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'root-package';
+        $this->sfs->mkdir($rootPackageDir);
+        $originalCwd = getcwd();
+
+        $this->executor = new ThrowingProcessExecutorMock($this->io, $this->getValidVersion());
+        $this->config = new Config(
+            [],
+            ['run-asset-manager' => true, 'root-package-json-dir' => $rootPackageDir],
+        );
+        $this->fallback->expects(self::once())->method('restore');
+        $this->manager = $this->getManager();
+
+        try {
+            $this->manager->run();
+            self::fail('Expected the process execution to fail.');
+        } catch (\RuntimeException $exception) {
+            self::assertSame('Process execution failed.', $exception->getMessage());
+            self::assertSame($originalCwd, getcwd());
+        }
+    }
+
     public function testRunRejectsUnsupportedManagerVersion(): void
     {
         $this->config = new Config([], ['run-asset-manager' => true]);
@@ -545,34 +568,37 @@ abstract class AssetManager extends TestCase
         }
     }
 
-    public function testRunRestoresWorkingDirectoryWhenExecutorThrows(): void
+    public function testRunUsesRelativeRootDirectoryWithoutChangingProcessDirectory(): void
     {
-        $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'root-package';
+        $configuredRootPackageDir = 'root-package';
+        $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . $configuredRootPackageDir;
         $this->sfs->mkdir($rootPackageDir);
         $originalCwd = getcwd();
 
-        $this->executor = new ThrowingProcessExecutorMock($this->io, $this->getValidVersion());
         $this->config = new Config(
             [],
-            ['run-asset-manager' => true, 'root-package-json-dir' => $rootPackageDir],
+            ['run-asset-manager' => true, 'root-package-json-dir' => $configuredRootPackageDir],
         );
-        $this->fallback->expects(self::once())->method('restore');
         $this->manager = $this->getManager();
 
-        try {
-            $this->manager->run();
-            self::fail('Expected the process execution to fail.');
-        } catch (\RuntimeException $exception) {
-            self::assertSame('Process execution failed.', $exception->getMessage());
-            self::assertSame($originalCwd, getcwd());
-        }
+        file_put_contents($rootPackageDir . DIRECTORY_SEPARATOR . $this->manager->getPackageName(), '{}');
+        file_put_contents($rootPackageDir . DIRECTORY_SEPARATOR . $this->manager->getLockPackageName(), '{}');
+        $this->sfs->mkdir($rootPackageDir . DIRECTORY_SEPARATOR . 'node_modules');
+
+        $this->actionForTestRunForInstallCommand('update');
+        $this->executor->addExpectedValues(0, 'ASSET MANAGER OUTPUT');
+
+        self::assertSame(0, $this->manager->run());
+        self::assertSame($this->getValidUpdateCommand(), $this->executor->getLastCommand());
+        self::assertSame($rootPackageDir, $this->executor->getExecutedWorkingDirectory(0));
+        self::assertSame($rootPackageDir, $this->executor->getExecutedWorkingDirectory(1));
+        self::assertSame($originalCwd, getcwd());
     }
 
-    public function testRunWithChdirFailure(): void
+    public function testRunWithAbsoluteRootDirectoryDoesNotReadCurrentWorkingDirectory(): void
     {
         $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'root-package';
         $this->sfs->mkdir($rootPackageDir);
-        $originalCwd = getcwd();
 
         $this->config = new Config(
             [],
@@ -580,63 +606,13 @@ abstract class AssetManager extends TestCase
         );
         $this->manager = $this->getManager();
 
-        MockerState::addCondition('Foxy\\Asset', 'chdir', [$rootPackageDir], false);
-        $this->actionForTestRunForInstallCommand('install');
-
-        try {
-            $this->getManager()->run();
-            self::fail('Expected a runtime exception when chdir fails.');
-        } catch (RuntimeException $exception) {
-            self::assertSame(
-                sprintf('Unable to change working directory to "%s".', $rootPackageDir),
-                $exception->getMessage(),
-            );
-            self::assertSame(
-                $originalCwd,
-                getcwd(),
-            );
-        }
-    }
-
-    public function testRunWithChdirRestoreFailure(): void
-    {
-        $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'root-package';
-        $this->sfs->mkdir($rootPackageDir);
-        $originalCwd = getcwd();
-
-        $this->config = new Config(
-            [],
-            ['run-asset-manager' => true, 'root-package-json-dir' => $rootPackageDir],
-        );
-        $this->manager = $this->getManager();
-
-        MockerState::addCondition('Foxy\\Asset', 'chdir', [$rootPackageDir], true);
-        MockerState::addCondition('Foxy\\Asset', 'chdir', [$originalCwd], false);
-
+        MockerState::addCondition('Foxy\\Asset', 'getcwd', [], false);
         $this->actionForTestRunForInstallCommand('install');
         $this->executor->addExpectedValues(0, 'ASSET MANAGER OUTPUT');
 
-        try {
-            $this->manager->run();
-            self::fail('Expected a runtime exception when restoring chdir fails.');
-        } catch (RuntimeException $exception) {
-            self::assertSame(
-                sprintf('Unable to restore working directory to "%s".', $originalCwd),
-                $exception->getMessage(),
-            );
-            self::assertSame(
-                $originalCwd,
-                getcwd(),
-            );
-            self::assertSame(
-                $this->getValidInstallCommand(),
-                $this->executor->getLastCommand(),
-            );
-            self::assertSame(
-                'ASSET MANAGER OUTPUT',
-                $this->executor->getLastOutput(),
-            );
-        }
+        self::assertSame(0, $this->manager->run());
+        self::assertSame($rootPackageDir, $this->executor->getExecutedWorkingDirectory(0));
+        self::assertSame($rootPackageDir, $this->executor->getExecutedWorkingDirectory(1));
     }
 
     #[DataProvider('getEnabledRunAssetManagerData')]
@@ -670,48 +646,19 @@ abstract class AssetManager extends TestCase
         self::assertNull($this->executor->getLastCommand());
     }
 
-    public function testRunWithGetcwdFailure(): void
-    {
-        $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'root-package';
-        $this->sfs->mkdir($rootPackageDir);
-        $originalCwd = getcwd();
-
-        $this->config = new Config(
-            [],
-            ['run-asset-manager' => true, 'root-package-json-dir' => $rootPackageDir],
-        );
-        $this->manager = $this->getManager();
-
-        MockerState::addCondition('Foxy\\Asset', 'getcwd', [], false);
-        $this->actionForTestRunForInstallCommand('install');
-
-        try {
-            $this->getManager()->run();
-            self::fail('Expected a runtime exception when getcwd fails.');
-        } catch (RuntimeException $exception) {
-            self::assertSame(
-                'Unable to get the current working directory.',
-                $exception->getMessage(),
-            );
-            self::assertSame(
-                $originalCwd,
-                getcwd(),
-            );
-        }
-    }
-
-    public function testRunWithoutCustomDirectoryDoesNotChangeWorkingDirectory(): void
+    public function testRunWithoutCustomDirectoryUsesCurrentWorkingDirectory(): void
     {
         $this->config = new Config([], ['run-asset-manager' => true]);
         $this->manager = $this->getManager();
-
-        MockerState::addCondition('Foxy\\Asset', 'chdir', [$this->cwd], false);
 
         $this->actionForTestRunForInstallCommand('install');
         $this->executor->addExpectedValues(0, 'ASSET MANAGER OUTPUT');
 
         self::assertSame(0, $this->manager->run());
         self::assertSame($this->getValidInstallCommand(), $this->executor->getLastCommand());
+        self::assertNull($this->executor->getExecutedWorkingDirectory(0));
+        self::assertNull($this->executor->getExecutedWorkingDirectory(1));
+        self::assertNull($this->executor->getExecutedCommand(2));
     }
 
     public function testSetUpdatable(): void
@@ -750,6 +697,8 @@ abstract class AssetManager extends TestCase
             $originalCwd,
             getcwd(),
         );
+        self::assertSame($rootPackageDir, $this->executor->getExecutedWorkingDirectory(0));
+        self::assertSame($rootPackageDir, $this->executor->getExecutedWorkingDirectory(1));
     }
 
     public function testSpecifyCustomDirectoryFromPackageJsonException(): void
