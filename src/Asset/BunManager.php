@@ -18,10 +18,9 @@ final class BunManager extends AbstractAssetManager
         return 'bun';
     }
 
-    public function hasLockFile(): bool
+    public function getVersionConstraint(): string
     {
-        return parent::hasLockFile()
-            || file_exists($this->getRootPackagePath('bun.lockb'));
+        return '^1.4.0';
     }
 
     public function isInstalled(): bool

@@ -53,6 +53,11 @@ final readonly class StubAssetManager implements AssetManagerInterface
         return 'stub-package.json';
     }
 
+    public function getVersionConstraint(): string
+    {
+        return '*';
+    }
+
     public function hasLockFile(): bool
     {
         return false;
@@ -69,11 +74,6 @@ final readonly class StubAssetManager implements AssetManagerInterface
     }
 
     public function isUpdatable(): bool
-    {
-        return false;
-    }
-
-    public function isValidForUpdate(): bool
     {
         return false;
     }

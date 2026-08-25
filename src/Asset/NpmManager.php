@@ -16,6 +16,11 @@ final class NpmManager extends AbstractAssetManager
         return 'npm';
     }
 
+    public function getVersionConstraint(): string
+    {
+        return '^12.0.2';
+    }
+
     protected function actionWhenComposerDependenciesAreAlreadyInstalled(array $names): void
     {
         foreach ($names as $name) {

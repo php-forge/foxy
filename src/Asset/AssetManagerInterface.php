@@ -34,6 +34,11 @@ interface AssetManagerInterface
     public function getPackageName(): string;
 
     /**
+     * Get the supported version constraint of the asset manager.
+     */
+    public function getVersionConstraint(): string;
+
+    /**
      * Check if the lock file is present or not.
      */
     public function hasLockFile(): bool;
@@ -52,11 +57,6 @@ interface AssetManagerInterface
      * Check if the asset manager can be use the update command or not.
      */
     public function isUpdatable(): bool;
-
-    /**
-     * Check if the asset package is valid for the update.
-     */
-    public function isValidForUpdate(): bool;
 
     /**
      * Run the asset manager to install/update the asset dependencies.

@@ -6,6 +6,7 @@ namespace Foxy\Asset;
 
 use Composer\IO\IOInterface;
 use Composer\Package\RootPackageInterface;
+use Composer\Semver\Constraint\Constraint;
 use Composer\Semver\VersionParser;
 use Composer\Util\{Filesystem, Platform, ProcessExecutor};
 use Exception;
@@ -16,6 +17,7 @@ use Foxy\Fallback\FallbackInterface;
 use Foxy\Json\JsonFile;
 use Seld\JsonLint\ParsingException;
 use Throwable;
+use UnexpectedValueException;
 
 use function is_dir;
 use function is_string;
@@ -116,12 +118,7 @@ abstract class AbstractAssetManager implements AssetManagerInterface
 
     public function isUpdatable(): bool
     {
-        return $this->updatable && $this->isInstalled() && $this->isValidForUpdate();
-    }
-
-    public function isValidForUpdate(): bool
-    {
-        return true;
+        return $this->updatable && $this->isInstalled();
     }
 
     public function run(): int
@@ -130,18 +127,14 @@ abstract class AbstractAssetManager implements AssetManagerInterface
             return 0;
         }
 
-        $rootPackageDir = $this->config->get('root-package-json-dir');
+        $this->validate();
+
+        $rootPackageDir = $this->getManagerWorkingDirectory();
 
         $originalDir = null;
         $changedDir = false;
 
-        if (is_string($rootPackageDir) && $rootPackageDir !== '') {
-            $rootPackageDir = $this->getRootPackageDir();
-
-            if (is_dir($rootPackageDir) === false) {
-                throw new RuntimeException(sprintf('The root package directory "%s" doesn\'t exist.', $rootPackageDir));
-            }
-
+        if (null !== $rootPackageDir) {
             $originalDir = getcwd();
 
             if (false === $originalDir) {
@@ -214,18 +207,38 @@ abstract class AbstractAssetManager implements AssetManagerInterface
     {
         $version = $this->getVersion();
 
-        /** @var string|null $constraintVersion */
-        $constraintVersion = $this->config->get('manager-version');
-
         if (null === $version) {
             throw new RuntimeException(sprintf('The binary of "%s" must be installed', $this->getName()));
         }
 
+        $parser = new VersionParser();
+
+        $supportedVersion = $this->getVersionConstraint();
+
+        $unsupportedVersionMessage = sprintf(
+            'The installed %s version "%s" doesn\'t match with the supported version constraint "%s"',
+            $this->getName(),
+            $version,
+            $supportedVersion,
+        );
+
+        try {
+            $versionConstraint = new Constraint('==', $parser->normalize($version));
+        } catch (UnexpectedValueException) {
+            throw new RuntimeException($unsupportedVersionMessage);
+        }
+
+        if (!$parser->parseConstraints($supportedVersion)->matches($versionConstraint)) {
+            throw new RuntimeException($unsupportedVersionMessage);
+        }
+
+        /** @var string|null $constraintVersion */
+        $constraintVersion = $this->config->get('manager-version');
+
         if (is_string($constraintVersion) && $constraintVersion !== '') {
-            $parser = new VersionParser();
             $constraint = $parser->parseConstraints($constraintVersion);
 
-            if (!$constraint->matches($parser->parseConstraints($version))) {
+            if (!$constraint->matches($versionConstraint)) {
                 throw new RuntimeException(
                     sprintf(
                         'The installed %s version "%s" doesn\'t match with the constraint version "%s"',
@@ -324,7 +337,11 @@ abstract class AbstractAssetManager implements AssetManagerInterface
     protected function getVersion(): string|null
     {
         if ($this->version === '' && $this->versionConverter !== null) {
-            $this->executor->execute($this->getVersionCommand(), $version);
+            $this->executor->execute(
+                $this->getVersionCommand(),
+                $version,
+                $this->getManagerWorkingDirectory(),
+            );
 
             $version = trim((string) $version);
 
@@ -334,6 +351,23 @@ abstract class AbstractAssetManager implements AssetManagerInterface
         }
 
         return $this->version;
+    }
+
+    private function getManagerWorkingDirectory(): string|null
+    {
+        $rootPackageDir = $this->config->get('root-package-json-dir');
+
+        if (!is_string($rootPackageDir) || $rootPackageDir === '') {
+            return null;
+        }
+
+        $rootPackageDir = $this->getRootPackageDir();
+
+        if (!is_dir($rootPackageDir)) {
+            throw new RuntimeException(sprintf('The root package directory "%s" doesn\'t exist.', $rootPackageDir));
+        }
+
+        return $rootPackageDir;
     }
 
     private function isAbsolutePath(string $path): bool

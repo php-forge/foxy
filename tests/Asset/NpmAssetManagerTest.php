@@ -48,10 +48,16 @@ final class NpmAssetManagerTest extends AssetManager
         $observedTimeout = null;
         $executor = $this->createMock(ProcessExecutor::class);
         $executor
-            ->expects(self::once())
+            ->expects(self::exactly(2))
             ->method('execute')
             ->willReturnCallback(
-                static function () use (&$observedTimeout): int {
+                static function (mixed $command, mixed &$output = null) use (&$observedTimeout): int {
+                    if ('npm --version' === $command) {
+                        $output = '12.0.2';
+
+                        return 0;
+                    }
+
                     $observedTimeout = ProcessExecutor::getTimeout();
 
                     return 0;
@@ -77,6 +83,11 @@ final class NpmAssetManagerTest extends AssetManager
         return new NpmManager($this->io, $this->config, $this->executor, $this->fs, $this->fallback);
     }
 
+    protected function getUnsupportedVersion(): string
+    {
+        return '12.0.1';
+    }
+
     protected function getValidInstallCommand(): string
     {
         return 'npm install';
@@ -97,8 +108,18 @@ final class NpmAssetManagerTest extends AssetManager
         return 'npm update';
     }
 
+    protected function getValidVersion(): string
+    {
+        return '12.0.2';
+    }
+
     protected function getValidVersionCommand(): string
     {
         return 'npm --version';
+    }
+
+    protected function getValidVersionConstraint(): string
+    {
+        return '^12.0.2';
     }
 }

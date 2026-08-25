@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Foxy\Asset;
 
-use Composer\Semver\VersionParser;
-
 final class YarnManager extends AbstractAssetManager
 {
     public function getLockPackageName(): string
@@ -18,56 +16,33 @@ final class YarnManager extends AbstractAssetManager
         return 'yarn';
     }
 
-    public function isInstalled(): bool
+    public function getVersionConstraint(): string
     {
-        return parent::isInstalled() && file_exists($this->getLockFilePath());
+        return '^4.18.0';
     }
 
-    public function isValidForUpdate(): bool
+    public function isInstalled(): bool
     {
-        if ($this->isYarnNext()) {
-            return true;
-        }
-
-        $cmd = $this->buildCommand('yarn', 'check', $this->mergeInteractiveCommand(['check']));
-
-        return 0 === $this->executor->execute($cmd);
+        return file_exists($this->getPackageJsonPath())
+            && file_exists($this->getLockFilePath())
+            && (
+                is_dir($this->getNodeModulesPath())
+                || file_exists($this->getRootPackagePath('.pnp.cjs'))
+            );
     }
 
     protected function getInstallCommand(): string
     {
-        return $this->buildCommand('yarn', 'install', $this->mergeInteractiveCommand(['install']));
+        return $this->buildCommand('yarn', 'install', 'install');
     }
 
     protected function getUpdateCommand(): string
     {
-        $commandName = $this->isYarnNext() ? 'up' : 'upgrade';
-
-        return $this->buildCommand('yarn', 'update', $this->mergeInteractiveCommand([$commandName]));
+        return $this->buildCommand('yarn', 'update', 'up');
     }
 
     protected function getVersionCommand(): string
     {
         return $this->buildCommand('yarn', 'version', '--version');
-    }
-
-    private function isYarnNext(): bool
-    {
-        $version = $this->getVersion();
-
-        $parser = new VersionParser();
-
-        $constraint = $parser->parseConstraints('>=2.0.0');
-
-        return $version !== null && $constraint->matches($parser->parseConstraints($version));
-    }
-
-    private function mergeInteractiveCommand(array $command): array
-    {
-        if (!$this->isYarnNext()) {
-            $command[] = '--non-interactive';
-        }
-
-        return $command;
     }
 }

@@ -18,6 +18,11 @@ final class InspectableAssetManager extends AbstractAssetManager
         return $this->buildCommand($defaultBin, $action, $command);
     }
 
+    public function disableVersionConverterForTest(): void
+    {
+        $this->versionConverter = null;
+    }
+
     /**
      * @return list<string>|null
      */
@@ -49,6 +54,16 @@ final class InspectableAssetManager extends AbstractAssetManager
     public function getRootPackageDirForTest(): string
     {
         return $this->getRootPackageDir();
+    }
+
+    public function getVersionConstraint(): string
+    {
+        return '*';
+    }
+
+    public function getVersionForTest(): string|null
+    {
+        return $this->getVersion();
     }
 
     protected function actionWhenComposerDependenciesAreAlreadyInstalled(array $names): void

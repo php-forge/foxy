@@ -16,6 +16,11 @@ final class PnpmManager extends AbstractAssetManager
         return 'pnpm';
     }
 
+    public function getVersionConstraint(): string
+    {
+        return '^11.23.0';
+    }
+
     public function isInstalled(): bool
     {
         return parent::isInstalled() && file_exists($this->getLockFilePath());

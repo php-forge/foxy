@@ -6,7 +6,7 @@ namespace Foxy\Tests\Asset;
 
 use Composer\IO\IOInterface;
 use Composer\Package\RootPackageInterface;
-use Composer\Util\Filesystem;
+use Composer\Util\{Filesystem, ProcessExecutor};
 use Foxy\Config\Config;
 use Foxy\Converter\VersionConverterInterface;
 use Foxy\Fallback\FallbackInterface;
@@ -209,6 +209,42 @@ final class AbstractAssetManagerTest extends TestCase
 
         self::assertSame(DIRECTORY_SEPARATOR . 'inspectable.lock', $manager->getLockFilePathForTest());
         self::assertSame(DIRECTORY_SEPARATOR . 'node_modules', $manager->getNodeModulesPathForTest());
+    }
+
+    public function testVersionCommandUsesConfiguredRootDirectory(): void
+    {
+        $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'web';
+        $this->sfs->mkdir($rootPackageDir);
+        $this->config = new Config([], ['root-package-json-dir' => $rootPackageDir]);
+        $observedDirectory = null;
+        $executor = $this->createMock(ProcessExecutor::class);
+        $executor
+            ->expects(self::once())
+            ->method('execute')
+            ->willReturnCallback(
+                static function (mixed $command, mixed &$output = null, mixed $cwd = null) use (
+                    &$observedDirectory,
+                ): int {
+                    $output = '42.0.0';
+                    $observedDirectory = $cwd;
+
+                    return 0;
+                },
+            );
+
+        $manager = new InspectableAssetManager($this->io, $this->config, $executor, $this->fs, $this->fallback);
+        $manager->validate();
+
+        self::assertSame($rootPackageDir, $observedDirectory);
+    }
+
+    public function testVersionLookupRemainsExtensibleWhenConverterIsDisabled(): void
+    {
+        $manager = $this->createManager();
+        $manager->disableVersionConverterForTest();
+
+        self::assertSame('', $manager->getVersionForTest());
+        self::assertNull($this->executor->getLastCommand());
     }
 
     protected function setUp(): void
