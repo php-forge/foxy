@@ -17,15 +17,15 @@ package version only when the embedded package does not declare its own version.
 
 ## Requirements
 
-| Requirement | Supported version or value                                                   |
-| ----------- | ---------------------------------------------------------------------------- |
-| PHP         | 8.3 or later                                                                 |
-| Composer    | 2.10.2 or later                                                              |
-| Bun         | `^1.4.0`                                                                     |
-| npm         | `^12.0.2`; Node.js `^22.22.2 || ^24.15.0 || >=26.0.0`                        |
-| pnpm        | `^11.23.0`; Node.js `>=22.13.0`                                               |
+| Requirement | Supported version or value                                                     |
+| ----------- | ------------------------------------------------------------------------------ |
+| PHP         | 8.3 or later                                                                   |
+| Composer    | 2.10.2 or later                                                                |
+| Bun         | `^1.4.0`                                                                       |
+| npm         | `^12.0.2`; Node.js `^22.22.2 \|\| ^24.15.0 \|\| >=26.0.0`                      |
+| pnpm        | `^11.23.0`; Node.js `>=22.13.0`                                                |
 | Yarn        | `^4.18.0`; Node.js `>=18.12.0` on a release that still receives security fixes |
-| Git         | Required only for Git-based dependencies                                     |
+| Git         | Required only for Git-based dependencies                                       |
 
 ## Installation
 
