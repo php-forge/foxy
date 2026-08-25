@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Foxy\Tests\Asset;
 
 use Foxy\Asset\YarnManager;
-use Foxy\Config\Config;
 
 use function file_put_contents;
 
@@ -13,37 +12,29 @@ use const DIRECTORY_SEPARATOR;
 
 final class YarnAssetManagerTest extends AssetManager
 {
-    public function actionForTestRunForInstallCommand($action): void
+    public function testIsInstalledRequiresLockFileWithPlugAndPlayState(): void
     {
-        $this->executor->addExpectedValues(0, '1.0.0');
+        file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'package.json', '{}');
+        file_put_contents($this->cwd . DIRECTORY_SEPARATOR . '.pnp.cjs', '');
 
-        if ('update' === $action) {
-            $this->executor->addExpectedValues(0, '1.0.0');
-            $this->executor->addExpectedValues(0, '1.0.0');
-            $this->executor->addExpectedValues(0, 'CHECK OUTPUT');
-        }
+        self::assertFalse($this->manager->isInstalled());
     }
 
-    public function testClassicUpdateChecksInstalledDependencies(): void
+    public function testIsInstalledRequiresPackageFileWithPlugAndPlayState(): void
+    {
+        file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'yarn.lock', '');
+        file_put_contents($this->cwd . DIRECTORY_SEPARATOR . '.pnp.cjs', '');
+
+        self::assertFalse($this->manager->isInstalled());
+    }
+
+    public function testIsInstalledWithPlugAndPlayState(): void
     {
         file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'package.json', '{}');
         file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'yarn.lock', '');
-        $this->sfs->mkdir($this->cwd . DIRECTORY_SEPARATOR . 'node_modules');
-        $this->config = new Config([], ['run-asset-manager' => true]);
-        $this->executor->addExpectedValues(0, '1.0.0');
-        $this->executor->addExpectedValues(0, 'CHECK OUTPUT');
-        $this->executor->addExpectedValues(0, 'UPDATE OUTPUT');
-        $this->manager = $this->getManager();
+        file_put_contents($this->cwd . DIRECTORY_SEPARATOR . '.pnp.cjs', '');
 
-        self::assertSame(0, $this->manager->run());
-        self::assertSame('yarn check --non-interactive', $this->executor->getExecutedCommand(1));
-        self::assertSame('yarn upgrade --non-interactive', $this->executor->getExecutedCommand(2));
-    }
-
-    protected function actionForTestAddDependenciesForUpdateCommand(): void
-    {
-        $this->executor->addExpectedValues(0, '1.0.0');
-        $this->executor->addExpectedValues(0, 'CHECK OUTPUT');
+        self::assertTrue($this->manager->isInstalled());
     }
 
     protected function getManager(): YarnManager
@@ -51,9 +42,14 @@ final class YarnAssetManagerTest extends AssetManager
         return new YarnManager($this->io, $this->config, $this->executor, $this->fs, $this->fallback);
     }
 
+    protected function getUnsupportedVersion(): string
+    {
+        return '4.17.1';
+    }
+
     protected function getValidInstallCommand(): string
     {
-        return 'yarn install --non-interactive';
+        return 'yarn install';
     }
 
     protected function getValidLockPackageName(): string
@@ -68,11 +64,21 @@ final class YarnAssetManagerTest extends AssetManager
 
     protected function getValidUpdateCommand(): string
     {
-        return 'yarn upgrade --non-interactive';
+        return 'yarn up';
+    }
+
+    protected function getValidVersion(): string
+    {
+        return '4.18.0';
     }
 
     protected function getValidVersionCommand(): string
     {
         return 'yarn --version';
+    }
+
+    protected function getValidVersionConstraint(): string
+    {
+        return '^4.18.0';
     }
 }

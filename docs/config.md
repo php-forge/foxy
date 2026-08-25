@@ -49,7 +49,7 @@ manager-prefixed environment variable should contain the scalar value for the ac
 | ------------------------- | ---------------- | ---------------------------------------- | ---------------------------------------------------------------------------- |
 | `enabled`                 | boolean          | `true`                                   | Enables Foxy processing.                                                     |
 | `manager`                 | string or `null` | `null`                                   | Selects `bun`, `npm`, `pnpm`, or `yarn`; `null` enables automatic selection. |
-| `manager-version`         | string or map    | Manager-specific                         | Validates the selected manager version with a Composer constraint.           |
+| `manager-version`         | string or map    | Empty                                    | Adds a constraint within the built-in supported manager range.               |
 | `manager-bin`             | string or map    | Manager executable                       | Overrides the manager executable.                                            |
 | `manager-options`         | string or map    | Empty                                    | Appends options to both install and update commands.                         |
 | `manager-install-options` | string or map    | Empty                                    | Appends options only to install commands.                                    |
@@ -97,23 +97,28 @@ unknown or its executable is unavailable.
 
 ## Manager version constraints
 
-The default constraints are:
+Foxy always validates the selected manager against its built-in supported constraint:
 
-| Manager | Constraint |
-| ------- | ---------- |
-| Bun     | `>=1.1.0`  |
-| npm     | `>=5.0.0`  |
-| pnpm    | `>=7.0.0`  |
-| Yarn    | `>=1.0.0`  |
+| Manager | Built-in constraint |
+| ------- | ------------------- |
+| Bun     | `^1.4.0`            |
+| npm     | `^12.0.2`           |
+| pnpm    | `^11.23.0`          |
+| Yarn    | `^4.18.0`           |
 
-Override the constraint for one manager:
+The `manager-version` option adds another Composer constraint that is evaluated together with the built-in constraint.
+It can narrow the accepted versions for a project, but it cannot replace or widen Foxy's supported range.
+Foxy treats the reported value as one concrete release and validates it from `root-package-json-dir` before every
+manager command. When `run-asset-manager` is `false`, Foxy neither executes nor validates the manager binary.
+
+Narrow the npm constraint for one project:
 
 ```json
 {
   "config": {
     "foxy": {
       "manager": "npm",
-      "manager-version": ">=10.0"
+      "manager-version": "~12.0.2"
     }
   }
 }
@@ -126,13 +131,16 @@ Manager-prefixed options may also use a map when a shared configuration supports
   "config": {
     "foxy": {
       "manager-version": {
-        "npm": ">=10.0",
-        "pnpm": ">=9.0"
+        "npm": "~12.0.2",
+        "pnpm": "~11.23.0"
       }
     }
   }
 }
 ```
+
+For example, configuring npm with `>=11.0.0` does not enable npm 11 because the built-in `^12.0.2` constraint remains
+in force. Remove `manager-version` to accept the complete built-in range for the selected manager.
 
 ## Manager executable and options
 

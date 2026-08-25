@@ -39,6 +39,8 @@ abstract class AssetManager extends TestCase
 
     abstract protected function getManager(): AssetManagerInterface;
 
+    abstract protected function getUnsupportedVersion(): string;
+
     abstract protected function getValidInstallCommand(): string;
 
     abstract protected function getValidLockPackageName(): string;
@@ -47,13 +49,26 @@ abstract class AssetManager extends TestCase
 
     abstract protected function getValidUpdateCommand(): string;
 
+    abstract protected function getValidVersion(): string;
+
     abstract protected function getValidVersionCommand(): string;
+
+    abstract protected function getValidVersionConstraint(): string;
 
     public static function getEnabledRunAssetManagerData(): array
     {
         return [
             'integer one' => [1],
             'string one' => ['1'],
+        ];
+    }
+
+    public static function getNonConcreteManagerVersionData(): array
+    {
+        return [
+            'named version' => ['latest', 'default || *'],
+            'range' => ['>=1', '>=1'],
+            'wildcard' => ['*', '*'],
         ];
     }
 
@@ -267,6 +282,14 @@ abstract class AssetManager extends TestCase
         );
     }
 
+    public function testGetVersionConstraint(): void
+    {
+        self::assertSame(
+            $this->getValidVersionConstraint(),
+            $this->manager->getVersionConstraint(),
+        );
+    }
+
     public function testHasLockFile(): void
     {
         self::assertFalse(
@@ -416,7 +439,7 @@ abstract class AssetManager extends TestCase
 
     public function testRunPreservesExecutorFailureWhenFallbackThrows(): void
     {
-        $this->executor = new ThrowingProcessExecutorMock($this->io);
+        $this->executor = new ThrowingProcessExecutorMock($this->io, $this->getValidVersion());
         $this->config = new Config([], ['run-asset-manager' => true]);
         $this->fallback
             ->expects(self::once())
@@ -468,6 +491,27 @@ abstract class AssetManager extends TestCase
         }
     }
 
+    public function testRunRejectsUnsupportedManagerVersion(): void
+    {
+        $this->config = new Config([], ['run-asset-manager' => true]);
+        $this->manager = $this->getManager();
+        $this->io->expects(self::never())->method('write');
+        $this->fallback->expects(self::never())->method('restore');
+        $this->executor->addExpectedValues(0, $this->getUnsupportedVersion());
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            sprintf(
+                'The installed %s version "%s" doesn\'t match with the supported version constraint "%s"',
+                $this->manager->getName(),
+                $this->getUnsupportedVersion(),
+                $this->getValidVersionConstraint(),
+            ),
+        );
+
+        $this->manager->run();
+    }
+
     public function testRunRestoresTimeoutWhenExecutorThrows(): void
     {
         $originalTimeout = ProcessExecutor::getTimeout();
@@ -477,7 +521,7 @@ abstract class AssetManager extends TestCase
         ProcessExecutor::setTimeout($expectedTimeout);
 
         try {
-            $this->executor = new ThrowingProcessExecutorMock($this->io);
+            $this->executor = new ThrowingProcessExecutorMock($this->io, $this->getValidVersion());
             $this->config = new Config([], ['run-asset-manager' => true, 'manager-timeout' => $managerTimeout]);
             $this->manager = $this->getManager();
             $this->fallback->expects(self::once())->method('restore');
@@ -507,7 +551,7 @@ abstract class AssetManager extends TestCase
         $this->sfs->mkdir($rootPackageDir);
         $originalCwd = getcwd();
 
-        $this->executor = new ThrowingProcessExecutorMock($this->io);
+        $this->executor = new ThrowingProcessExecutorMock($this->io, $this->getValidVersion());
         $this->config = new Config(
             [],
             ['run-asset-manager' => true, 'root-package-json-dir' => $rootPackageDir],
@@ -537,6 +581,7 @@ abstract class AssetManager extends TestCase
         $this->manager = $this->getManager();
 
         MockerState::addCondition('Foxy\\Asset', 'chdir', [$rootPackageDir], false);
+        $this->actionForTestRunForInstallCommand('install');
 
         try {
             $this->getManager()->run();
@@ -638,6 +683,7 @@ abstract class AssetManager extends TestCase
         $this->manager = $this->getManager();
 
         MockerState::addCondition('Foxy\\Asset', 'getcwd', [], false);
+        $this->actionForTestRunForInstallCommand('install');
 
         try {
             $this->getManager()->run();
@@ -694,6 +740,8 @@ abstract class AssetManager extends TestCase
             $rootPackageDir,
             $this->config->get('root-package-json-dir'),
         );
+        $this->actionForTestRunForInstallCommand('install');
+        $this->executor->addExpectedValues(0, 'ASSET MANAGER OUTPUT');
         self::assertSame(
             0,
             $this->getManager()->run(),
@@ -714,6 +762,7 @@ abstract class AssetManager extends TestCase
             ['run-asset-manager' => true, 'root-package-json-dir' => 'path/to/invalid'],
         );
         $this->manager = $this->getManager();
+        $this->actionForTestRunForInstallCommand('install');
 
         try {
             $this->getManager()->run();
@@ -732,7 +781,7 @@ abstract class AssetManager extends TestCase
 
     public function testValidateWithInstalledManagerAndWithoutValidationVersion(): void
     {
-        $this->executor->addExpectedValues(0, '42.0.0');
+        $this->executor->addExpectedValues(0, $this->getValidVersion());
         $this->manager->validate();
 
         self::assertNull(
@@ -742,30 +791,55 @@ abstract class AssetManager extends TestCase
 
     public function testValidateWithInstalledManagerAndWithoutValidVersion(): void
     {
+        $constraintVersion = '>' . $this->getValidVersion();
+
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessageMatches(
-            '/The installed (\w+) version "42.0.0" doesn\'t match with the constraint version ">=50.0"/',
+        $this->expectExceptionMessage(
+            sprintf(
+                'The installed %s version "%s" doesn\'t match with the constraint version "%s"',
+                $this->manager->getName(),
+                $this->getValidVersion(),
+                $constraintVersion,
+            ),
         );
 
-        $this->config = new Config([], ['manager-version' => '>=50.0']);
+        $this->config = new Config([], ['manager-version' => $constraintVersion]);
 
         $this->manager = $this->getManager();
-        $this->executor->addExpectedValues(0, '42.0.0');
+        $this->executor->addExpectedValues(0, $this->getValidVersion());
         $this->manager->validate();
     }
 
     public function testValidateWithInstalledManagerAndWithValidVersion(): void
     {
-        $this->config = new Config([], ['manager-version' => '>=41.0']);
+        $versionConstraint = $this->getValidVersionConstraint();
+        $this->config = new Config([], ['manager-version' => $versionConstraint]);
 
         $this->manager = $this->getManager();
-        $this->executor->addExpectedValues(0, '42.0.0');
+        $this->executor->addExpectedValues(0, $this->getValidVersion());
         $this->manager->validate();
 
         self::assertSame(
-            '>=41.0',
+            $versionConstraint,
             $this->config->get('manager-version'),
         );
+    }
+
+    #[DataProvider('getNonConcreteManagerVersionData')]
+    public function testValidateWithNonConcreteManagerVersion(string $reportedVersion, string $convertedVersion): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            sprintf(
+                'The installed %s version "%s" doesn\'t match with the supported version constraint "%s"',
+                $this->manager->getName(),
+                $convertedVersion,
+                $this->getValidVersionConstraint(),
+            ),
+        );
+
+        $this->executor->addExpectedValues(0, $reportedVersion);
+        $this->manager->validate();
     }
 
     public function testValidateWithoutInstalledManager(): void
@@ -773,6 +847,25 @@ abstract class AssetManager extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessageMatches('/The binary of "(\w+)" must be installed/');
 
+        $this->manager->validate();
+    }
+
+    public function testValidateWithUnsupportedManagerVersion(): void
+    {
+        $unsupportedVersion = $this->getUnsupportedVersion();
+        $versionConstraint = $this->getValidVersionConstraint();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            sprintf(
+                'The installed %s version "%s" doesn\'t match with the supported version constraint "%s"',
+                $this->manager->getName(),
+                $unsupportedVersion,
+                $versionConstraint,
+            ),
+        );
+
+        $this->executor->addExpectedValues(0, $unsupportedVersion);
         $this->manager->validate();
     }
 
@@ -786,7 +879,7 @@ abstract class AssetManager extends TestCase
      */
     protected function actionForTestRunForInstallCommand(string $action): void
     {
-        // do nothing by default
+        $this->executor->addExpectedValues(0, $this->getValidVersion());
     }
 
     /**

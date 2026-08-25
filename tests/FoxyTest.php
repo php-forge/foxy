@@ -117,6 +117,10 @@ final class FoxyTest extends TestCase
      */
     public function testActivateOnInstall(): void
     {
+        $this->package
+            ->method('getConfig')
+            ->willReturn(['foxy' => ['manager' => 'npm', 'run-asset-manager' => false]]);
+
         $package = $this->createMock(Package::class);
         $package->expects(self::once())->method('getName')->willReturn('php-forge/foxy');
         $operation = $this->createMock(InstallOperation::class);

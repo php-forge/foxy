@@ -283,14 +283,14 @@ final class ConfigTest extends TestCase
     {
         $config = new FoxyConfig(
             [],
-            ['manager-version' => ['npm' => '>=10.0.0', 'yarn' => '>=4.0.0']],
+            ['manager-version' => ['npm' => '^12.0.2', 'yarn' => '^4.18.0']],
         );
 
         self::assertNull($config->get('manager-version'));
 
         $config->setResolvedManager('yarn');
 
-        self::assertSame('>=4.0.0', $config->get('manager-version'));
+        self::assertSame('^4.18.0', $config->get('manager-version'));
     }
 
     protected function setUp(): void

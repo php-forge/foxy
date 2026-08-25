@@ -13,6 +13,11 @@ final class PnpmAssetManagerTest extends AssetManager
         return new PnpmManager($this->io, $this->config, $this->executor, $this->fs, $this->fallback);
     }
 
+    protected function getUnsupportedVersion(): string
+    {
+        return '11.22.0';
+    }
+
     protected function getValidInstallCommand(): string
     {
         return 'pnpm install';
@@ -33,8 +38,18 @@ final class PnpmAssetManagerTest extends AssetManager
         return 'pnpm update';
     }
 
+    protected function getValidVersion(): string
+    {
+        return '11.23.0';
+    }
+
     protected function getValidVersionCommand(): string
     {
         return 'pnpm --version';
+    }
+
+    protected function getValidVersionConstraint(): string
+    {
+        return '^11.23.0';
     }
 }

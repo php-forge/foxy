@@ -10,11 +10,15 @@ Before updating, ensure the environment provides:
 
 - PHP 8.3 or later.
 - Composer 2.10.2 or later.
-- A supported Bun, npm, pnpm, or Yarn executable.
-- Node.js when using npm, pnpm, or Yarn.
+- One supported frontend manager: Bun `^1.4.0`, npm `^12.0.2`, pnpm `^11.23.0`, or Yarn `^4.18.0`.
+- For npm, Node.js `^22.22.2 || ^24.15.0 || >=26.0.0`.
+- For pnpm, Node.js `>=22.13.0`.
+- For Yarn, Node.js `>=18.12.0` on a release that still receives security updates.
 
 PHP 8.1 and 8.2 are not supported by Foxy 0.3.
 The Ctype and Mbstring extensions are no longer package requirements.
+Earlier frontend manager versions are not supported. The `manager-version` setting can narrow the built-in constraint
+for a project, but it cannot widen the supported range or opt an earlier manager version back in.
 
 ### Composer constraint and plugin authorization
 
@@ -60,8 +64,80 @@ commit its native lockfile:
 
 Remove stale lockfiles from other managers before the first Composer operation with Foxy 0.3.
 
-Bun detection now uses its native `bun.lock` or legacy `bun.lockb` file instead of `yarn.lock`. Bun projects that
-previously depended on `yarn.lock` for selection should generate a Bun lockfile or set `config.foxy.manager` to `bun`.
+#### npm 12 migration
+
+Upgrade Node.js to a release accepted by npm 12 first, then install the latest npm 12 release and regenerate the
+installation state:
+
+```bash
+npm install --global npm@12
+npm --version
+npm install
+```
+
+The reported npm version must satisfy `^12.0.2`. Review npm 12 configuration changes against the
+[npm 12 documentation](https://docs.npmjs.com/cli/v12/) and commit any `package-lock.json` changes.
+
+#### pnpm 11 migration
+
+pnpm 11 requires Node.js 22 or later. Upgrade Node.js first, update to the latest pnpm 11 release, apply the official
+configuration codemod, and reinstall:
+
+```bash
+pnpm self-update 11
+pnpm --version
+pnpx codemod run pnpm-v10-to-v11
+pnpm install
+```
+
+The reported pnpm version must satisfy `^11.23.0`. Review the codemod result and manual follow-ups in the
+[pnpm v10 to v11 migration guide](https://pnpm.io/migration), then commit `pnpm-lock.yaml` and configuration changes.
+
+#### Bun lockfile migration
+
+Upgrade Bun and confirm that the result satisfies `^1.4.0`. Foxy recognizes only the text-based `bun.lock` file, so
+convert a legacy `bun.lockb` without changing the resolved dependency versions:
+
+```bash
+bun upgrade
+bun --version
+bun install --save-text-lockfile --frozen-lockfile --lockfile-only
+```
+
+Verify and commit `bun.lock`, then delete `bun.lockb`. Bun projects that previously depended on `yarn.lock` for
+automatic selection must generate `bun.lock` before running Composer or configure `config.foxy.manager` explicitly as
+`bun`.
+
+#### Yarn 4 migration
+
+Yarn Classic 1.x, Yarn 2.x, and Yarn 3.x are not supported. Install and enable Corepack, select the latest Yarn 4
+release, reinstall, and commit the resulting `packageManager`, `yarn.lock`, and Yarn configuration changes:
+
+```bash
+npm install --global corepack
+corepack enable
+yarn set version 4.x
+yarn --version
+yarn install
+```
+
+The reported Yarn version must satisfy `^4.18.0`. The
+[current Yarn installation guide](https://yarnpkg.com/getting-started/install) documents the Corepack setup.
+Projects migrating from Yarn Classic must also convert `.npmrc` or `.yarnrc` settings to `.yarnrc.yml` and review
+renamed or removed commands. Projects upgrading from Yarn 2 or 3 should review the
+[Yarn 4 release notes](https://yarnpkg.com/blog/release/4.0) before committing the regenerated installation artifacts.
+The [Yarn migration guide](https://yarnpkg.com/migration/guide) documents the configuration and command changes.
+
+### Custom manager implementations
+
+Custom `AssetManagerInterface` implementations must add `getVersionConstraint(): string` and return their hard
+supported version range as a Composer constraint. Remove implementations and calls of the obsolete
+`isValidForUpdate()` method.
+
+`AbstractAssetManager` subclasses inherit the simplified update eligibility based on installation state and the
+`setUpdatable()` flag, concrete-version enforcement before every manager command, and version detection in the
+configured `root-package-json-dir`; they must also provide `getVersionConstraint()`. Direct `AssetManagerInterface`
+implementations must enforce the returned constraint in their own `validate()` and `run()` implementations.
 
 ### Embedded package metadata and paths
 

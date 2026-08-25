@@ -38,8 +38,11 @@
 
 - PHP 8.3 or later.
 - Composer 2.10.2 or later.
-- One supported frontend manager: Bun, npm, pnpm, or Yarn.
-- Node.js when using npm, pnpm, or Yarn.
+- One supported frontend manager:
+  - Bun `^1.4.0`.
+  - npm `^12.0.2` with Node.js `^22.22.2 || ^24.15.0 || >=26.0.0`.
+  - pnpm `^11.23.0` with Node.js `>=22.13.0`.
+  - Yarn `^4.18.0` with Node.js `>=18.12.0`; use a Node.js release that still receives security updates.
 
 ## Installation
 
@@ -122,7 +125,7 @@ the Composer project directory.
 [![Codecov](https://img.shields.io/codecov/c/github/php-forge/foxy.svg?style=for-the-badge&logo=codecov&logoColor=white&label=Coverage)](https://codecov.io/gh/php-forge/foxy)
 [![PHPStan Level 5](https://img.shields.io/badge/PHPStan-Level%205-4F5D95.svg?style=for-the-badge&logo=github&logoColor=white)](https://github.com/php-forge/foxy/actions/workflows/static.yml)
 [![Quality](https://img.shields.io/github/actions/workflow/status/php-forge/foxy/quality.yml?style=for-the-badge&label=Quality&logo=github)](https://github.com/php-forge/foxy/actions/workflows/quality.yml)
-[![Dependency Check](https://img.shields.io/github/actions/workflow/status/php-forge/foxy/dependency-check.yml?style=for-the-badge&label=Dependency%20Check&logo=github)](https://github.com/php-forge/foxy/actions/workflows/dependency-check.yml)
+[![StyleCI](https://img.shields.io/badge/StyleCI-Passed-44CC11.svg?style=for-the-badge&logo=github&logoColor=white)](https://github.styleci.io/repos/745652761?branch=main)
 
 ## Community
 
