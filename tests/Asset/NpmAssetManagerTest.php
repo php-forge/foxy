@@ -15,11 +15,45 @@ use const DIRECTORY_SEPARATOR;
 
 final class NpmAssetManagerTest extends AssetManager
 {
+    public function testExistingDependencyCleanupIsSkippedWhenManagerExecutionIsDisabled(): void
+    {
+        $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'web';
+        $this->sfs->mkdir($rootPackageDir);
+        $this->config = new Config(
+            [],
+            ['root-package-json-dir' => $rootPackageDir, 'run-asset-manager' => false],
+        );
+        $this->manager = $this->getManager();
+
+        file_put_contents(
+            $rootPackageDir . DIRECTORY_SEPARATOR . 'package.json',
+            '{"dependencies":{"@composer-asset/foo--bar":"file:../asset/foo/bar"}}',
+        );
+
+        $this->fs->expects(self::never())->method('remove');
+
+        $rootPackage = $this->createMock(RootPackageInterface::class);
+        $rootPackage->method('getLicense')->willReturn([]);
+
+        $assetPackage = $this->manager->addDependencies(
+            $rootPackage,
+            [
+                '@composer-asset/foo--bar' => $this->cwd . '/asset/foo/bar/package.json',
+                '@composer-asset/new--dependency' => $this->cwd . '/asset/new/dependency/package.json',
+            ],
+        );
+
+        self::assertArrayHasKey('@composer-asset/new--dependency', $assetPackage->getPackage()['dependencies']);
+    }
+
     public function testExistingDependencyCleanupUsesConfiguredRootDirectory(): void
     {
         $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'web';
         $this->sfs->mkdir($rootPackageDir);
-        $this->config = new Config([], ['root-package-json-dir' => $rootPackageDir]);
+        $this->config = new Config(
+            [],
+            ['root-package-json-dir' => $rootPackageDir, 'run-asset-manager' => true],
+        );
         $this->manager = $this->getManager();
 
         file_put_contents(

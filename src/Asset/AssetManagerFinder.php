@@ -35,11 +35,12 @@ final class AssetManagerFinder
      * Find the asset manager.
      *
      * @param string|null $manager The name of the asset manager
+     * @param bool $checkAvailability Whether to check automatically selected manager availability
      *
      * @throws RuntimeException When the asset manager does not exist
      * @throws RuntimeException When the asset manager is not found
      */
-    public function findManager(string|null $manager = null): AssetManagerInterface
+    public function findManager(string|null $manager = null, bool $checkAvailability = true): AssetManagerInterface
     {
         if (null !== $manager) {
             if (isset($this->managers[$manager])) {
@@ -49,7 +50,7 @@ final class AssetManagerFinder
             throw new RuntimeException(sprintf('The asset manager "%s" doesn\'t exist', $manager));
         }
 
-        return $this->findAvailableManager();
+        return $this->findAvailableManager($checkAvailability);
     }
 
     /**
@@ -57,7 +58,7 @@ final class AssetManagerFinder
      *
      * @throws RuntimeException When no asset manager is found
      */
-    private function findAvailableManager(): AssetManagerInterface
+    private function findAvailableManager(bool $checkAvailability): AssetManagerInterface
     {
         $lockedManagers = [];
 
@@ -73,7 +74,7 @@ final class AssetManagerFinder
         }
 
         if (isset($lockedManagers[0])) {
-            if ($lockedManagers[0]->isAvailable()) {
+            if (!$checkAvailability || $lockedManagers[0]->isAvailable()) {
                 return $lockedManagers[0];
             }
 
@@ -85,9 +86,9 @@ final class AssetManagerFinder
             );
         }
 
-        // Find the first available manager when no lockfile exists.
+        // Find the first manager when no lockfile exists, probing it only when requested.
         foreach ($this->managers as $manager) {
-            if ($manager->isAvailable()) {
+            if (!$checkAvailability || $manager->isAvailable()) {
                 return $manager;
             }
         }

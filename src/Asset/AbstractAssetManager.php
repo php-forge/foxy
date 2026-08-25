@@ -78,7 +78,10 @@ abstract class AbstractAssetManager implements AssetManagerInterface
 
             $alreadyInstalledDependencies = $assetPackage->addNewDependencies($dependencies);
 
-            $this->actionWhenComposerDependenciesAreAlreadyInstalled($alreadyInstalledDependencies);
+            if ($this->config->isEnabled('run-asset-manager')) {
+                $this->actionWhenComposerDependenciesAreAlreadyInstalled($alreadyInstalledDependencies);
+            }
+
             $this->io->write('<info>Merging Composer dependencies in the asset package</info>');
 
             return $assetPackage->write();
@@ -129,61 +132,35 @@ abstract class AbstractAssetManager implements AssetManagerInterface
 
         $this->validate();
 
-        $rootPackageDir = $this->getManagerWorkingDirectory();
+        $managerWorkingDirectory = $this->getManagerWorkingDirectory();
+        $updatable = $this->isUpdatable();
 
-        $originalDir = null;
-        $changedDir = false;
+        $info = sprintf('<info>%s %s dependencies</info>', $updatable ? 'Updating' : 'Installing', $this->getName());
 
-        if (null !== $rootPackageDir) {
-            $originalDir = getcwd();
+        $this->io->write($info);
 
-            if (false === $originalDir) {
-                throw new RuntimeException('Unable to get the current working directory.');
-            }
+        $timeout = ProcessExecutor::getTimeout();
 
-            if (chdir($rootPackageDir) === false) {
-                throw new RuntimeException(sprintf('Unable to change working directory to "%s".', $rootPackageDir));
-            }
+        /** @var int $managerTimeout */
+        $managerTimeout = $this->config->get('manager-timeout', PHP_INT_MAX);
 
-            $changedDir = true;
-        }
+        ProcessExecutor::setTimeout($managerTimeout);
 
         try {
-            $updatable = $this->isUpdatable();
+            $cmd = $updatable ? $this->getUpdateCommand() : $this->getInstallCommand();
+            $res = $this->executeManagerCommand($cmd, $managerWorkingDirectory);
+        } catch (Throwable $exception) {
+            $this->restoreAfterFailure($exception);
 
-            $info = sprintf('<info>%s %s dependencies</info>', $updatable ? 'Updating' : 'Installing', $this->getName());
-
-            $this->io->write($info);
-
-            $timeout = ProcessExecutor::getTimeout();
-
-            /** @var int $managerTimeout */
-            $managerTimeout = $this->config->get('manager-timeout', PHP_INT_MAX);
-
-            ProcessExecutor::setTimeout($managerTimeout);
-
-            try {
-                $cmd = $updatable ? $this->getUpdateCommand() : $this->getInstallCommand();
-                $res = $this->executor->execute($cmd);
-            } catch (Throwable $exception) {
-                $this->restoreAfterFailure($exception);
-
-                throw $exception;
-            } finally {
-                ProcessExecutor::setTimeout($timeout);
-            }
-
-            if (0 !== $res && null !== $this->fallback) {
-                $this->restoreAfterFailure(
-                    new RuntimeException(sprintf('The asset manager exited with status code %d.', $res), $res),
-                );
-            }
+            throw $exception;
         } finally {
-            if ($changedDir && chdir($originalDir) === false) {
-                throw new RuntimeException(
-                    sprintf('Unable to restore working directory to "%s".', $originalDir),
-                );
-            }
+            ProcessExecutor::setTimeout($timeout);
+        }
+
+        if (0 !== $res && null !== $this->fallback) {
+            $this->restoreAfterFailure(
+                new RuntimeException(sprintf('The asset manager exited with status code %d.', $res), $res),
+            );
         }
 
         return $res;
@@ -351,6 +328,24 @@ abstract class AbstractAssetManager implements AssetManagerInterface
         }
 
         return $this->version;
+    }
+
+    /**
+     * Execute a manager command without changing the PHP process working directory.
+     */
+    private function executeManagerCommand(string $command, string|null $workingDirectory): int
+    {
+        $outputHandler = function (string $type, string $buffer): void {
+            if ('err' === $type) {
+                $this->io->writeErrorRaw($buffer, false);
+
+                return;
+            }
+
+            $this->io->writeRaw($buffer, false);
+        };
+
+        return $this->executor->execute($command, $outputHandler, $workingDirectory);
     }
 
     private function getManagerWorkingDirectory(): string|null

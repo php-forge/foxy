@@ -6,11 +6,21 @@ namespace Foxy\Tests\Asset;
 
 use Foxy\Asset\{AssetManagerFinder, AssetManagerInterface};
 use Foxy\Exception\RuntimeException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class AssetManagerFinderTest extends TestCase
 {
-    public function testFindManagerRejectsMultipleLockFiles(): void
+    public static function availabilityChecks(): array
+    {
+        return [
+            'enabled' => [true],
+            'disabled' => [false],
+        ];
+    }
+
+    #[DataProvider('availabilityChecks')]
+    public function testFindManagerRejectsMultipleLockFiles(bool $checkAvailability): void
     {
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Multiple asset manager lock files were found');
@@ -25,7 +35,7 @@ final class AssetManagerFinderTest extends TestCase
         $second->expects(self::once())->method('hasLockFile')->willReturn(true);
         $second->expects(self::never())->method('isAvailable');
 
-        (new AssetManagerFinder([$first, $second]))->findManager();
+        (new AssetManagerFinder([$first, $second]))->findManager(checkAvailability: $checkAvailability);
     }
 
     public function testFindManagerRejectsUnavailableManagerSelectedByLockFile(): void
@@ -91,6 +101,36 @@ final class AssetManagerFinderTest extends TestCase
         $amf = new AssetManagerFinder([$am]);
 
         $amf->findManager();
+    }
+
+    public function testFindManagerWithDisabledAvailabilityCheckUsesFirstManagerWithoutProbing(): void
+    {
+        $first = $this->createMock(AssetManagerInterface::class);
+        $first->expects(self::once())->method('getName')->willReturn('first');
+        $first->expects(self::once())->method('hasLockFile')->willReturn(false);
+        $first->expects(self::never())->method('isAvailable');
+
+        $second = $this->createMock(AssetManagerInterface::class);
+        $second->expects(self::once())->method('getName')->willReturn('second');
+        $second->expects(self::once())->method('hasLockFile')->willReturn(false);
+        $second->expects(self::never())->method('isAvailable');
+
+        $res = (new AssetManagerFinder([$first, $second]))->findManager(checkAvailability: false);
+
+        self::assertSame($first, $res);
+    }
+
+    public function testFindManagerWithDisabledAvailabilityCheckUsesLockFileWithoutProbing(): void
+    {
+        $am = $this->createMock(AssetManagerInterface::class);
+
+        $am->expects(self::once())->method('getName')->willReturn('foo');
+        $am->expects(self::once())->method('hasLockFile')->willReturn(true);
+        $am->expects(self::never())->method('isAvailable');
+
+        $res = (new AssetManagerFinder([$am]))->findManager(checkAvailability: false);
+
+        self::assertSame($am, $res);
     }
 
     public function testFindManagerWithInvalidManager(): void

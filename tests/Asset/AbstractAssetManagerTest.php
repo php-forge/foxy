@@ -49,8 +49,22 @@ final class AbstractAssetManagerTest extends TestCase
         ];
     }
 
+    public function testActionHookIsSkippedWhenManagerExecutionIsDisabled(): void
+    {
+        $this->config = new Config([], ['run-asset-manager' => false]);
+
+        $manager = $this->createManager();
+        $manager->addDependencies(
+            $this->rootPackage,
+            ['@composer-asset/foo--bar' => 'path/foo/bar/package.json'],
+        );
+
+        self::assertNull($manager->getHandledDependencies());
+    }
+
     public function testActionHookRemainsExtensible(): void
     {
+        $this->config = new Config([], ['run-asset-manager' => true]);
         $this->io
             ->expects(self::once())
             ->method('write')
@@ -209,6 +223,51 @@ final class AbstractAssetManagerTest extends TestCase
 
         self::assertSame(DIRECTORY_SEPARATOR . 'inspectable.lock', $manager->getLockFilePathForTest());
         self::assertSame(DIRECTORY_SEPARATOR . 'node_modules', $manager->getNodeModulesPathForTest());
+    }
+
+    public function testRunStreamsOutputFromConfiguredRootDirectory(): void
+    {
+        $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'web';
+        $this->sfs->mkdir($rootPackageDir);
+        $this->config = new Config(
+            [],
+            ['root-package-json-dir' => $rootPackageDir, 'run-asset-manager' => true],
+        );
+        $position = 0;
+        $executor = $this->createMock(ProcessExecutor::class);
+        $executor
+            ->expects(self::exactly(2))
+            ->method('execute')
+            ->willReturnCallback(
+                static function (mixed $command, mixed &$output = null, mixed $cwd = null) use (
+                    &$position,
+                    $rootPackageDir,
+                ): int {
+                    self::assertSame($rootPackageDir, $cwd);
+
+                    if (0 === $position++) {
+                        self::assertSame('inspectable --version', $command);
+                        $output = '42.0.0';
+
+                        return 0;
+                    }
+
+                    self::assertSame('inspectable install', $command);
+                    self::assertIsCallable($output);
+
+                    $output('out', 'standard output');
+                    $output('err', 'error output');
+
+                    return 0;
+                },
+            );
+
+        $this->io->expects(self::once())->method('writeRaw')->with('standard output', false);
+        $this->io->expects(self::once())->method('writeErrorRaw')->with('error output', false);
+
+        $manager = new InspectableAssetManager($this->io, $this->config, $executor, $this->fs, $this->fallback);
+
+        self::assertSame(0, $manager->run());
     }
 
     public function testVersionCommandUsesConfiguredRootDirectory(): void

@@ -38,7 +38,7 @@
 
 - PHP 8.3 or later.
 - Composer 2.10.2 or later.
-- One supported frontend manager:
+- One supported frontend manager when manager execution is enabled:
   - Bun `^1.4.0`.
   - npm `^12.0.2` with Node.js `^22.22.2 || ^24.15.0 || >=26.0.0`.
   - pnpm `^11.23.0` with Node.js `>=22.13.0`.
@@ -71,9 +71,12 @@ Selecting a manager explicitly is recommended for reproducible local and CI beha
 }
 ```
 
-Valid manager values are `bun`, `npm`, `pnpm`, and `yarn`. When `manager` is omitted, Foxy first looks for one
-recognized native lockfile and then checks available executables. Configure the manager explicitly when the project
-contains lockfiles from more than one manager.
+Valid manager values are `bun`, `npm`, `pnpm`, and `yarn`. When manager execution is enabled and `manager` is omitted,
+Foxy first looks for one recognized native lockfile and then checks available executables. Configure the manager
+explicitly when the project contains lockfiles from more than one manager.
+
+When `run-asset-manager` is `false`, Foxy does not require or probe a manager binary. Automatic selection uses the
+single recognized lockfile when present, or npm as the manifest adapter when no lockfile exists.
 
 ## Quick start
 

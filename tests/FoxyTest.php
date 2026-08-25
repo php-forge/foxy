@@ -14,7 +14,8 @@ use Composer\IO\IOInterface;
 use Composer\Package\{Package, RootPackageInterface};
 use Composer\Repository\RepositoryManager;
 use Composer\Script\{Event, ScriptEvents};
-use Foxy\Asset\{AbstractAssetManager, AssetManagerInterface};
+use Composer\Util\{Filesystem, ProcessExecutor};
+use Foxy\Asset\{AbstractAssetManager, AssetManagerInterface, NpmManager};
 use Foxy\Config\Config as FoxyConfig;
 use Foxy\Exception\RuntimeException;
 use Foxy\Fallback\AssetFallback;
@@ -250,6 +251,33 @@ final class FoxyTest extends TestCase
         $foxy = new Foxy();
 
         $foxy->activate($this->composer, $this->io);
+    }
+
+    public function testAutomaticManagerDiscoveryDoesNotProbeBinariesWhenExecutionIsDisabled(): void
+    {
+        $config = new FoxyConfig(
+            [],
+            [
+                'root-package-json-dir' => __DIR__ . '/Fixtures/package/global',
+                'run-asset-manager' => false,
+            ],
+        );
+        $executor = $this->createMock(ProcessExecutor::class);
+        $executor->expects(self::never())->method('execute');
+
+        $foxy = new Foxy();
+        $reflection = new ReflectionClass($foxy);
+        $reflection->getProperty('config')->setValue($foxy, $config);
+
+        $manager = $reflection->getMethod('getAssetManager')->invoke(
+            $foxy,
+            $this->io,
+            $config,
+            $executor,
+            $this->createMock(Filesystem::class),
+        );
+
+        self::assertInstanceOf(NpmManager::class, $manager);
     }
 
     public function testConfigurationFlagsRemainCompatibleDuringPluginSelfUpdate(): void
