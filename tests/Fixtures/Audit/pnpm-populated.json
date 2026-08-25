@@ -1,0 +1,68 @@
+{
+    "advisories": {
+        "1106913": {
+            "findings": [
+                {
+                    "version": "4.17.20",
+                    "paths": [
+                        "project>lodash",
+                        "project>lodash"
+                    ],
+                    "dev": false,
+                    "optional": false,
+                    "bundled": false
+                },
+                {
+                    "version": "4.17.19",
+                    "paths": [
+                        "project>parent>lodash"
+                    ],
+                    "dev": true,
+                    "optional": false,
+                    "bundled": false
+                }
+            ],
+            "id": 1106913,
+            "title": "Prototype pollution in lodash",
+            "module_name": "lodash",
+            "vulnerable_versions": "<4.17.21",
+            "patched_versions": ">=4.17.21",
+            "severity": "high",
+            "cwe": "CWE-1321",
+            "github_advisory_id": "GHSA-35JH-R3H4-6JHM",
+            "url": "https://github.com/advisories/GHSA-35jh-r3h4-6jhm"
+        },
+        "1107000": {
+            "findings": [
+                {
+                    "version": "1.0.0",
+                    "paths": [],
+                    "dev": false,
+                    "optional": true,
+                    "bundled": false
+                }
+            ],
+            "id": 1107000,
+            "title": "Informational advisory",
+            "module_name": "example-package",
+            "vulnerable_versions": "<=1.0.0",
+            "severity": "info",
+            "cwe": "",
+            "github_advisory_id": "",
+            "url": "https://security.example.test/advisories/1107000"
+        }
+    },
+    "metadata": {
+        "vulnerabilities": {
+            "info": 1,
+            "low": 0,
+            "moderate": 0,
+            "high": 1,
+            "critical": 0
+        },
+        "dependencies": 1,
+        "devDependencies": 1,
+        "optionalDependencies": 1,
+        "totalDependencies": 3
+    }
+}

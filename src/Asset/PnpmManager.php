@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Foxy\Asset;
 
+use Composer\Util\ProcessExecutor;
+
 final class PnpmManager extends AbstractAssetManager
 {
     public function getLockPackageName(): string
@@ -26,6 +28,33 @@ final class PnpmManager extends AbstractAssetManager
         return parent::isInstalled() && file_exists($this->getLockFilePath());
     }
 
+    protected function getAuditCommand(bool $noDev): string
+    {
+        $command = [
+            'audit',
+            '--json',
+            '--audit-level=info',
+            '--lockfile-dir=.',
+            '--ignore-pnpmfile',
+            '--only=null',
+        ];
+
+        if ($noDev) {
+            $command = [...$command, '--prod', '--optional=true'];
+        } else {
+            $command = [...$command, '--prod=false', '--dev=false', '--optional=true'];
+        }
+
+        $command = [
+            ...$command,
+            '--ignore-registry-errors=false',
+            '--ignore-unfixable=false',
+            ProcessExecutor::escape('--config.auditConfig={ignoreGhsas:[]}'),
+        ];
+
+        return $this->buildUnconfiguredCommand('pnpm', $command);
+    }
+
     protected function getInstallCommand(): string
     {
         return $this->buildCommand('pnpm', 'install', 'install');
@@ -38,6 +67,6 @@ final class PnpmManager extends AbstractAssetManager
 
     protected function getVersionCommand(): string
     {
-        return $this->buildCommand('pnpm', 'version', '--version');
+        return $this->buildUnconfiguredCommand('pnpm', '--version');
     }
 }

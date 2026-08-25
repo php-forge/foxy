@@ -23,6 +23,11 @@ final class InspectableAssetManager extends AbstractAssetManager
         $this->versionConverter = null;
     }
 
+    public function getAuditCommandForTest(bool $noDev = false): string
+    {
+        return $this->getAuditCommand($noDev);
+    }
+
     /**
      * @return list<string>|null
      */
@@ -73,6 +78,11 @@ final class InspectableAssetManager extends AbstractAssetManager
         $this->handledDependencies = $names;
     }
 
+    protected function getAuditCommand(bool $noDev): string
+    {
+        return $this->buildUnconfiguredCommand('inspectable', $noDev ? ['audit', '--prod'] : ['audit']);
+    }
+
     protected function getInstallCommand(): string
     {
         return $this->buildCommand('inspectable', 'install', 'install');
@@ -85,6 +95,6 @@ final class InspectableAssetManager extends AbstractAssetManager
 
     protected function getVersionCommand(): string
     {
-        return $this->buildCommand('inspectable', 'version', '--version');
+        return $this->buildUnconfiguredCommand('inspectable', '--version');
     }
 }

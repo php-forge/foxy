@@ -9,11 +9,14 @@ use Composer\DependencyResolver\Operation\InstallOperation;
 use Composer\EventDispatcher\EventSubscriberInterface;
 use Composer\Installer\{PackageEvent, PackageEvents};
 use Composer\IO\IOInterface;
-use Composer\Plugin\PluginInterface;
+use Composer\Plugin\Capability\CommandProvider as ComposerCommandProvider;
+use Composer\Plugin\{Capable, PluginInterface};
 use Composer\Script\{Event, ScriptEvents};
 use Composer\Util\{Filesystem, ProcessExecutor};
 use Foxy\Asset\{AbstractAssetManager, AssetManagerFinder, AssetManagerInterface};
 use Foxy\Asset\{BunManager, NpmManager, PnpmManager, YarnManager};
+use Foxy\Audit\{AuditReport, AuditRequest, AuditRunner, AuditRunnerInterface, AuditableAssetManagerInterface};
+use Foxy\Command\FoxyCommandProvider;
 use Foxy\Config\{Config, ConfigBuilder};
 use Foxy\Exception\RuntimeException;
 use Foxy\Fallback\{AssetFallback, ComposerFallback};
@@ -23,7 +26,7 @@ use Seld\JsonLint\ParsingException;
 
 use function str_contains;
 
-final class Foxy implements PluginInterface, EventSubscriberInterface
+final class Foxy implements PluginInterface, EventSubscriberInterface, Capable, AuditRunnerInterface
 {
     final public const string REQUIRED_COMPOSER_VERSION = '^2.10.2';
 
@@ -98,9 +101,27 @@ final class Foxy implements PluginInterface, EventSubscriberInterface
         $this->assetManager->setFallback($this->assetFallback);
     }
 
+    public function audit(AuditRequest $request): AuditReport
+    {
+        if (!isset($this->config) || !$this->isEnabled()) {
+            throw new RuntimeException('Foxy is disabled; frontend dependencies cannot be audited.');
+        }
+
+        if (!isset($this->assetManager) || !$this->assetManager instanceof AuditableAssetManagerInterface) {
+            throw new RuntimeException('The selected asset manager does not support security audits.');
+        }
+
+        return (new AuditRunner($this->assetManager))->audit($request);
+    }
+
     public function deactivate(Composer $composer, IOInterface $io): void
     {
         // Do nothing
+    }
+
+    public function getCapabilities(): array
+    {
+        return [ComposerCommandProvider::class => FoxyCommandProvider::class];
     }
 
     public static function getSubscribedEvents(): array

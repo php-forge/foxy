@@ -105,6 +105,110 @@ final class AbstractAssetManagerTest extends TestCase
         $this->createManager()->addDependencies($this->rootPackage, []);
     }
 
+    public function testAuditCapturesStandardAndErrorOutputWithoutStreaming(): void
+    {
+        file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'inspectable.lock', '{}');
+
+        $position = 0;
+        $executor = $this->createMock(ProcessExecutor::class);
+        $executor
+            ->expects(self::exactly(2))
+            ->method('execute')
+            ->willReturnCallback(
+                static function (mixed $command, mixed &$output = null, mixed $cwd = null) use (&$position): int {
+                    self::assertNull($cwd);
+
+                    if (0 === $position++) {
+                        self::assertSame('inspectable --version', $command);
+                        $output = '42.0.0';
+
+                        return 0;
+                    }
+
+                    self::assertSame('inspectable audit --prod', $command);
+                    $output = 'standard output';
+
+                    return 1;
+                },
+            );
+        $executor
+            ->expects(self::once())
+            ->method('getErrorOutput')
+            ->willReturn('error output');
+
+        $this->io->expects(self::never())->method('writeRaw');
+        $this->io->expects(self::never())->method('writeErrorRaw');
+
+        $manager = new InspectableAssetManager($this->io, $this->config, $executor, $this->fs, $this->fallback);
+        $result = $manager->audit(true);
+
+        self::assertSame(1, $result->exitCode);
+        self::assertSame('standard output', $result->output);
+        self::assertSame('error output', $result->errorOutput);
+    }
+
+    public function testAuditRestoresTimeoutWhenExecutorThrows(): void
+    {
+        $originalTimeout = ProcessExecutor::getTimeout();
+        $expectedTimeout = 42;
+        $managerTimeout = 900;
+        $observedTimeout = null;
+
+        file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'inspectable.lock', '{}');
+        $this->config = new Config(
+            [
+                'manager-timeout' => $managerTimeout,
+                'run-asset-manager' => false,
+            ],
+        );
+        $position = 0;
+        $executor = $this->createMock(ProcessExecutor::class);
+        $executor
+            ->expects(self::exactly(2))
+            ->method('execute')
+            ->willReturnCallback(
+                static function (mixed $command, mixed &$output = null) use (
+                    &$observedTimeout,
+                    &$position,
+                ): int {
+                    if (0 === $position++) {
+                        $output = '42.0.0';
+
+                        return 0;
+                    }
+
+                    $observedTimeout = ProcessExecutor::getTimeout();
+
+                    throw new \RuntimeException('Audit execution failed.');
+                },
+            );
+        $this->fallback->expects(self::never())->method('restore');
+
+        try {
+            ProcessExecutor::setTimeout($expectedTimeout);
+
+            $manager = new InspectableAssetManager(
+                $this->io,
+                $this->config,
+                $executor,
+                $this->fs,
+                $this->fallback,
+            );
+
+            try {
+                $manager->audit(false);
+                self::fail('Expected the audit process to fail.');
+            } catch (\RuntimeException $exception) {
+                self::assertSame('Audit execution failed.', $exception->getMessage());
+            }
+
+            self::assertSame($managerTimeout, $observedTimeout);
+            self::assertSame($expectedTimeout, ProcessExecutor::getTimeout());
+        } finally {
+            ProcessExecutor::setTimeout($originalTimeout);
+        }
+    }
+
     #[RunInSeparateProcess]
     #[PreserveGlobalState(false)]
     public function testBuildCommandNormalizesWindowsBinaryPath(): void

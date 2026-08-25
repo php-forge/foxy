@@ -1,0 +1,63 @@
+{
+    "auditReportVersion": 2,
+    "vulnerabilities": {
+        "lodash": {
+            "name": "lodash",
+            "severity": "critical",
+            "isDirect": true,
+            "via": [
+                {
+                    "source": 1106913,
+                    "name": "lodash",
+                    "dependency": "lodash",
+                    "title": "Prototype\npollution in lodash",
+                    "url": "https://github.com/advisories/GHSA-35jh-r3h4-6jhm",
+                    "severity": "high",
+                    "cwe": [
+                        "CWE-1321"
+                    ],
+                    "cvss": {
+                        "score": 7.2,
+                        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:L/I:L/A:N"
+                    },
+                    "range": "<4.17.21"
+                },
+                "transitive-vulnerable-package",
+                {
+                    "source": "1108258",
+                    "name": "lodash",
+                    "dependency": "lodash",
+                    "url": "https://github.com/advisories/GHSA-jf85-cpcp-j695",
+                    "severity": "critical",
+                    "range": ">=4.0.0 <4.17.21"
+                }
+            ],
+            "effects": [],
+            "range": "<=4.17.20",
+            "nodes": [
+                "node_modules/lodash",
+                "node_modules/parent/node_modules/lodash",
+                "node_modules/lodash"
+            ],
+            "fixAvailable": true
+        }
+    },
+    "metadata": {
+        "vulnerabilities": {
+            "info": 0,
+            "low": 0,
+            "moderate": 0,
+            "high": 0,
+            "critical": 1,
+            "total": 1
+        },
+        "dependencies": {
+            "prod": 1,
+            "dev": 0,
+            "optional": 0,
+            "peer": 0,
+            "peerOptional": 0,
+            "total": 1
+        }
+    }
+}

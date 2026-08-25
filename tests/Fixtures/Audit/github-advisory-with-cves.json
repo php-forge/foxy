@@ -1,0 +1,22 @@
+{
+    "ghsa_id": "GHSA-35JH-R3H4-6JHM",
+    "cve_id": "CVE-2021-23337",
+    "identifiers": [
+        {
+            "value": "GHSA-35jh-r3h4-6jhm",
+            "type": "GHSA"
+        },
+        {
+            "value": "CVE-2020-8203",
+            "type": "CVE"
+        },
+        {
+            "value": "CVE-2021-23337",
+            "type": "CVE"
+        },
+        {
+            "value": "not-a-cve",
+            "type": "CVE"
+        }
+    ]
+}

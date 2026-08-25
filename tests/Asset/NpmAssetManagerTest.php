@@ -8,13 +8,62 @@ use Composer\Package\RootPackageInterface;
 use Composer\Util\ProcessExecutor;
 use Foxy\Asset\NpmManager;
 use Foxy\Config\Config;
+use Foxy\Exception\RuntimeException;
+use PHPUnit\Framework\Attributes\DataProvider;
 
+use function array_map;
 use function file_put_contents;
+use function implode;
 
 use const DIRECTORY_SEPARATOR;
 
 final class NpmAssetManagerTest extends AssetManager
 {
+    #[DataProvider('workspaceLocksThatCannotBeEnumerated')]
+    public function testAuditFailsClosedWhenWorkspaceGraphCannotBeEnumerated(string|null $manifest, string $lock): void
+    {
+        if (null !== $manifest) {
+            file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'package.json', $manifest);
+        }
+
+        file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'package-lock.json', $lock);
+        $this->executor->addExpectedValues(0, $this->getValidVersion());
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            'The npm workspace graph couldn\'t be enumerated from package-lock.json. '
+            . 'Regenerate the lock file with a supported npm version.',
+        );
+
+        $this->getManager()->audit(false);
+    }
+
+    #[DataProvider('workspaceManifests')]
+    public function testAuditForcesTheCompleteWorkspaceGraph(string $manifest, string $lock, array $workspacePaths): void
+    {
+        file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'package.json', $manifest);
+        file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'package-lock.json', $lock);
+        $this->executor->addExpectedValues(0, $this->getValidVersion());
+        $this->executor->addExpectedValues(0, '{}');
+
+        $this->getManager()->audit(false);
+
+        $workspaceSelectors = implode(
+            ' ',
+            array_map(
+                static fn(string $path): string => ProcessExecutor::escape('--workspace=' . $path),
+                $workspacePaths,
+            ),
+        );
+
+        self::assertSame(
+            'npm audit --json --package-lock-only --package-lock=true --audit-level=info --prefix=. --workspaces=true '
+            . $workspaceSelectors
+            . ' --include-workspace-root=true --include=dev --include=optional --include=peer',
+            $this->executor->getExecutedCommand(1),
+        );
+    }
+
     public function testExistingDependencyCleanupIsSkippedWhenManagerExecutionIsDisabled(): void
     {
         $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'web';
@@ -87,7 +136,7 @@ final class NpmAssetManagerTest extends AssetManager
             ->willReturnCallback(
                 static function (mixed $command, mixed &$output = null) use (&$observedTimeout): int {
                     if ('npm --version' === $command) {
-                        $output = '12.0.2';
+                        $output = '10.9.8';
 
                         return 0;
                     }
@@ -112,6 +161,60 @@ final class NpmAssetManagerTest extends AssetManager
         }
     }
 
+    public static function workspaceLocksThatCannotBeEnumerated(): array
+    {
+        return [
+            'legacy lock without package map' => [
+                '{"workspaces":["packages/*"]}',
+                '{"lockfileVersion":1}',
+            ],
+            'lock without workspace entries' => [
+                '{"workspaces":["packages/*"]}',
+                '{"packages":{"":{"workspaces":["packages/*"]}}}',
+            ],
+            'stale workspace declaration' => [
+                '{"workspaces":["packages/*"]}',
+                '{"packages":{"":{"workspaces":["other/*"]},"packages/a":{}}}',
+            ],
+            'manifest without locked workspaces' => [
+                '{}',
+                '{"packages":{"":{"workspaces":["packages/*"]},"packages/a":{}}}',
+            ],
+            'missing manifest with locked workspaces' => [
+                null,
+                '{"packages":{"":{"workspaces":["packages/*"]},"packages/a":{}}}',
+            ],
+            'malformed manifest workspace declaration' => [
+                '{"workspaces":"packages/*"}',
+                '{"packages":{"":{}}}',
+            ],
+            'malformed locked workspace declaration' => [
+                '{}',
+                '{"packages":{"":{"workspaces":{"packages":"packages/*"}}}}',
+            ],
+        ];
+    }
+    public static function workspaceManifests(): array
+    {
+        return [
+            'workspace list' => [
+                '{"workspaces":["packages/*"]}',
+                '{"packages":{"":{"workspaces":["packages/*"]},"node_modules/a":{"link":true,"resolved":"packages/a"},"packages/a":{}}}',
+                ['packages/a'],
+            ],
+            'workspace packages object' => [
+                '{"workspaces":{"packages":["packages/*"]}}',
+                '{"packages":{"":{"workspaces":{"packages":["packages/*"]}},"node_modules/a":{"link":true,"resolved":"packages/a"},"packages/a":{}}}',
+                ['packages/a'],
+            ],
+            'dot-leading workspace path' => [
+                '{"workspaces":["visible",".hidden"]}',
+                '{"packages":{"":{"workspaces":["visible",".hidden"]},".hidden":{},"node_modules/hidden":{"link":true,"resolved":".hidden"},"node_modules/visible":{"link":true,"resolved":"visible"},"visible":{}}}',
+                ['.hidden', 'visible'],
+            ],
+        ];
+    }
+
     protected function getManager(): NpmManager
     {
         return new NpmManager($this->io, $this->config, $this->executor, $this->fs, $this->fallback);
@@ -119,7 +222,16 @@ final class NpmAssetManagerTest extends AssetManager
 
     protected function getUnsupportedVersion(): string
     {
-        return '12.0.1';
+        return '10.9.7';
+    }
+
+    protected function getValidAuditCommand(bool $noDev): string
+    {
+        $command = 'npm audit --json --package-lock-only --package-lock=true --audit-level=info --prefix=.';
+
+        return $command . ($noDev
+            ? ' --omit=dev --include=optional --include=peer'
+            : ' --include=dev --include=optional --include=peer');
     }
 
     protected function getValidInstallCommand(): string
@@ -144,7 +256,7 @@ final class NpmAssetManagerTest extends AssetManager
 
     protected function getValidVersion(): string
     {
-        return '12.0.2';
+        return '10.9.8';
     }
 
     protected function getValidVersionCommand(): string
@@ -154,6 +266,6 @@ final class NpmAssetManagerTest extends AssetManager
 
     protected function getValidVersionConstraint(): string
     {
-        return '^12.0.2';
+        return '>=10.9.8';
     }
 }

@@ -10,6 +10,7 @@ use Composer\Semver\Constraint\Constraint;
 use Composer\Semver\VersionParser;
 use Composer\Util\{Filesystem, Platform, ProcessExecutor};
 use Exception;
+use Foxy\Audit\{AuditProcessResult, AuditableAssetManagerInterface};
 use Foxy\Config\Config;
 use Foxy\Converter\{SemverConverter, VersionConverterInterface};
 use Foxy\Exception\RuntimeException;
@@ -19,17 +20,20 @@ use Seld\JsonLint\ParsingException;
 use Throwable;
 use UnexpectedValueException;
 
+use function array_key_exists;
+use function getenv;
 use function is_dir;
 use function is_string;
 use function ltrim;
 use function preg_match;
+use function putenv;
 use function rtrim;
 use function sprintf;
 use function trim;
 
 use const DIRECTORY_SEPARATOR;
 
-abstract class AbstractAssetManager implements AssetManagerInterface
+abstract class AbstractAssetManager implements AssetManagerInterface, AuditableAssetManagerInterface
 {
     final public const NODE_MODULES_PATH = './node_modules';
 
@@ -47,6 +51,11 @@ abstract class AbstractAssetManager implements AssetManagerInterface
     ) {
         $this->versionConverter ??= new SemverConverter();
     }
+
+    /**
+     * Get the command to audit the asset dependencies.
+     */
+    abstract protected function getAuditCommand(bool $noDev): string;
 
     /**
      * Get the command to install the asset dependencies.
@@ -89,6 +98,44 @@ abstract class AbstractAssetManager implements AssetManagerInterface
             $this->restoreAfterFailure($exception);
 
             throw $exception;
+        }
+    }
+
+    public function audit(bool $noDev): AuditProcessResult
+    {
+        if (!$this->hasLockFile()) {
+            throw new RuntimeException(
+                sprintf('The %s lock file "%s" was not found.', $this->getName(), $this->getLockFilePath()),
+            );
+        }
+
+        $this->validateAuditConfiguration($noDev);
+        $this->validate();
+
+        $timeout = ProcessExecutor::getTimeout();
+
+        /** @var int $managerTimeout */
+        $managerTimeout = $this->config->get('manager-timeout', PHP_INT_MAX);
+
+        ProcessExecutor::setTimeout($managerTimeout);
+
+        $environment = $this->overrideEnvironment($this->getAuditEnvironment());
+
+        try {
+            $output = '';
+            $result = $this->executor->execute(
+                $this->getAuditCommand($noDev),
+                $output,
+                $this->getManagerWorkingDirectory(),
+            );
+
+            return new AuditProcessResult($result, (string) $output, $this->executor->getErrorOutput());
+        } finally {
+            try {
+                $this->restoreEnvironment($environment);
+            } finally {
+                ProcessExecutor::setTimeout($timeout);
+            }
         }
     }
 
@@ -182,6 +229,8 @@ abstract class AbstractAssetManager implements AssetManagerInterface
 
     public function validate(): void
     {
+        $this->config->setResolvedManager($this->getName());
+
         $version = $this->getVersion();
 
         if (null === $version) {
@@ -245,20 +294,36 @@ abstract class AbstractAssetManager implements AssetManagerInterface
      */
     protected function buildCommand(string $defaultBin, string $action, array|string $command): string
     {
-        $bin = $this->config->get('manager-bin', $defaultBin);
-
-        $bin = Platform::isWindows() ? str_replace('/', '\\', (string) $bin) : $bin;
-
         $gOptions = trim((string) $this->config->get('manager-options', ''));
-        $options = trim((string) $this->config->get('manager-' . $action . '-options', ''));
+        $options = trim((string) $this->config->get("manager-{$action}-options", ''));
 
         return sprintf(
             '%s %s%s%s',
-            $bin,
+            $this->getManagerBinary($defaultBin),
             implode(' ', (array) $command),
-            $gOptions === '' ? '' : ' ' . $gOptions,
-            $options === '' ? '' : ' ' . $options,
+            $gOptions === '' ? '' : " {$gOptions}",
+            $options === '' ? '' : " {$options}",
         );
+    }
+
+    /**
+     * Build a manager command without inheriting install and update options.
+     *
+     * @param array|string $command The command.
+     */
+    protected function buildUnconfiguredCommand(string $defaultBin, array|string $command): string
+    {
+        return sprintf('%s %s', $this->getManagerBinary($defaultBin), implode(' ', (array) $command));
+    }
+
+    /**
+     * Get environment overrides required for a complete audit.
+     *
+     * @return array<string, string>
+     */
+    protected function getAuditEnvironment(): array
+    {
+        return [];
     }
 
     protected function getLockFilePath(): string
@@ -331,6 +396,11 @@ abstract class AbstractAssetManager implements AssetManagerInterface
     }
 
     /**
+     * Validate manager configuration that can change the audit scope.
+     */
+    protected function validateAuditConfiguration(bool $noDev): void {}
+
+    /**
      * Execute a manager command without changing the PHP process working directory.
      */
     private function executeManagerCommand(string $command, string|null $workingDirectory): int
@@ -346,6 +416,13 @@ abstract class AbstractAssetManager implements AssetManagerInterface
         };
 
         return $this->executor->execute($command, $outputHandler, $workingDirectory);
+    }
+
+    private function getManagerBinary(string $defaultBin): string
+    {
+        $bin = (string) $this->config->get('manager-bin', $defaultBin);
+
+        return Platform::isWindows() ? str_replace('/', '\\', $bin) : $bin;
     }
 
     private function getManagerWorkingDirectory(): string|null
@@ -375,6 +452,39 @@ abstract class AbstractAssetManager implements AssetManagerInterface
     }
 
     /**
+     * @param array<string, string> $environment
+     *
+     * @return array<string, array{
+     *     process: string|false,
+     *     envExists: bool,
+     *     env: mixed,
+     *     serverExists: bool,
+     *     server: mixed,
+     * }>
+     */
+    private function overrideEnvironment(array $environment): array
+    {
+        $state = [];
+
+        foreach ($environment as $name => $value) {
+            $state[$name] = [
+                'process' => getenv($name),
+                'envExists' => array_key_exists($name, $_ENV),
+                'env' => $_ENV[$name] ?? null,
+                'serverExists' => array_key_exists($name, $_SERVER),
+                'server' => $_SERVER[$name] ?? null,
+            ];
+
+            putenv("{$name}={$value}");
+
+            $_ENV[$name] = $value;
+            $_SERVER[$name] = $value;
+        }
+
+        return $state;
+    }
+
+    /**
      * Restore the asset manifest without hiding the manager failure.
      */
     private function restoreAfterFailure(Throwable $exception): void
@@ -393,6 +503,34 @@ abstract class AbstractAssetManager implements AssetManagerInterface
                 ),
                 previous: $exception,
             );
+        }
+    }
+
+    /**
+     * @param array<string, array{
+     *     process: string|false,
+     *     envExists: bool,
+     *     env: mixed,
+     *     serverExists: bool,
+     *     server: mixed,
+     * }> $state
+     */
+    private function restoreEnvironment(array $state): void
+    {
+        foreach ($state as $name => $values) {
+            putenv(false === $values['process'] ? $name : "{$name}=" . $values['process']);
+
+            if ($values['envExists']) {
+                $_ENV[$name] = $values['env'];
+            } else {
+                unset($_ENV[$name]);
+            }
+
+            if ($values['serverExists']) {
+                $_SERVER[$name] = $values['server'];
+            } else {
+                unset($_SERVER[$name]);
+            }
         }
     }
 }

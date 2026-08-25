@@ -9,6 +9,7 @@ use Composer\Json\JsonFile;
 use Composer\Package\RootPackageInterface;
 use Composer\Util\{Filesystem, ProcessExecutor};
 use Foxy\Asset\{AbstractAssetManager, AssetManagerInterface, AssetPackageInterface};
+use Foxy\Audit\AuditableAssetManagerInterface;
 use Foxy\Config\Config;
 use Foxy\Exception\RuntimeException;
 use Foxy\Fallback\FallbackInterface;
@@ -41,6 +42,8 @@ abstract class AssetManager extends TestCase
 
     abstract protected function getUnsupportedVersion(): string;
 
+    abstract protected function getValidAuditCommand(bool $noDev): string;
+
     abstract protected function getValidInstallCommand(): string;
 
     abstract protected function getValidLockPackageName(): string;
@@ -54,6 +57,14 @@ abstract class AssetManager extends TestCase
     abstract protected function getValidVersionCommand(): string;
 
     abstract protected function getValidVersionConstraint(): string;
+
+    public static function getAuditCommandData(): array
+    {
+        return [
+            'all dependencies' => [false],
+            'production dependencies' => [true],
+        ];
+    }
 
     public static function getEnabledRunAssetManagerData(): array
     {
@@ -236,6 +247,113 @@ abstract class AssetManager extends TestCase
             '/\n {8}"@composer-asset\/new--dependency": "file:\.\.\/path\/new\/dependency"/',
             $updatedContent,
         );
+    }
+
+    #[DataProvider('getAuditCommandData')]
+    public function testAuditBuildsExactCommandWithoutInstallOptions(bool $noDev): void
+    {
+        $this->config = new Config(
+            [
+                'manager-options' => ' --install-only ',
+                'run-asset-manager' => false,
+            ],
+        );
+        $this->manager = $this->getManager();
+
+        file_put_contents($this->cwd . DIRECTORY_SEPARATOR . $this->manager->getLockPackageName(), '{}');
+
+        $this->executor->addExpectedValues(0, $this->getValidVersion());
+        $this->executor->addExpectedValues(1, 'AUDIT OUTPUT');
+
+        self::assertInstanceOf(AuditableAssetManagerInterface::class, $this->manager);
+
+        $result = $this->manager->audit($noDev);
+
+        self::assertSame(1, $result->exitCode);
+        self::assertSame('AUDIT OUTPUT', $result->output);
+        self::assertSame('', $result->errorOutput);
+        self::assertSame($this->getValidVersionCommand(), $this->executor->getExecutedCommand(0));
+        self::assertSame($this->getValidAuditCommand($noDev), $this->executor->getExecutedCommand(1));
+        self::assertNull($this->executor->getExecutedCommand(2));
+    }
+
+    public function testAuditRejectsMissingLockFileBeforeManagerAuditCommand(): void
+    {
+        $this->config = new Config(['run-asset-manager' => false]);
+        $this->manager = $this->getManager();
+
+        self::assertInstanceOf(AuditableAssetManagerInterface::class, $this->manager);
+
+        try {
+            $this->manager->audit(false);
+            self::fail('Expected the audit to reject a missing lock file.');
+        } catch (RuntimeException $exception) {
+            self::assertSame(
+                sprintf(
+                    'The %s lock file "%s" was not found.',
+                    $this->manager->getName(),
+                    $this->cwd . DIRECTORY_SEPARATOR . $this->manager->getLockPackageName(),
+                ),
+                $exception->getMessage(),
+            );
+        }
+
+        self::assertNull($this->executor->getExecutedCommand(0));
+    }
+
+    public function testAuditResolvesManagerSpecificBinaryConfiguration(): void
+    {
+        $managerName = $this->manager->getName();
+        $customBinary = 'custom-manager';
+        $this->config = new Config(
+            [
+                'manager-bin' => [$managerName => $customBinary],
+                'run-asset-manager' => false,
+            ],
+        );
+        $this->manager = $this->getManager();
+
+        file_put_contents($this->cwd . DIRECTORY_SEPARATOR . $this->manager->getLockPackageName(), '{}');
+
+        $this->executor->addExpectedValues(0, $this->getValidVersion());
+        $this->executor->addExpectedValues(0, '{}');
+
+        self::assertInstanceOf(AuditableAssetManagerInterface::class, $this->manager);
+
+        $this->manager->audit(false);
+
+        [, $auditArguments] = explode(' ', $this->getValidAuditCommand(false), 2);
+
+        self::assertSame($customBinary . ' --version', $this->executor->getExecutedCommand(0));
+        self::assertSame($customBinary . ' ' . $auditArguments, $this->executor->getExecutedCommand(1));
+    }
+
+    public function testAuditUsesConfiguredRootDirectoryWithoutChangingProcessDirectory(): void
+    {
+        $configuredRootPackageDir = 'root-package';
+        $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . $configuredRootPackageDir;
+        $this->sfs->mkdir($rootPackageDir);
+        $originalCwd = getcwd();
+        $this->config = new Config(
+            [
+                'root-package-json-dir' => $configuredRootPackageDir,
+                'run-asset-manager' => false,
+            ],
+        );
+        $this->manager = $this->getManager();
+
+        file_put_contents($rootPackageDir . DIRECTORY_SEPARATOR . $this->manager->getLockPackageName(), '{}');
+
+        $this->executor->addExpectedValues(0, $this->getValidVersion());
+        $this->executor->addExpectedValues(0, '{}');
+
+        self::assertInstanceOf(AuditableAssetManagerInterface::class, $this->manager);
+
+        $this->manager->audit(false);
+
+        self::assertSame($rootPackageDir, $this->executor->getExecutedWorkingDirectory(0));
+        self::assertSame($rootPackageDir, $this->executor->getExecutedWorkingDirectory(1));
+        self::assertSame($originalCwd, getcwd());
     }
 
     public function testGetLockPackageName(): void
