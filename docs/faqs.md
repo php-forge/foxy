@@ -50,8 +50,7 @@ Check the following:
 1. The package uses one of the documented activation methods.
 2. Its `package.json` exists at the package root or configured Foxy root.
 3. The root application's `enable-packages` configuration does not exclude it.
-4. When manager execution is enabled, the selected frontend manager is installed and allowed by its configured
-   version constraint.
+4. When manager execution is enabled, the selected frontend manager is installed and allowed by its configured version constraint.
 
 Composer must run before a standalone frontend manager command because Foxy creates the local package representations
 during Composer install and update operations.
