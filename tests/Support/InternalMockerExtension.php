@@ -41,6 +41,10 @@ final class InternalMockerExtension implements Extension
     {
         $mocks = [
             [
+                'namespace' => 'Composer\\Json',
+                'name' => 'file_put_contents',
+            ],
+            [
                 'namespace' => 'Foxy\\Asset',
                 'name' => 'getcwd',
             ],

@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: run manager commands in the configured root directory without changing the PHP working directory, and prevent manager probes and npm dependency cleanup when manager execution is disabled.
 - feat!: add secure frontend audits with CVE reporting, CI formats, and strict npm, pnpm, Yarn, and Bun validation.
 - perf: write generated Composer asset manifests directly without first copying their source files.
+- fix: detect generated asset manifest write failures before running the frontend manager.
 
 ## 0.2.0 January 24, 2026
 

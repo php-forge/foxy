@@ -8,6 +8,7 @@ use Composer\Composer;
 use Composer\EventDispatcher\EventDispatcher;
 use Composer\Installer\InstallationManager;
 use Composer\IO\IOInterface;
+use Composer\Json\JsonFile;
 use Composer\Package\{Link, PackageInterface, RootPackageInterface};
 use Composer\Repository\{InstalledArrayRepository, RepositoryManager, WritableRepositoryInterface};
 use Composer\Semver\Constraint\Constraint;
@@ -20,11 +21,13 @@ use Foxy\Exception\RuntimeException;
 use Foxy\Fallback\FallbackInterface;
 use Foxy\FoxyEvents;
 use Foxy\Solver\{Solver, SolverInterface};
+use JsonException;
 use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
+use Seld\JsonLint\ParsingException;
 use Xepozz\InternalMocker\MockerState;
 
 use function chdir;
@@ -824,6 +827,121 @@ class SolverTest extends TestCase
         $solver->solve($this->composer, $this->io);
     }
 
+    public function testSolveRestoresComposerWhenAssetManifestCannotBeRead(): void
+    {
+        $sourceContent = '{"name":"source-package","version":"1.0.0"}';
+        ['source' => $source, 'target' => $target] = $this->prepareAssetPackageManifest($sourceContent);
+
+        MockerState::addCondition(
+            'Foxy\\Solver',
+            'file_get_contents',
+            [$source, false, null, 0, null],
+            false,
+        );
+
+        $this->manager->expects(self::never())->method('addDependencies');
+        $this->manager->expects(self::never())->method('run');
+        $this->composerFallback->expects(self::once())->method('restore');
+
+        try {
+            $this->solver->solve($this->composer, $this->io);
+            self::fail('Expected reading the asset manifest to fail.');
+        } catch (RuntimeException $exception) {
+            self::assertSame(sprintf('Unable to read asset manifest "%s".', $source), $exception->getMessage());
+        }
+
+        self::assertSame($sourceContent, file_get_contents($source));
+        self::assertFileDoesNotExist($target);
+    }
+
+    public function testSolveRestoresComposerWhenAssetManifestCannotBeWritten(): void
+    {
+        $sourceContent = '{"name":"source-package","version":"1.0.0"}';
+        ['source' => $source, 'target' => $target] = $this->prepareAssetPackageManifest($sourceContent);
+        $targetContent = JsonFile::encode(
+            ['name' => '@composer-asset/foo--bar', 'version' => '1.0.0'],
+        ) . "\n";
+
+        MockerState::addCondition(
+            'Composer\\Json',
+            'file_put_contents',
+            [$target, $targetContent, 0, null],
+            false,
+        );
+
+        $this->manager->expects(self::never())->method('addDependencies');
+        $this->manager->expects(self::never())->method('run');
+        $this->composerFallback->expects(self::once())->method('restore');
+
+        try {
+            $this->solver->solve($this->composer, $this->io);
+            self::fail('Expected writing the asset manifest to fail.');
+        } catch (RuntimeException $exception) {
+            self::assertSame(sprintf('Unable to write asset manifest "%s".', $target), $exception->getMessage());
+        }
+
+        self::assertSame($sourceContent, file_get_contents($source));
+        self::assertFileDoesNotExist($target);
+    }
+
+    public function testSolveRestoresComposerWhenAssetManifestContainsInvalidJson(): void
+    {
+        $sourceContent = '{';
+        ['source' => $source, 'target' => $target] = $this->prepareAssetPackageManifest($sourceContent);
+
+        $this->manager->expects(self::never())->method('addDependencies');
+        $this->manager->expects(self::never())->method('run');
+        $this->composerFallback->expects(self::once())->method('restore');
+
+        try {
+            $this->solver->solve($this->composer, $this->io);
+            self::fail('Expected decoding the asset manifest to fail.');
+        } catch (JsonException $exception) {
+            self::assertSame('Syntax error', $exception->getMessage());
+        }
+
+        self::assertSame($sourceContent, file_get_contents($source));
+        self::assertFileDoesNotExist($target);
+    }
+
+    public function testSolveRestoresComposerWhenAssetManifestIsTruncated(): void
+    {
+        $sourceContent = '{"name":"source-package","version":"1.0.0"}';
+        ['source' => $source, 'target' => $target] = $this->prepareAssetPackageManifest($sourceContent);
+        $targetContent = JsonFile::encode(
+            ['name' => '@composer-asset/foo--bar', 'version' => '1.0.0'],
+        ) . "\n";
+        $truncatedTargetContent = substr($targetContent, 0, -2);
+
+        MockerState::addCondition(
+            'Composer\\Json',
+            'file_put_contents',
+            [$target, $targetContent, 0, null],
+            static function (string $filename, mixed $data, int $flags, mixed $context): false {
+                self::assertNotFalse(
+                    file_put_contents($filename, substr((string) $data, 0, -2), $flags, $context),
+                );
+
+                return false;
+            },
+        );
+
+        $this->manager->expects(self::never())->method('addDependencies');
+        $this->manager->expects(self::never())->method('run');
+        $this->composerFallback->expects(self::once())->method('restore');
+
+        try {
+            $this->solver->solve($this->composer, $this->io);
+            self::fail('Expected validating the generated asset manifest to fail.');
+        } catch (RuntimeException $exception) {
+            self::assertSame(sprintf('Unable to write asset manifest "%s".', $target), $exception->getMessage());
+            self::assertInstanceOf(ParsingException::class, $exception->getPrevious());
+        }
+
+        self::assertSame($sourceContent, file_get_contents($source));
+        self::assertSame($truncatedTargetContent, file_get_contents($target));
+    }
+
     public function testSolveRestoresComposerWhenManagerThrows(): void
     {
         $this->addInstalledPackages();
@@ -1044,5 +1162,39 @@ class SolverTest extends TestCase
     private function invokeSolverMethodOn(SolverInterface $solver, string $method, mixed ...$arguments): mixed
     {
         return (new ReflectionClass($solver))->getMethod($method)->invoke($solver, ...$arguments);
+    }
+
+    /**
+     * @return array{source: string, target: string}
+     */
+    private function prepareAssetPackageManifest(string $sourceContent): array
+    {
+        $package = $this->createMock(PackageInterface::class);
+        $package->method('getName')->willReturn('foo/bar');
+        $package
+            ->method('getRequires')
+            ->willReturn([new Link('root/package', 'php-forge/foxy', new Constraint('=', '1.0.0'))]);
+
+        $this->addInstalledPackages([$package]);
+
+        $installPath = "{$this->cwd}/vendor/foo/bar";
+        $source = "{$installPath}/package.json";
+
+        $this->im->expects(self::once())->method('getInstallPath')->with($package)->willReturn($installPath);
+        $this->manager->expects(self::once())->method('getPackageName')->willReturn('package.json');
+        $this->sfs->mkdir($installPath);
+
+        self::assertNotFalse(file_put_contents($source, $sourceContent));
+
+        $source = realpath($source);
+
+        if (false === $source) {
+            self::fail('Unable to resolve the source asset manifest.');
+        }
+
+        return [
+            'source' => $this->fs->normalizePath($source),
+            'target' => $this->getCanonicalPath('/composer-asset-dir/foo/bar/package.json'),
+        ];
     }
 }
