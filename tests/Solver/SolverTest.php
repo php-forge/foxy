@@ -84,23 +84,74 @@ class SolverTest extends TestCase
         );
     }
 
-    public function testGetMockPackagePathRejectsCopyFailure(): void
+    public function testGetMockPackagePathDoesNotCopySourceBeforeWritingFormattedManifest(): void
     {
-        $assetDir = $this->cwd . '/copy-failure-assets';
-        $source = $this->cwd . '/source-package.json';
-        $target = $assetDir . '/foo/bar/source-package.json';
+        $assetDir = "{$this->cwd}/direct-write-assets";
+        $source = "{$this->cwd}/source-package.json";
+
+        $target = "{$assetDir}/foo/bar/source-package.json";
+
+        $sourceContent = <<<JSON
+            {
+                "name": "source-package",
+                "version": "1.2.3",
+                "engines": {},
+                "bundleDependencies": [],
+                "scripts": {
+                    "build": "ignored"
+                },
+                "dependencies": {}
+            }
+            JSON;
+
         $package = $this->createMock(PackageInterface::class);
         $package->method('getName')->willReturn('foo/bar');
-        file_put_contents($source, '{}');
+
+        file_put_contents($source, $sourceContent);
 
         $fs = $this->getMockBuilder(Filesystem::class)->onlyMethods(['copy'])->getMock();
-        $fs->expects(self::once())->method('copy')->with($source, $target)->willReturn(false);
+        $fs->expects(self::never())->method('copy');
         $solver = new Solver($this->manager, $this->config, $fs, $this->composerFallback);
 
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage(sprintf('Unable to copy asset manifest "%s".', $source));
+        $result = $this->invokeSolverMethodOn($solver, 'getMockPackagePath', $package, $assetDir, $source);
 
-        $this->invokeSolverMethodOn($solver, 'getMockPackagePath', $package, $assetDir, $source);
+        self::assertSame(['@composer-asset/foo--bar', $target], $result);
+        self::assertSame($sourceContent, file_get_contents($source));
+        self::assertFileExists($target);
+        self::assertSame(
+            <<<'JSON'
+                {
+                    "name": "@composer-asset/foo--bar",
+                    "version": "1.2.3",
+                    "engines": {},
+                    "bundleDependencies": [],
+                    "dependencies": {}
+                }
+
+                JSON,
+            file_get_contents($target),
+        );
+    }
+
+    public function testGetMockPackagePathRejectsUnreadableSourceManifest(): void
+    {
+        $assetDir = "{$this->cwd}/unreadable-source-assets";
+        $source = "{$this->cwd}/source-package.json";
+
+        $package = $this->createMock(PackageInterface::class);
+        $package->method('getName')->willReturn('foo/bar');
+
+        MockerState::addCondition(
+            'Foxy\\Solver',
+            'file_get_contents',
+            [$source, false, null, 0, null],
+            false,
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(sprintf('Unable to read asset manifest "%s".', $source));
+
+        $this->invokeSolverMethod('getMockPackagePath', $package, $assetDir, $source);
     }
 
     public function testGetMockPackagePathWrapsDirectoryCreationFailure(): void

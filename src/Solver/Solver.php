@@ -27,6 +27,7 @@ use function implode;
 use function is_dir;
 use function is_file;
 use function is_string;
+use function json_decode;
 use function realpath;
 use function rtrim;
 use function sprintf;
@@ -173,7 +174,7 @@ final readonly class Solver implements SolverInterface
      * @param string $assetDir The asset directory.
      * @param string $filename The filename of asset package.
      *
-     * @throws Exception if the asset package cannot be copied or written.
+     * @throws Exception if the asset package cannot be read or written.
      *
      * @return array{0: string, 1: string} The package name and absolute generated manifest path.
      */
@@ -194,17 +195,23 @@ final readonly class Solver implements SolverInterface
             );
         }
 
-        if (!$this->fs->copy($filename, $newFilename)) {
+        $sourceContent = file_get_contents($filename);
+
+        if (false === $sourceContent) {
             throw new RuntimeException(
-                sprintf('Unable to copy asset manifest "%s".', $filename),
+                sprintf('Unable to read asset manifest "%s".', $filename),
             );
         }
 
-        $jsonFile = new JsonFile($newFilename);
+        $packageValue = AssetUtil::formatPackage(
+            $package,
+            $packageName,
+            (array) json_decode($sourceContent, false, flags: JSON_THROW_ON_ERROR),
+        );
 
-        $packageValue = AssetUtil::formatPackage($package, $packageName, (array) $jsonFile->read());
+        $targetJsonFile = new JsonFile($newFilename);
 
-        $jsonFile->write($packageValue);
+        $targetJsonFile->write($packageValue);
 
         return [$packageName, $newFilename];
     }
