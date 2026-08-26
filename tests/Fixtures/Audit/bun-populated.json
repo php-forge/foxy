@@ -1,0 +1,27 @@
+{
+    "lodash": [
+        {
+            "id": 1106913,
+            "url": "https://github.com/advisories/GHSA-35jh-r3h4-6jhm",
+            "title": "Command Injection in lodash",
+            "severity": "high",
+            "vulnerable_versions": "<4.17.21",
+            "cwe": [
+                "CWE-77",
+                "CWE-94"
+            ],
+            "cvss": {
+                "score": 7.2,
+                "vectorString": "CVSS:3.1/AV:N/AC:L/PR:H/UI:N/S:U/C:H/I:H/A:H"
+            }
+        }
+    ],
+    "example-package": [
+        {
+            "id": "1107000",
+            "url": "https://security.example.test/advisories/1107000",
+            "severity": "info",
+            "vulnerable_versions": "<=1.0.0"
+        }
+    ]
+}

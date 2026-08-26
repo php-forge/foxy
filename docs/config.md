@@ -55,7 +55,7 @@ manager-prefixed environment variable should contain the scalar value for the ac
 | `manager-install-options` | string or map    | Empty                                    | Appends options only to install commands.                                    |
 | `manager-update-options`  | string or map    | Empty                                    | Appends options only to update commands.                                     |
 | `manager-timeout`         | integer or map   | No practical limit                       | Sets the manager process timeout in seconds.                                 |
-| `run-asset-manager`       | boolean          | `true`                                   | Controls manager probing and execution while retaining package merging.      |
+| `run-asset-manager`       | boolean          | `true`                                   | Controls automatic manager probing and install or update execution.          |
 | `fallback-asset`          | boolean          | `true`                                   | Restores `package.json` after asset processing fails.                        |
 | `fallback-composer`       | boolean          | `true`                                   | Restores Composer lock and vendor state after asset solving fails.           |
 | `composer-asset-dir`      | string or `null` | `<vendor-dir>/php-forge/composer-asset/` | Sets the mock package directory.                                             |
@@ -106,14 +106,16 @@ When manager execution is enabled, Foxy validates the selected manager against i
 | Manager | Built-in constraint |
 | ------- | ------------------- |
 | Bun     | `^1.4.0`            |
-| npm     | `^12.0.2`           |
+| npm     | `>=10.9.8`          |
 | pnpm    | `^11.23.0`          |
 | Yarn    | `^4.18.0`           |
 
 The `manager-version` option adds another Composer constraint that is evaluated together with the built-in constraint.
 It can narrow the accepted versions for a project, but it cannot replace or widen Foxy's supported range.
 Foxy treats the reported value as one concrete release and validates it from `root-package-json-dir` before every
-manager command. When `run-asset-manager` is `false`, Foxy neither probes, executes, nor validates the manager binary.
+manager command. During automatic Composer processing, `run-asset-manager=false` prevents probing, execution, and
+validation of the manager binary. An explicit `composer foxy:audit` remains an exception because it is a direct user
+request.
 
 Narrow the npm constraint for one project:
 
@@ -122,7 +124,7 @@ Narrow the npm constraint for one project:
   "config": {
     "foxy": {
       "manager": "npm",
-      "manager-version": "~12.0.2"
+      "manager-version": "~10.9.8"
     }
   }
 }
@@ -135,7 +137,7 @@ Manager-prefixed options may also use a map when a shared configuration supports
   "config": {
     "foxy": {
       "manager-version": {
-        "npm": "~12.0.2",
+        "npm": "~10.9.8",
         "pnpm": "~11.23.0"
       }
     }
@@ -143,8 +145,8 @@ Manager-prefixed options may also use a map when a shared configuration supports
 }
 ```
 
-For example, configuring npm with `>=11.0.0` does not enable npm 11 because the built-in `^12.0.2` constraint remains
-in force. Remove `manager-version` to accept the complete built-in range for the selected manager.
+For example, configuring npm with `<10.9.8` does not enable an older release because the built-in `>=10.9.8`
+constraint remains in force. Remove `manager-version` to accept the complete built-in range for the selected manager.
 
 ## Manager executable and options
 
@@ -178,6 +180,18 @@ Use the three manager option settings only when native manager configuration fil
 
 These values are appended to an external command. Treat project, global, and environment configuration as trusted
 input. Prefer native files such as `.npmrc`, `.yarnrc.yml`, `pnpm-workspace.yaml`, or `bunfig.toml` where appropriate.
+They apply to install and update operations only. `foxy:audit` owns its machine-output, advisory-filter, and
+dependency-scope flags and does not inherit these options. It does honor `manager-bin`, `manager-version`,
+`manager-timeout`, and `root-package-json-dir`.
+
+Where the native manager supports an explicit override, Foxy neutralizes inherited settings that could exclude
+dependencies or advisories. Bun 1.4 cannot reset every inherited dependency-scope setting without also discarding
+registry configuration. Foxy therefore rejects a Bun audit when a loaded `.npmrc` or `bunfig.toml` excludes a dependency
+type required by the requested audit. Remove the restrictive setting, or use `--no-dev` when the only restriction is the
+development dependency graph. Audit preflight also requires UTF-8 configuration and canonical `[install]` table syntax;
+inline or array install tables, escaped keys or omit values, and multiline values inside `[install]` are rejected rather
+than interpreted heuristically. The preflight rejects restrictive declarations even when a later `include` or
+higher-precedence file would override them.
 
 ## Manager timeout
 
@@ -209,7 +223,8 @@ Disable manager binary probing and execution while continuing to update `package
 
 In this manifest-only mode, Foxy does not probe manager binaries, run install or update commands, or remove existing
 `node_modules/@composer-asset/*` installations during npm reconciliation. Generated Composer asset manifests and the
-root `package.json` are still updated.
+root `package.json` are still updated. An explicit `composer foxy:audit` remains available and validates and runs the
+selected manager because it represents a direct user request.
 
 ## Fallbacks
 

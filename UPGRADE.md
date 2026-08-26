@@ -10,8 +10,8 @@ Before updating, ensure the environment provides:
 
 - PHP 8.3 or later.
 - Composer 2.10.2 or later.
-- One supported frontend manager when manager execution is enabled: Bun `^1.4.0`, npm `^12.0.2`, pnpm `^11.23.0`, or Yarn `^4.18.0`.
-- For npm, Node.js `^22.22.2 || ^24.15.0 || >=26.0.0`.
+- One supported frontend manager for automatic manager execution or explicit security audits: Bun `^1.4.0`, npm `>=10.9.8`, pnpm `^11.23.0`, or Yarn `^4.18.0`.
+- For npm, use a Node.js version supported by the selected npm release.
 - For pnpm, Node.js `>=22.13.0`.
 - For Yarn, Node.js `>=18.12.0` on a release that still receives security updates.
 
@@ -64,19 +64,18 @@ configure the manager and commit its native lockfile:
 
 Remove stale lockfiles from other managers before the first Composer operation with Foxy 0.3.
 
-#### npm 12 migration
+#### npm migration
 
-Upgrade Node.js to a release accepted by npm 12 first, then install the latest npm 12 release and regenerate the
-installation state:
+Ensure npm is at least 10.9.8 and regenerate the installation state:
 
 ```bash
-npm install --global npm@12
 npm --version
 npm install
 ```
 
-The reported npm version must satisfy `^12.0.2`. Review npm 12 configuration changes against the
-[npm 12 documentation](https://docs.npmjs.com/cli/v12/) and commit any `package-lock.json` changes.
+The reported npm version must satisfy `>=10.9.8`. npm 10.9.8 requires Node.js `^18.17.0 || >=20.5.0`; later npm
+releases may require a newer Node.js version. Review the [npm documentation](https://docs.npmjs.com/cli/) for the
+selected release and commit any `package-lock.json` changes.
 
 #### pnpm 11 migration
 
@@ -132,7 +131,11 @@ The [Yarn migration guide](https://yarnpkg.com/migration/guide) documents the co
 
 Custom `AssetManagerInterface` implementations must add `getVersionConstraint(): string` and return their hard
 supported version range as a Composer constraint. Remove implementations and calls of the obsolete
-`isValidForUpdate()` method.
+`isValidForUpdate()` method. Custom `AbstractAssetManager` subclasses must also implement
+`getAuditCommand(bool $noDev): string`. Foxy currently normalizes only the report schemas and manager names of its four
+built-in managers; arbitrary custom managers are not supported by `composer foxy:audit`. Direct `AssetManagerInterface`
+implementations that do not implement Foxy's auditable manager contract remain usable for asset solving, but the audit
+command reports that they cannot be audited reliably.
 
 `AbstractAssetManager` subclasses inherit the simplified update eligibility based on installation state and the
 `setUpdatable()` flag, concrete-version enforcement before every manager command, and version detection in the
@@ -187,4 +190,6 @@ when necessary, revert the root manifest after a failed operation.
 
 Setting `enabled=false` now bypasses manager discovery, fallback snapshots, package merging, and manager execution.
 Setting `run-asset-manager=false` retains package merging but skips manager binary probing, version validation,
-execution, and npm cleanup of existing `node_modules/@composer-asset/*` installations.
+execution, and npm cleanup of existing `node_modules/@composer-asset/*` installations. The new explicit
+`composer foxy:audit` command still validates and invokes the selected manager in this mode; it never installs, updates,
+or repairs dependencies.

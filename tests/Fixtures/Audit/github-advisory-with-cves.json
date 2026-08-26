@@ -1,0 +1,22 @@
+{
+    "ghsa_id": "GHSA-AAAA-BBBB-CCCC",
+    "cve_id": "CVE-2021-23337",
+    "identifiers": [
+        {
+            "value": "GHSA-aaaa-bbbb-cccc",
+            "type": "GHSA"
+        },
+        {
+            "value": "CVE-2020-8203",
+            "type": "CVE"
+        },
+        {
+            "value": "CVE-2021-23337",
+            "type": "CVE"
+        },
+        {
+            "value": "not-a-cve",
+            "type": "CVE"
+        }
+    ]
+}

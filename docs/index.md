@@ -22,13 +22,13 @@ package version only when the embedded package does not declare its own version.
 | PHP         | 8.3 or later                                                                   |
 | Composer    | 2.10.2 or later                                                                |
 | Bun         | `^1.4.0`                                                                       |
-| npm         | `^12.0.2`; Node.js `^22.22.2 \|\| ^24.15.0 \|\| >=26.0.0`                      |
+| npm         | `>=10.9.8`; use a Node.js version supported by the selected npm release        |
 | pnpm        | `^11.23.0`; Node.js `>=22.13.0`                                                |
 | Yarn        | `^4.18.0`; Node.js `>=18.12.0` on a release that still receives security fixes |
 | Git         | Required only for Git-based dependencies                                       |
 
-The frontend manager requirements apply only when manager execution is enabled. Manifest-only mode does not require a
-manager binary.
+The frontend manager requirements apply to automatic manager execution and explicit security audits. Manifest-only
+Composer processing does not require a manager binary, but `composer foxy:audit` does.
 
 ## Installation
 
@@ -47,8 +47,9 @@ Set `config.foxy.manager` to `bun`, `npm`, `pnpm`, or `yarn` when reproducible m
 manager execution is enabled and the option is omitted, Foxy looks for one recognized native lockfile and then for an
 available manager executable. Multiple recognized lockfiles require explicit selection.
 
-When `run-asset-manager` is `false`, Foxy selects from a single lockfile or uses npm as the manifest adapter without
-probing executables.
+During automatic Composer processing, `run-asset-manager=false` makes Foxy select from a single lockfile or use npm as
+the manifest adapter without probing executables. An explicit `composer foxy:audit` still probes and runs the selected
+manager.
 
 Commit the selected manager's native lockfile and use the same explicit manager in local development and CI.
 

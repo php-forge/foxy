@@ -254,6 +254,37 @@ final class AssetUtilTest extends TestCase
     /**
      * @throws JsonException
      */
+    public function testGetPathIgnoresNonStringConfiguredDirectory(): void
+    {
+        $installPath = $this->cwd . '/invalid-configured-package';
+
+        $this->sfs->mkdir($installPath);
+        file_put_contents(
+            $installPath . '/composer.json',
+            '{"config":{"foxy":{"root-package-json-dir":[]}}}',
+        );
+        file_put_contents($installPath . '/package.json', '{}');
+
+        $installationManager = $this->createMock(InstallationManager::class);
+        $installationManager->expects(self::once())->method('getInstallPath')->willReturn($installPath);
+
+        $assetManager = $this->createMock(AssetManagerInterface::class);
+        $assetManager->expects(self::once())->method('getPackageName')->willReturn('package.json');
+
+        $package = $this->createMock(PackageInterface::class);
+        $package->method('getExtra')->willReturn(['foxy' => true]);
+        $package->method('getRequires')->willReturn([]);
+        $package->method('getDevRequires')->willReturn([]);
+
+        self::assertSame(
+            str_replace('\\', '/', (string) realpath($installPath . '/package.json')),
+            AssetUtil::getPath($installationManager, $assetManager, $package),
+        );
+    }
+
+    /**
+     * @throws JsonException
+     */
     public function testGetPathPrefersConfiguredManifestOverRootManifest(): void
     {
         $installPath = $this->cwd . '/configured-package';

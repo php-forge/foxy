@@ -21,6 +21,7 @@ final class ConsoleUtilTest extends TestCase
             [false, false, 'auto', false],
             [false, true, 'auto', [false, true]],
             [true, false, 'source', false],
+            [true, false, 'source', [false, null]],
             [false, true, 'dist', false],
             [true, false, 'auto', [1, 0]],
         ];
@@ -47,13 +48,13 @@ final class ConsoleUtilTest extends TestCase
     public function testGetPreferredInstallOptions(
         bool $expectedPreferSource,
         bool $expectedPreferDist,
-        string $preferedInstall,
+        string $preferredInstall,
         mixed $inputPrefer,
     ): void {
         $config = $this->createMock(Config::class);
         $input = $this->createMock(InputInterface::class);
 
-        $config->expects(self::once())->method('get')->with('preferred-install')->willReturn($preferedInstall);
+        $config->expects(self::once())->method('get')->with('preferred-install')->willReturn($preferredInstall);
 
         if (is_array($inputPrefer)) {
             $input->expects(self::atLeastOnce())

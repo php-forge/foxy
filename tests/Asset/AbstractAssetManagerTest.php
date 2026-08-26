@@ -24,6 +24,8 @@ use function define;
 use function defined;
 use function file_put_contents;
 use function getcwd;
+use function getenv;
+use function putenv;
 use function str_replace;
 
 use const DIRECTORY_SEPARATOR;
@@ -103,6 +105,179 @@ final class AbstractAssetManagerTest extends TestCase
         $this->expectException(ParsingException::class);
 
         $this->createManager()->addDependencies($this->rootPackage, []);
+    }
+
+    public function testAuditCapturesStandardAndErrorOutputWithoutStreaming(): void
+    {
+        file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'inspectable.lock', '{}');
+
+        $position = 0;
+        $executor = $this->createMock(ProcessExecutor::class);
+        $executor
+            ->expects(self::exactly(2))
+            ->method('execute')
+            ->willReturnCallback(
+                static function (mixed $command, mixed &$output = null, mixed $cwd = null) use (&$position): int {
+                    self::assertNull($cwd);
+
+                    if (0 === $position++) {
+                        self::assertSame('inspectable --version', $command);
+                        $output = '42.0.0';
+
+                        return 0;
+                    }
+
+                    self::assertSame('inspectable audit --prod', $command);
+                    $output = 'standard output';
+
+                    return 1;
+                },
+            );
+        $executor
+            ->expects(self::once())
+            ->method('getErrorOutput')
+            ->willReturn('error output');
+
+        $this->io->expects(self::never())->method('writeRaw');
+        $this->io->expects(self::never())->method('writeErrorRaw');
+
+        $manager = new InspectableAssetManager($this->io, $this->config, $executor, $this->fs, $this->fallback);
+        $result = $manager->audit(true);
+
+        self::assertSame(1, $result->exitCode);
+        self::assertSame('standard output', $result->output);
+        self::assertSame('error output', $result->errorOutput);
+    }
+
+    public function testAuditInvokesManagerConfigurationValidation(): void
+    {
+        file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'inspectable.lock', '{}');
+        $this->executor->addExpectedValues(0, '42.0.0');
+        $this->executor->addExpectedValues(0, '{}');
+
+        $manager = $this->createManager();
+
+        $manager->audit(true);
+
+        self::assertTrue($manager->getAuditValidationForTest());
+    }
+
+    public function testAuditOverridesAndRestoresManagerEnvironment(): void
+    {
+        $name = 'FOXY_ABSTRACT_ASSET_MANAGER_AUDIT';
+        $processValue = getenv($name);
+        $environment = $_ENV;
+        $server = $_SERVER;
+
+        file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'inspectable.lock', '{}');
+        putenv("{$name}=process-before-audit");
+        $_ENV[$name] = 'env-before-audit';
+        $_SERVER[$name] = 'server-before-audit';
+
+        $position = 0;
+        $executor = $this->createMock(ProcessExecutor::class);
+        $executor
+            ->expects(self::exactly(2))
+            ->method('execute')
+            ->willReturnCallback(
+                static function (mixed $command, mixed &$output = null) use (&$position, $name): int {
+                    if (0 === $position++) {
+                        $output = '42.0.0';
+
+                        return 0;
+                    }
+
+                    self::assertSame('audit-value', getenv($name));
+                    self::assertSame('audit-value', $_ENV[$name]);
+                    self::assertSame('audit-value', $_SERVER[$name]);
+                    $output = '{}';
+
+                    return 0;
+                },
+            );
+
+        try {
+            $manager = new InspectableAssetManager(
+                $this->io,
+                $this->config,
+                $executor,
+                $this->fs,
+                $this->fallback,
+            );
+            $manager->setAuditEnvironmentForTest([$name => 'audit-value']);
+
+            $manager->audit(false);
+
+            self::assertSame('process-before-audit', getenv($name));
+            self::assertSame('env-before-audit', $_ENV[$name]);
+            self::assertSame('server-before-audit', $_SERVER[$name]);
+        } finally {
+            putenv(false === $processValue ? $name : "{$name}={$processValue}");
+            $_ENV = $environment;
+            $_SERVER = $server;
+        }
+    }
+
+    public function testAuditRestoresTimeoutWhenExecutorThrows(): void
+    {
+        $originalTimeout = ProcessExecutor::getTimeout();
+        $expectedTimeout = 42;
+        $managerTimeout = 900;
+        $observedTimeout = null;
+
+        file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'inspectable.lock', '{}');
+        $this->config = new Config(
+            [
+                'manager-timeout' => $managerTimeout,
+                'run-asset-manager' => false,
+            ],
+        );
+        $position = 0;
+        $executor = $this->createMock(ProcessExecutor::class);
+        $executor
+            ->expects(self::exactly(2))
+            ->method('execute')
+            ->willReturnCallback(
+                static function (mixed $command, mixed &$output = null) use (
+                    &$observedTimeout,
+                    &$position,
+                ): int {
+                    if (0 === $position++) {
+                        $output = '42.0.0';
+
+                        return 0;
+                    }
+
+                    $observedTimeout = ProcessExecutor::getTimeout();
+
+                    throw new \RuntimeException('Audit execution failed.');
+                },
+            );
+        $this->fallback->expects(self::never())->method('restore');
+
+        try {
+            ProcessExecutor::setTimeout($expectedTimeout);
+
+            $manager = new InspectableAssetManager(
+                $this->io,
+                $this->config,
+                $executor,
+                $this->fs,
+                $this->fallback,
+            );
+
+            try {
+                $manager->audit(false);
+                self::fail('Expected the audit process to fail.');
+            } catch (\RuntimeException $exception) {
+                self::assertSame('Audit execution failed.', $exception->getMessage());
+            }
+
+            self::assertSame($managerTimeout, $observedTimeout);
+            self::assertSame($expectedTimeout, ProcessExecutor::getTimeout());
+        } finally {
+            ProcessExecutor::setTimeout($originalTimeout);
+        }
     }
 
     #[RunInSeparateProcess]

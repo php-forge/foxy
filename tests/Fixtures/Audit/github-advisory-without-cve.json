@@ -1,0 +1,10 @@
+{
+    "ghsa_id": "GHSA-DDDD-EEEE-FFFF",
+    "cve_id": null,
+    "identifiers": [
+        {
+            "value": "GHSA-dddd-eeee-ffff",
+            "type": "GHSA"
+        }
+    ]
+}

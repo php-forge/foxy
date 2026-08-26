@@ -49,6 +49,10 @@ final class InternalMockerExtension implements Extension
                 'name' => 'chdir',
             ],
             [
+                'namespace' => 'Foxy\\Asset',
+                'name' => 'file_get_contents',
+            ],
+            [
                 'namespace' => 'Foxy\\Json',
                 'name' => 'file_get_contents',
             ],

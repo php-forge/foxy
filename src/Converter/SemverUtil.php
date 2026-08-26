@@ -54,7 +54,7 @@ abstract class SemverUtil
             }
         }
 
-        return static::cleanWildcard($version);
+        return self::cleanWildcard($version);
     }
 
     /**
@@ -73,18 +73,6 @@ abstract class SemverUtil
         $numVer3 = "({$numVer}\.{$numVer}\.{$numVer})";
 
         return "/^({$numVer}|{$numVer2}|{$numVer3}){$pattern}/";
-    }
-
-    /**
-     * Clean the wildcard in version.
-     *
-     * @param string $version The version.
-     *
-     * @return string The cleaned version.
-     */
-    protected static function cleanWildcard(string $version): string
-    {
-        return Preg::replace('/(?:\.x){2,}/', '.x', $version);
     }
 
     /**
@@ -112,6 +100,18 @@ abstract class SemverUtil
         $type = '' !== $rawType ? self::normalizeStability($rawType) : '';
 
         return [$type, $version, $end];
+    }
+
+    /**
+     * Clean the wildcard in version.
+     *
+     * @param string $version The version.
+     *
+     * @return string The cleaned version.
+     */
+    private static function cleanWildcard(string $version): string
+    {
+        return Preg::replace('/(?:\.x){2,}/', '.x', $version);
     }
 
     /**

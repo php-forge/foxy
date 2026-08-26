@@ -43,6 +43,18 @@ Multiple recognized lockfiles require explicit selection in either mode.
 
 Explicit selection and a committed native lockfile are recommended for CI.
 
+## How can frontend dependencies be checked for known CVEs?
+
+Run `composer foxy:audit`. Foxy audits the dependency graph from the selected manager's native lockfile. The default
+table, plain, and JSON formats identify the affected package, advisory, severity, vulnerable range, and available CVE
+identifiers. Use `--format=summary` for compact counts in CI or `--format=json` for a versioned machine-readable
+document.
+
+The native registry response commonly contains a GHSA but no CVE. Foxy resolves that relationship through GitHub's
+public advisory API unless `--no-cve` or `--format=summary` is supplied. A lookup failure is shown as unavailable
+without hiding the native security finding. See [Security auditing](usage.md#security-auditing) for options and exit
+statuses.
+
 ## Why is a dependency's package.json not detected?
 
 Check the following:
