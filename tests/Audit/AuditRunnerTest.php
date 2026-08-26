@@ -10,12 +10,22 @@ use Foxy\Audit\{
     AuditRequest,
     AuditRunner,
     AuditableAssetManagerInterface,
+    CveStatus,
     Severity,
 };
 use Foxy\Exception\RuntimeException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+
+use function array_reverse;
+use function explode;
+use function implode;
+use function json_decode;
+use function json_encode;
+use function trim;
+
+use const JSON_THROW_ON_ERROR;
 
 final class AuditRunnerTest extends TestCase
 {
@@ -69,11 +79,48 @@ final class AuditRunnerTest extends TestCase
         self::assertCount(1, $report->findings);
         self::assertSame(Severity::HIGH, $report->findings[0]->severity);
         self::assertSame('First title', $report->findings[0]->title);
+        self::assertSame('https://security.example.test/first', $report->findings[0]->url);
         self::assertSame(['1.0.0', '1.1.0'], $report->findings[0]->affectedVersions);
         self::assertSame(
             ['parent-a@npm:1.0.0', 'parent-b@npm:2.0.0'],
             $report->findings[0]->dependencyPaths,
         );
+    }
+
+    public function testRunnerMarksMergedDuplicateCvesAsResolved(): void
+    {
+        $data = json_decode(self::fixture('pnpm-populated.json'), true, 512, JSON_THROW_ON_ERROR);
+        $duplicate = $data['advisories']['1106913'];
+        $duplicate['id'] = 1106914;
+        $duplicate['cves'] = ['CVE-2021-23337'];
+        $data['advisories']['1106914'] = $duplicate;
+        $data['metadata']['vulnerabilities']['high'] = 2;
+        $manager = $this->manager(
+            'pnpm',
+            new AuditProcessResult(1, json_encode($data, JSON_THROW_ON_ERROR), ''),
+        );
+
+        $report = (new AuditRunner($manager))->audit(new AuditRequest());
+
+        self::assertCount(2, $report->findings);
+        self::assertSame(['CVE-2021-23337'], $report->findings[0]->cves);
+        self::assertSame(CveStatus::RESOLVED, $report->findings[0]->cveStatus);
+    }
+
+    public function testRunnerPreservesTheHigherSeverityWhenDuplicateFindingsAreReversed(): void
+    {
+        $findings = explode("\n", trim(self::fixture('yarn-duplicates.ndjson')));
+        $manager = $this->manager(
+            'yarn',
+            new AuditProcessResult(1, implode("\n", array_reverse($findings)), ''),
+        );
+
+        $report = (new AuditRunner($manager))->audit(new AuditRequest());
+
+        self::assertCount(1, $report->findings);
+        self::assertSame(Severity::HIGH, $report->findings[0]->severity);
+        self::assertSame('Second title', $report->findings[0]->title);
+        self::assertSame('https://security.example.test/second', $report->findings[0]->url);
     }
 
     #[DataProvider('bunPartialReports')]

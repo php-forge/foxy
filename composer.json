@@ -72,8 +72,14 @@
     "scripts": {
         "check-dependencies": "./vendor/bin/composer-require-checker check",
         "ecs": "./vendor/bin/ecs --fix",
-        "mutation": "./vendor/bin/infection --threads=4 --min-msi=100 --min-covered-msi=100",
-        "mutation-static": "./vendor/bin/infection --threads=4 --min-msi=100 --min-covered-msi=100 --static-analysis-tool=phpstan --static-analysis-tool-options='--memory-limit=-1 --debug'",
+        "mutation": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php -d memory_limit=-1 ./vendor/bin/infection --threads=4 --with-uncovered --min-msi=100 --min-covered-msi=100"
+        ],
+        "mutation-static": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php -d memory_limit=-1 ./vendor/bin/infection --threads=4 --with-uncovered --min-msi=100 --min-covered-msi=100 --static-analysis-tool=phpstan --static-analysis-tool-options='--memory-limit=-1'"
+        ],
         "rector": "./vendor/bin/rector process",
         "static": "./vendor/bin/phpstan --memory-limit=-1",
         "sync-metadata": [

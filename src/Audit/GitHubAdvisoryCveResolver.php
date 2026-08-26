@@ -8,7 +8,6 @@ use Composer\Util\HttpDownloader;
 use Foxy\Exception\RuntimeException;
 
 use function array_unique;
-use function array_values;
 use function is_array;
 use function is_string;
 use function preg_match;
@@ -72,17 +71,17 @@ final readonly class GitHubAdvisoryCveResolver implements CveResolverInterface
             $value = $identifier['value'] ?? null;
 
             if (is_string($value) && $this->isCve($value)) {
-                $cves[] = strtoupper($value);
+                $cves[] = strtoupper(trim($value));
             }
         }
 
         $cveId = $data['cve_id'] ?? null;
 
         if (is_string($cveId) && $this->isCve($cveId)) {
-            $cves[] = strtoupper($cveId);
+            $cves[] = strtoupper(trim($cveId));
         }
 
-        $cves = array_values(array_unique($cves));
+        $cves = array_unique($cves);
         sort($cves);
 
         return new CveResolution(

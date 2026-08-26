@@ -236,6 +236,54 @@ final class ComposerFallbackTest extends TestCase
     /**
      * @throws Exception|JsonException
      */
+    public function testRestorePreservesLockMetadata(): void
+    {
+        $packages = [['name' => 'foo/bar', 'version' => '1.0.0.0']];
+        $devPackages = [['name' => 'foo/dev', 'version' => '2.0.0.0']];
+        $platform = ['php' => '^8.2'];
+        $platformDev = ['ext-json' => '*'];
+        $stabilityFlags = ['foo/bar' => 10];
+        $platformOverrides = ['php' => '8.3.4'];
+
+        $this->setupRestoreEnvironment(
+            $packages,
+            static fn($option): bool|null => 'verbose' === $option ? false : null,
+            lockOptions: [
+                'packages-dev' => $devPackages,
+                'platform' => $platform,
+                'platform-dev' => $platformDev,
+                'minimum-stability' => 'beta',
+                'stability-flags' => $stabilityFlags,
+                'prefer-lowest' => true,
+                'platform-overrides' => $platformOverrides,
+            ],
+        );
+
+        $this->expectInstallerRun();
+        $this->composerFallback->save();
+        $this->composerFallback->restore();
+
+        $restoredLock = json_decode(
+            file_get_contents($this->cwd . '/composer.lock'),
+            true,
+            512,
+            JSON_THROW_ON_ERROR,
+        );
+
+        self::assertSame('foo/bar', $restoredLock['packages'][0]['name']);
+        self::assertSame('foo/dev', $restoredLock['packages-dev'][0]['name']);
+        self::assertSame($platform, $restoredLock['platform']);
+        self::assertSame($platformDev, $restoredLock['platform-dev']);
+        self::assertSame('beta', $restoredLock['minimum-stability']);
+        self::assertSame($stabilityFlags, $restoredLock['stability-flags']);
+        self::assertTrue($restoredLock['prefer-stable']);
+        self::assertTrue($restoredLock['prefer-lowest']);
+        self::assertSame($platformOverrides, $restoredLock['platform-overrides']);
+    }
+
+    /**
+     * @throws Exception|JsonException
+     */
     public function testRestorePreservesRawAliases(): void
     {
         $aliases = [
@@ -766,6 +814,7 @@ final class ComposerFallbackTest extends TestCase
         array $aliases = [],
         int $restoreCount = 1,
         array $configOptions = [],
+        array $lockOptions = [],
     ): void {
         $composerFile = 'composer.json';
         $composerContent = '{}';
@@ -776,13 +825,13 @@ final class ComposerFallbackTest extends TestCase
         file_put_contents(
             $this->cwd . '/' . $lockFile,
             json_encode(
-                [
+                array_replace([
                     'content-hash' => 'HASH_VALUE',
                     'packages' => $packages,
                     'packages-dev' => [],
                     'aliases' => $aliases,
                     'prefer-stable' => true,
-                ],
+                ], $lockOptions),
                 JSON_THROW_ON_ERROR,
             ),
         );

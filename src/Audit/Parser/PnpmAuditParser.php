@@ -7,6 +7,7 @@ namespace Foxy\Audit\Parser;
 use Foxy\Audit\{AuditFinding, AuditParserInterface, CveStatus};
 
 use function count;
+use function is_array;
 use function is_int;
 use function sprintf;
 
@@ -106,7 +107,7 @@ final class PnpmAuditParser extends AbstractAuditParser implements AuditParserIn
     {
         $findingsData = $advisory['findings'] ?? null;
 
-        if (!is_array($findingsData) || !array_is_list($findingsData) || [] === $findingsData) {
+        if (!is_array($findingsData) || [] === $findingsData) {
             throw $this->malformed(sprintf('%s.findings must be a non-empty list', $context));
         }
 

@@ -13,11 +13,20 @@ use Foxy\Audit\{
     CveStatus,
     Severity,
 };
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
 final class CveEnricherTest extends TestCase
 {
+    public static function advisoryIdsWithSurroundingText(): array
+    {
+        return [
+            'prefix' => ['prefix-GHSA-35jh-r3h4-6jhm'],
+            'suffix' => ['GHSA-35jh-r3h4-6jhm-suffix'],
+        ];
+    }
+
     public function testEnricherCachesResolutionForRepeatedGhsa(): void
     {
         $resolver = $this->createMock(CveResolverInterface::class);
@@ -48,7 +57,11 @@ final class CveEnricherTest extends TestCase
     public function testEnricherDoesNotRequestExistingCves(): void
     {
         $resolver = $this->createMock(CveResolverInterface::class);
-        $resolver->expects(self::never())->method('resolve');
+        $resolver
+            ->expects(self::once())
+            ->method('resolve')
+            ->with('GHSA-35jh-r3h4-6jhm')
+            ->willReturn(new CveResolution([], CveStatus::NONE_ASSIGNED));
         $finding = new AuditFinding(
             'lodash',
             Severity::HIGH,
@@ -60,12 +73,17 @@ final class CveEnricherTest extends TestCase
         );
 
         $enriched = (new CveEnricher($resolver))->enrich(
-            new AuditReport('pnpm', [$finding]),
+            new AuditReport(
+                'pnpm',
+                [$finding, $this->finding('example-package', 'GHSA-35jh-r3h4-6jhm')],
+            ),
             static fn(string $warning) => self::fail($warning),
         );
 
+        self::assertCount(2, $enriched->findings);
         self::assertSame(['CVE-2021-23337'], $enriched->findings[0]->cves);
         self::assertSame(CveStatus::RESOLVED, $enriched->findings[0]->cveStatus);
+        self::assertSame(CveStatus::NONE_ASSIGNED, $enriched->findings[1]->cveStatus);
     }
 
     public function testEnricherMarksNativeAdvisoryAsUnavailableWithoutNetworkRequest(): void
@@ -74,11 +92,19 @@ final class CveEnricherTest extends TestCase
         $resolver->expects(self::never())->method('resolve');
 
         $enriched = (new CveEnricher($resolver))->enrich(
-            new AuditReport('bun', [$this->finding('example-package', '1107000')]),
+            new AuditReport(
+                'bun',
+                [
+                    $this->finding('example-package', '1107000'),
+                    $this->finding('dependent-package', '1107001'),
+                ],
+            ),
             static fn(string $warning) => self::fail($warning),
         );
 
+        self::assertCount(2, $enriched->findings);
         self::assertSame(CveStatus::UNAVAILABLE, $enriched->findings[0]->cveStatus);
+        self::assertSame(CveStatus::UNAVAILABLE, $enriched->findings[1]->cveStatus);
     }
 
     public function testEnricherMarksSuccessfulResolutionWithoutCve(): void
@@ -96,6 +122,20 @@ final class CveEnricherTest extends TestCase
 
         self::assertSame([], $enriched->findings[0]->cves);
         self::assertSame(CveStatus::NONE_ASSIGNED, $enriched->findings[0]->cveStatus);
+    }
+
+    #[DataProvider('advisoryIdsWithSurroundingText')]
+    public function testEnricherRejectsGhsaWithSurroundingText(string $advisoryId): void
+    {
+        $resolver = $this->createMock(CveResolverInterface::class);
+        $resolver->expects(self::never())->method('resolve');
+
+        $enriched = (new CveEnricher($resolver))->enrich(
+            new AuditReport('npm', [$this->finding('example-package', $advisoryId)]),
+            static fn(string $warning) => self::fail($warning),
+        );
+
+        self::assertSame(CveStatus::UNAVAILABLE, $enriched->findings[0]->cveStatus);
     }
 
     public function testEnricherWarnsOnceAndPreservesFindingsWhenResolutionFails(): void

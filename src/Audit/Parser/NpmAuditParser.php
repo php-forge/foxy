@@ -107,7 +107,7 @@ final class NpmAuditParser extends AbstractAuditParser implements AuditParserInt
 
         $via = $vulnerability['via'] ?? null;
 
-        if (!is_array($via) || !array_is_list($via) || [] === $via) {
+        if (!is_array($via) || [] === $via) {
             throw $this->malformed(sprintf('%s.via must be a non-empty list', $context));
         }
 

@@ -45,6 +45,16 @@ final class AuditParserTest extends TestCase
                 '{"auditReportVersion":2,"vulnerabilities":{"pkg":{"name":"pkg","severity":"low","isDirect":true,"via":[false],"effects":[],"range":"<1","nodes":[],"fixAvailable":false}},"metadata":{}}',
                 'via.0 must be a string or object',
             ],
+            'npm empty vulnerability key' => [
+                new NpmAuditParser(),
+                '{"auditReportVersion":2,"vulnerabilities":{"":{}},"metadata":{}}',
+                'each vulnerability must be keyed by a package name',
+            ],
+            'npm mismatched vulnerability name' => [
+                new NpmAuditParser(),
+                '{"auditReportVersion":2,"vulnerabilities":{"pkg":{"name":"other"}},"metadata":{}}',
+                'vulnerabilities.pkg.name must match its vulnerability key',
+            ],
             'npm metadata list' => [
                 new NpmAuditParser(),
                 '{"auditReportVersion":2,"vulnerabilities":[],"metadata":[]}',
@@ -125,15 +135,65 @@ final class AuditParserTest extends TestCase
                 "{\"value\":\"pkg\",\"children\":{\"ID\":1,\"Issue\":\"Issue\",\"Severity\":\"low\",\"Vulnerable Versions\":\"<1\",\"Tree Versions\":[],\"Dependents\":[]}}\nnot-json",
                 'line 2 contains invalid JSON',
             ],
+            'Yarn non-object record' => [
+                new YarnAuditParser(),
+                '[]',
+                'line 1 is not an audit finding',
+            ],
             'Yarn missing tree versions' => [
                 new YarnAuditParser(),
                 '{"value":"pkg","children":{"ID":1,"Issue":"Issue","Severity":"low","Vulnerable Versions":"<1","Dependents":[]}}',
-                'Tree Versions must be a list',
+                'line 1.children.Tree Versions must be a list',
+            ],
+            'Yarn invalid package on second line' => [
+                new YarnAuditParser(),
+                "{\"value\":\"first\",\"children\":{\"ID\":1,\"Issue\":\"Issue\",\"Severity\":\"low\",\"Vulnerable Versions\":\"<1\",\"Tree Versions\":[],\"Dependents\":[]}}\n{\"value\":false,\"children\":{\"ID\":2,\"Issue\":\"Issue\",\"Severity\":\"low\",\"Vulnerable Versions\":\"<1\",\"Tree Versions\":[],\"Dependents\":[]}}",
+                'line 2.value must be a string',
+            ],
+            'Yarn invalid advisory ID' => [
+                new YarnAuditParser(),
+                '{"value":"pkg","children":{"ID":false,"Issue":"Issue","Severity":"low","Vulnerable Versions":"<1","Tree Versions":[],"Dependents":[]}}',
+                'line 1.children.ID must be a string or integer',
+            ],
+            'Yarn invalid dependents' => [
+                new YarnAuditParser(),
+                '{"value":"pkg","children":{"ID":1,"Issue":"Issue","Severity":"low","Vulnerable Versions":"<1","Tree Versions":[],"Dependents":false}}',
+                'line 1.children.Dependents must be a list',
             ],
             'Bun root list' => [
                 new BunAuditParser(),
                 '[]',
                 'expected a JSON object',
+            ],
+            'Bun empty package key' => [
+                new BunAuditParser(),
+                '{"":[]}',
+                'each package must contain a list of advisories',
+            ],
+            'Bun advisories object' => [
+                new BunAuditParser(),
+                '{"pkg":{}}',
+                'each package must contain a list of advisories',
+            ],
+            'Bun non-string optional URL' => [
+                new BunAuditParser(),
+                '{"pkg":[{"id":1,"url":false}]}',
+                'pkg.0.url must be a string',
+            ],
+            'Bun non-scalar advisory ID' => [
+                new BunAuditParser(),
+                '{"pkg":[{"id":false}]}',
+                'pkg.0.id must be a string or integer',
+            ],
+            'Bun empty advisory ID' => [
+                new BunAuditParser(),
+                '{"pkg":[{"id":" "}]}',
+                'pkg.0.id must not be empty',
+            ],
+            'Bun blank required string' => [
+                new BunAuditParser(),
+                '{"pkg":[{"id":1,"severity":"low","vulnerable_versions":"   "}]}',
+                'pkg.0.vulnerable_versions must be a string',
             ],
             'unsupported severity' => [
                 new BunAuditParser(),
@@ -193,6 +253,18 @@ final class AuditParserTest extends TestCase
                 },
                 'metadata.dependencies.prod must be a non-negative integer',
             ],
+            'severity count context' => [
+                static function (array &$data): void {
+                    $data['metadata']['vulnerabilities']['high'] = -1;
+                },
+                'metadata.vulnerabilities.high must be a non-negative integer',
+            ],
+            'total severity count context' => [
+                static function (array &$data): void {
+                    $data['metadata']['vulnerabilities']['total'] = -1;
+                },
+                'metadata.vulnerabilities.total must be a non-negative integer',
+            ],
         ];
     }
 
@@ -222,6 +294,24 @@ final class AuditParserTest extends TestCase
                 },
                 'advisories.1106913.cves must contain only strings',
             ],
+            'invalid CVE identifier' => [
+                static function (array &$data): void {
+                    $data['advisories']['1106913']['cves'] = ['CVE-invalid'];
+                },
+                'advisories.1106913.cves contains an invalid CVE identifier',
+            ],
+            'prefixed CVE identifier' => [
+                static function (array &$data): void {
+                    $data['advisories']['1106913']['cves'] = ['prefix-CVE-2021-23337'];
+                },
+                'advisories.1106913.cves contains an invalid CVE identifier',
+            ],
+            'suffixed CVE identifier' => [
+                static function (array &$data): void {
+                    $data['advisories']['1106913']['cves'] = ['CVE-2021-23337-suffix'];
+                },
+                'advisories.1106913.cves contains an invalid CVE identifier',
+            ],
             'development dependency flag' => [
                 static function (array &$data): void {
                     $data['advisories']['1106913']['findings'][0]['dev'] = 1;
@@ -243,6 +333,43 @@ final class AuditParserTest extends TestCase
         ];
     }
 
+    public function testBunParserAcceptsCaseInsensitiveSeverity(): void
+    {
+        $data = json_decode(self::fixture('bun-populated.json'), true, 512, JSON_THROW_ON_ERROR);
+        $data['lodash'][0]['severity'] = 'HIGH';
+
+        $findings = (new BunAuditParser())->parse(json_encode($data, JSON_THROW_ON_ERROR));
+
+        self::assertSame(Severity::HIGH, $findings[0]->severity);
+    }
+
+    public function testBunParserAcceptsSurroundingWhitespace(): void
+    {
+        $output = "\n " . self::fixture('bun-clean.json') . " \n";
+
+        self::assertSame([], (new BunAuditParser())->parse($output));
+    }
+
+    public function testBunParserNormalizesBlankOptionalUrl(): void
+    {
+        $data = json_decode(self::fixture('bun-populated.json'), true, 512, JSON_THROW_ON_ERROR);
+        $data['lodash'][0]['url'] = '   ';
+
+        $findings = (new BunAuditParser())->parse(json_encode($data, JSON_THROW_ON_ERROR));
+
+        self::assertNull($findings[0]->url);
+        self::assertSame('1106913', $findings[0]->advisoryId);
+    }
+
+    public function testBunParserReadsNumericPackageName(): void
+    {
+        $findings = (new BunAuditParser())->parse(
+            '{"0":[{"id":1,"severity":"low","vulnerable_versions":"<1"}]}',
+        );
+
+        self::assertSame('0', $findings[0]->package);
+    }
+
     public function testBunParserReadsRawBulkAuditReport(): void
     {
         $findings = (new BunAuditParser())->parse(self::fixture('bun-populated.json'));
@@ -252,6 +379,7 @@ final class AuditParserTest extends TestCase
         self::assertSame(Severity::HIGH, $findings[0]->severity);
         self::assertSame('GHSA-35jh-r3h4-6jhm', $findings[0]->advisoryId);
         self::assertSame('1106913', $findings[0]->sourceId);
+        self::assertSame('Command Injection in lodash', $findings[0]->title);
         self::assertSame([], $findings[0]->affectedVersions);
         self::assertSame([], $findings[0]->dependencyPaths);
         self::assertSame('1107000', $findings[1]->advisoryId);
@@ -334,6 +462,14 @@ final class AuditParserTest extends TestCase
         (new NpmAuditParser())->parse(json_encode($data, JSON_THROW_ON_ERROR));
     }
 
+    public function testParserAcceptsReportAtSafetyLimit(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('auditReportVersion must be 2');
+
+        (new NpmAuditParser())->parse('{' . str_repeat(' ', 16 * 1024 * 1024 - 2) . '}');
+    }
+
     public function testParserFactoryCreatesEverySupportedParser(): void
     {
         self::assertInstanceOf(NpmAuditParser::class, AuditParserFactory::create('npm'));
@@ -412,6 +548,16 @@ final class AuditParserTest extends TestCase
         (new PnpmAuditParser())->parse(json_encode($data, JSON_THROW_ON_ERROR));
     }
 
+    public function testPnpmParserPrefersExplicitGhsaIdOverAdvisoryUrl(): void
+    {
+        $data = json_decode(self::fixture('pnpm-populated.json'), true, 512, JSON_THROW_ON_ERROR);
+        $data['advisories']['1106913']['github_advisory_id'] = 'GHSA-2222-3333-4444';
+
+        $findings = (new PnpmAuditParser())->parse(json_encode($data, JSON_THROW_ON_ERROR));
+
+        self::assertSame('GHSA-2222-3333-4444', $findings[0]->advisoryId);
+    }
+
     public function testPnpmParserReadsInstalledVersionsAndPaths(): void
     {
         $findings = (new PnpmAuditParser())->parse(self::fixture('pnpm-populated.json'));
@@ -457,5 +603,13 @@ final class AuditParserTest extends TestCase
         );
         self::assertSame('1107000', $findings[1]->advisoryId);
         self::assertSame(Severity::INFO, $findings[1]->severity);
+    }
+
+    public function testYarnParserRejectsReportAboveSafetyLimit(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('the report exceeds the 16 MiB safety limit');
+
+        (new YarnAuditParser())->parse(str_repeat(' ', 16 * 1024 * 1024 + 1));
     }
 }

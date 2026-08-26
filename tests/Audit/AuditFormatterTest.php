@@ -57,6 +57,13 @@ final class AuditFormatterTest extends TestCase
         $output = new BufferedOutput();
 
         (new AuditFormatter())->write($report, Severity::CRITICAL, AuditFormat::JSON, $output);
+        $formatted = self::normalizeLineEndings($output->fetch());
+
+        self::assertStringContainsString("{\n    \"schema_version\": 1,", $formatted);
+        self::assertStringContainsString(
+            '"url": "https://github.com/advisories/GHSA-35jh-r3h4-6jhm"',
+            $formatted,
+        );
 
         self::assertSame(
             [
@@ -104,7 +111,7 @@ final class AuditFormatterTest extends TestCase
                     ],
                 ],
             ],
-            json_decode($output->fetch(), true, 512, JSON_THROW_ON_ERROR),
+            json_decode($formatted, true, 512, JSON_THROW_ON_ERROR),
         );
     }
 
@@ -147,6 +154,23 @@ final class AuditFormatterTest extends TestCase
         self::assertSame(
             "high | lodash | GHSA-35jh-r3h4-6jhm | CVE-2021-23337 | <1.0.0 | Advisory title | https://github.com/advisories/GHSA-35jh-r3h4-6jhm\n"
             . "1 advisory affecting 1 package (high: 1).\n",
+            self::normalizeLineEndings($output->fetch()),
+        );
+    }
+
+    public function testPlainFormatReportsCleanAuditOnce(): void
+    {
+        $output = new BufferedOutput();
+
+        (new AuditFormatter())->write(
+            new AuditReport('npm', []),
+            Severity::LOW,
+            AuditFormat::PLAIN,
+            $output,
+        );
+
+        self::assertSame(
+            "No known frontend vulnerabilities found.\n",
             self::normalizeLineEndings($output->fetch()),
         );
     }
@@ -223,6 +247,7 @@ final class AuditFormatterTest extends TestCase
                     'GHSA-35jh-r3h4-6jhm',
                     CveStatus::RESOLVED,
                     ['CVE-2021-23337'],
+                    'https://github.com/advisories/GHSA-35jh-r3h4-6jhm',
                 ),
             ],
         );
@@ -232,8 +257,16 @@ final class AuditFormatterTest extends TestCase
         $formatted = $output->fetch();
 
         self::assertStringContainsString('Severity', $formatted);
+        self::assertStringContainsString(
+            '| high     | lodash  | GHSA-35jh-r3h4-6jhm',
+            $formatted,
+        );
         self::assertStringContainsString('lodash', $formatted);
         self::assertStringContainsString('GHSA-35jh-r3h4-6jhm', $formatted);
+        self::assertStringContainsString(
+            'https://github.com/advisories/GHSA-35jh-r3h4-6jhm',
+            $formatted,
+        );
         self::assertStringContainsString('CVE-2021-23337', $formatted);
         self::assertStringContainsString('1 advisory affecting 1 package (high: 1).', $formatted);
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Foxy\Asset;
 
+use Composer\Pcre\Preg;
 use Composer\Util\Platform;
 use Foxy\Exception\RuntimeException;
 use Stringable;
@@ -13,20 +14,18 @@ use function array_intersect_key;
 use function array_intersect_ukey;
 use function array_key_exists;
 use function array_pop;
-use function array_unique;
-use function array_values;
 use function file_exists;
-use function file_get_contents;
 use function getenv;
+use function in_array;
 use function is_file;
 use function is_readable;
 use function is_scalar;
 use function ltrim;
 use function preg_match;
-use function preg_split;
 use function rtrim;
 use function sprintf;
 use function str_contains;
+use function str_ends_with;
 use function str_starts_with;
 use function strcasecmp;
 use function strlen;
@@ -112,47 +111,6 @@ final class BunManager extends AbstractAssetManager
         }
     }
 
-    private function consumeTomlStringCharacter(
-        string $character,
-        bool &$inDoubleQuote,
-        bool &$inSingleQuote,
-        bool &$escaped,
-    ): bool {
-        if ($inDoubleQuote) {
-            if ($escaped) {
-                $escaped = false;
-            } elseif ('\\' === $character) {
-                $escaped = true;
-            } elseif ('"' === $character) {
-                $inDoubleQuote = false;
-            }
-
-            return true;
-        }
-
-        if ($inSingleQuote) {
-            if ('\'' === $character) {
-                $inSingleQuote = false;
-            }
-
-            return true;
-        }
-
-        if ('"' === $character) {
-            $inDoubleQuote = true;
-
-            return true;
-        }
-
-        if ('\'' === $character) {
-            $inSingleQuote = true;
-
-            return true;
-        }
-
-        return false;
-    }
-
     /**
      * Read the environment using the same merge order as Symfony Process.
      */
@@ -173,22 +131,13 @@ final class BunManager extends AbstractAssetManager
         }
 
         if (array_key_exists($name, $environment)) {
-            $value = $environment[$name];
-
-            return (is_scalar($value) || $value instanceof Stringable) && false !== $value && '' !== (string) $value
-                ? (string) $value
-                : null;
+            return $this->normalizeAuditEnvironmentValue($environment[$name]);
         }
 
         if (Platform::isWindows()) {
             foreach ($environment as $key => $value) {
-                if (
-                    0 === strcasecmp((string) $key, $name)
-                    && (is_scalar($value) || $value instanceof Stringable)
-                    && false !== $value
-                    && '' !== (string) $value
-                ) {
-                    return (string) $value;
+                if (0 === strcasecmp((string) $key, $name)) {
+                    return $this->normalizeAuditEnvironmentValue($value);
                 }
             }
         }
@@ -214,7 +163,7 @@ final class BunManager extends AbstractAssetManager
 
         $paths[] = $this->getRootPackagePath('bunfig.toml');
 
-        return array_values(array_unique($paths));
+        return $paths;
     }
 
     private function getConfigurationPath(string $directory, string $file): string
@@ -260,20 +209,36 @@ final class BunManager extends AbstractAssetManager
 
         $paths[] = $this->getRootPackagePath('.npmrc');
 
-        return array_values(array_unique($paths));
+        return $paths;
     }
 
     private function isSingleLineTomlContainer(string $value): bool
     {
         $closingCharacters = [];
-        $inDoubleQuote = false;
-        $inSingleQuote = false;
-        $escaped = false;
+        $quote = null;
 
         for ($position = 0, $length = strlen($value); $position < $length; ++$position) {
             $character = $value[$position];
 
-            if ($this->consumeTomlStringCharacter($character, $inDoubleQuote, $inSingleQuote, $escaped)) {
+            if ('\\' === $quote) {
+                $quote = '"';
+
+                continue;
+            }
+
+            if (null !== $quote) {
+                if ('"' === $quote && '\\' === $character) {
+                    $quote = '\\';
+                } elseif ($quote === $character) {
+                    $quote = null;
+                }
+
+                continue;
+            }
+
+            if ('"' === $character || '\'' === $character) {
+                $quote = $character;
+
                 continue;
             }
 
@@ -296,7 +261,18 @@ final class BunManager extends AbstractAssetManager
             }
         }
 
-        return [] === $closingCharacters && !$inDoubleQuote && !$inSingleQuote;
+        return [] === $closingCharacters && null === $quote;
+    }
+
+    private function normalizeAuditEnvironmentValue(mixed $value): string|null
+    {
+        if (!is_scalar($value) && !$value instanceof Stringable) {
+            return null;
+        }
+
+        $value = (string) $value;
+
+        return '' === $value ? null : $value;
     }
 
     private function readAuditConfiguration(string $path): string|null
@@ -340,16 +316,37 @@ final class BunManager extends AbstractAssetManager
         );
     }
 
+    private function stripLeadingUtf8Bom(string $contents): string
+    {
+        return Preg::replace('/\A(?:\xEF\xBB\xBF)++/', '', $contents);
+    }
+
     private function stripTomlComment(string $line): string
     {
-        $inDoubleQuote = false;
-        $inSingleQuote = false;
-        $escaped = false;
+        $quote = null;
 
         for ($position = 0, $length = strlen($line); $position < $length; ++$position) {
             $character = $line[$position];
 
-            if ($this->consumeTomlStringCharacter($character, $inDoubleQuote, $inSingleQuote, $escaped)) {
+            if ('\\' === $quote) {
+                $quote = '"';
+
+                continue;
+            }
+
+            if (null !== $quote) {
+                if ('"' === $quote && '\\' === $character) {
+                    $quote = '\\';
+                } elseif ($quote === $character) {
+                    $quote = null;
+                }
+
+                continue;
+            }
+
+            if ('"' === $character || '\'' === $character) {
+                $quote = $character;
+
                 continue;
             }
 
@@ -367,15 +364,11 @@ final class BunManager extends AbstractAssetManager
             $this->rejectUnverifiableAuditConfiguration($path, 'the configuration must be UTF-8');
         }
 
-        while (str_starts_with($contents, "\xEF\xBB\xBF")) {
-            $contents = substr($contents, 3);
-        }
+        $contents = $this->stripLeadingUtf8Bom($contents);
 
         $inInstallSection = false;
 
-        $lines = preg_split('/\R/u', $contents);
-
-        $lines = false === $lines ? [] : $lines;
+        $lines = Preg::split('/\R/u', $contents);
 
         foreach ($lines as $line) {
             $line = trim($this->stripTomlComment($line));
@@ -416,21 +409,19 @@ final class BunManager extends AbstractAssetManager
                 }
             }
 
-            if (1 === preg_match('/^\[\s*(?:"install"|\'install\'|install)\s*\]$/', $line)) {
-                $inInstallSection = true;
-
-                continue;
-            }
-
-            if (1 === preg_match('/^\[\[\s*(?:"install"|\'install\'|install)\s*\]\]$/', $line)) {
-                $this->rejectUnverifiableAuditConfiguration(
-                    $path,
-                    'array install tables are not supported; use an [install] table',
-                );
-            }
-
             if ('[' === $line[0]) {
-                $inInstallSection = false;
+                $arrayTable = str_starts_with($line, '[[');
+                $tableName = trim(substr($line, $arrayTable ? 2 : 1, $arrayTable ? -2 : -1));
+
+                $inInstallSection = str_ends_with($line, ']')
+                    && in_array($tableName, ['install', '"install"', "'install'"], true);
+
+                if ($arrayTable && $inInstallSection) {
+                    $this->rejectUnverifiableAuditConfiguration(
+                        $path,
+                        'array install tables are not supported; use an [install] table',
+                    );
+                }
 
                 continue;
             }
@@ -444,8 +435,6 @@ final class BunManager extends AbstractAssetManager
                 )
             ) {
                 $this->validateBunScopeSetting($matches[1], 'true' === $matches[2], $path, $noDev);
-
-                continue;
             }
 
             if (
@@ -457,8 +446,6 @@ final class BunManager extends AbstractAssetManager
                 )
             ) {
                 $this->validateBunScopeSetting($matches[1], 'true' === $matches[2], $path, $noDev);
-
-                continue;
             }
 
             if (
@@ -477,14 +464,10 @@ final class BunManager extends AbstractAssetManager
 
     private function validateBunScopeSetting(string $name, bool $value, string $path, bool $noDev): void
     {
-        $restricted = match ($name) {
-            'production' => $value && !$noDev,
-            'dev' => !$value && !$noDev,
-            'optional', 'peer' => !$value,
-            default => false,
-        };
+        $includesRequiredScope = 'production' === $name ? !$value : $value;
+        $appliesToAudit = !$noDev || 'optional' === $name || 'peer' === $name;
 
-        if ($restricted) {
+        if ($appliesToAudit && !$includesRequiredScope) {
             $this->rejectRestrictedAuditScope($path, 'install.' . $name . '=' . ($value ? 'true' : 'false'));
         }
     }
@@ -495,23 +478,15 @@ final class BunManager extends AbstractAssetManager
             $this->rejectUnverifiableAuditConfiguration($path, 'the configuration must be UTF-8');
         }
 
-        while (str_starts_with($contents, "\xEF\xBB\xBF")) {
-            $contents = substr($contents, 3);
-        }
+        $contents = $this->stripLeadingUtf8Bom($contents);
 
-        $lines = preg_split('/\R/u', $contents);
-
-        $lines = false === $lines ? [] : $lines;
+        $lines = Preg::split('/\R/u', $contents);
 
         foreach ($lines as $line) {
             $line = ltrim($line);
 
-            if ('' === $line || '#' === $line[0] || ';' === $line[0]) {
-                continue;
-            }
-
             $assignmentPosition = strpos($line, '=');
-            $keyExpression = false === $assignmentPosition ? $line : trim(substr($line, 0, $assignmentPosition));
+            $keyExpression = false === $assignmentPosition ? $line : substr($line, 0, $assignmentPosition);
 
             if (
                 '' !== $keyExpression
@@ -524,21 +499,17 @@ final class BunManager extends AbstractAssetManager
                 );
             }
 
-            if (
-                1 !== preg_match(
-                    '/^(?:"omit(?:\[\])?"|\'omit(?:\[\])?\'|omit(?:\[\])?)\s*=\s*(.*)$/i',
-                    $line,
-                    $matches,
-                )
-            ) {
+            if (false === $assignmentPosition) {
                 continue;
             }
 
-            $value = trim($matches[1]);
+            $key = strtolower(trim($keyExpression, " \t'\""));
 
-            if ('' === $value) {
+            if ('omit' !== $key && 'omit[]' !== $key) {
                 continue;
             }
+
+            $value = trim(substr($line, $assignmentPosition + 1));
 
             if (str_contains($value, '${')) {
                 $this->rejectRestrictedAuditScope($path, 'dynamic omit=' . $value);
@@ -551,8 +522,7 @@ final class BunManager extends AbstractAssetManager
                 );
             }
 
-            $values = preg_split('/[\s,;]+/u', $value);
-            $values = false === $values ? [] : $values;
+            $values = Preg::split('/[\s,;]+/u', $value);
 
             foreach ($values as $omitted) {
                 $omitted = strtolower(trim($omitted, " \t\n\r\0\x0B[]'\""));

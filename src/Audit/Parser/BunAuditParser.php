@@ -17,11 +17,7 @@ final class BunAuditParser extends AbstractAuditParser implements AuditParserInt
         $findings = [];
 
         foreach ($packages as $package => $advisories) {
-            if (
-                (string) $package === ''
-                || !is_array($advisories)
-                || !array_is_list($advisories)
-            ) {
+            if ($package === '' || !is_array($advisories)) {
                 throw $this->malformed('each package must contain a list of advisories');
             }
 

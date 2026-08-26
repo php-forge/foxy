@@ -11,7 +11,6 @@ use stdClass;
 
 use function array_map;
 use function array_unique;
-use function array_values;
 use function get_object_vars;
 use function is_array;
 use function is_bool;
@@ -55,13 +54,9 @@ abstract class AbstractAuditParser
         }
 
         try {
-            $data = json_decode($output, false, 512, JSON_THROW_ON_ERROR);
+            $data = json_decode($output, flags: JSON_THROW_ON_ERROR);
         } catch (JsonException $exception) {
             throw $this->malformed('invalid JSON', $exception);
-        }
-
-        if (!$data instanceof stdClass) {
-            throw $this->malformed('expected a JSON object');
         }
 
         return get_object_vars($data);
@@ -213,7 +208,7 @@ abstract class AbstractAuditParser
      */
     final protected function getStringList(mixed $value, string $context): array
     {
-        if (!is_array($value) || !array_is_list($value)) {
+        if (!is_array($value)) {
             throw $this->malformed(sprintf('%s must be a list', $context));
         }
 
@@ -249,7 +244,7 @@ abstract class AbstractAuditParser
      */
     final protected function uniqueStrings(array $values): array
     {
-        $values = array_values(array_unique($values));
+        $values = array_unique($values);
         sort($values);
 
         return $values;

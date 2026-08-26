@@ -131,11 +131,8 @@ abstract class AbstractAssetManager implements AssetManagerInterface, AuditableA
 
             return new AuditProcessResult($result, (string) $output, $this->executor->getErrorOutput());
         } finally {
-            try {
-                $this->restoreEnvironment($environment);
-            } finally {
-                ProcessExecutor::setTimeout($timeout);
-            }
+            $this->restoreEnvironment($environment);
+            ProcessExecutor::setTimeout($timeout);
         }
     }
 
@@ -420,7 +417,8 @@ abstract class AbstractAssetManager implements AssetManagerInterface, AuditableA
 
     private function getManagerBinary(string $defaultBin): string
     {
-        $bin = (string) $this->config->get('manager-bin', $defaultBin);
+        /** @var string $bin */
+        $bin = $this->config->get('manager-bin', $defaultBin);
 
         return Platform::isWindows() ? str_replace('/', '\\', $bin) : $bin;
     }

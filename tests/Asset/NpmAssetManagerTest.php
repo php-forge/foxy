@@ -64,6 +64,18 @@ final class NpmAssetManagerTest extends AssetManager
         );
     }
 
+    public function testAuditWithoutWorkspacesUsesTheRootPackageOnly(): void
+    {
+        file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'package.json', '{}');
+        file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'package-lock.json', '{"packages":{"":{}}}');
+        $this->executor->addExpectedValues(0, $this->getValidVersion());
+        $this->executor->addExpectedValues(0, '{}');
+
+        $this->getManager()->audit(false);
+
+        self::assertSame($this->getValidAuditCommand(false), $this->executor->getExecutedCommand(1));
+    }
+
     public function testExistingDependencyCleanupIsSkippedWhenManagerExecutionIsDisabled(): void
     {
         $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'web';
@@ -176,6 +188,10 @@ final class NpmAssetManagerTest extends AssetManager
                 '{"workspaces":["packages/*"]}',
                 '{"packages":{"":{"workspaces":["other/*"]},"packages/a":{}}}',
             ],
+            'stale secondary workspace declaration' => [
+                '{"workspaces":["packages/*","apps/*"]}',
+                '{"packages":{"":{"workspaces":["packages/*","services/*"]},"packages/a":{}}}',
+            ],
             'manifest without locked workspaces' => [
                 '{}',
                 '{"packages":{"":{"workspaces":["packages/*"]},"packages/a":{}}}',
@@ -187,6 +203,14 @@ final class NpmAssetManagerTest extends AssetManager
             'malformed manifest workspace declaration' => [
                 '{"workspaces":"packages/*"}',
                 '{"packages":{"":{}}}',
+            ],
+            'manifest workspace declaration with a non-string pattern' => [
+                '{"workspaces":[null]}',
+                '{"packages":{"":{}}}',
+            ],
+            'manifest workspace declaration with a blank pattern' => [
+                '{"workspaces":[" "]}',
+                '{"packages":{"":{"workspaces":[" "]},"packages/a":{}}}',
             ],
             'malformed locked workspace declaration' => [
                 '{}',
@@ -212,6 +236,16 @@ final class NpmAssetManagerTest extends AssetManager
                 '{"workspaces":["visible",".hidden"]}',
                 '{"packages":{"":{"workspaces":["visible",".hidden"]},".hidden":{},"node_modules/hidden":{"link":true,"resolved":".hidden"},"node_modules/visible":{"link":true,"resolved":"visible"},"visible":{}}}',
                 ['.hidden', 'visible'],
+            ],
+            'numeric workspace path' => [
+                '{"workspaces":["0"]}',
+                '{"packages":{"":{"workspaces":["0"]},"0":{},"node_modules/zero":{"link":true,"resolved":"0"}}}',
+                ['0'],
+            ],
+            'node_modules path separators and boundary' => [
+                '{"workspaces":["packages/*"]}',
+                '{"packages":{"":{"workspaces":["packages/*"]},"node_modules":{},"packages/a":{},"packages\\\\a\\\\node_modules\\\\hidden":{}}}',
+                ['packages/a'],
             ],
         ];
     }

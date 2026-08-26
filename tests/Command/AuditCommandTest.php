@@ -110,6 +110,42 @@ final class AuditCommandTest extends TestCase
         self::assertStringContainsString('2 means the audit could not be completed reliably', $command->getHelp());
     }
 
+    /**
+     * @throws JsonException
+     */
+    public function testCveResolutionFailureWritesASanitizedWarningAndPreservesTheReport(): void
+    {
+        $runner = $this->createMock(AuditRunnerInterface::class);
+        $runner
+            ->expects(self::once())
+            ->method('audit')
+            ->willReturn(new AuditReport('npm', [self::finding(Severity::HIGH)]));
+        $resolver = $this->createMock(CveResolverInterface::class);
+        $resolver
+            ->expects(self::once())
+            ->method('resolve')
+            ->with('GHSA-aaaa-bbbb-cccc')
+            ->willThrowException(new RuntimeException("rate\nlimited\0now"));
+        $io = $this->createMock(IOInterface::class);
+        $io
+            ->expects(self::once())
+            ->method('writeError')
+            ->with(
+                '<warning>Unable to resolve CVE identifiers for GHSA-aaaa-bbbb-cccc: rate limited now</warning>',
+            );
+        $tester = $this->createTester($runner, $resolver, $io);
+
+        self::assertSame(
+            AuditCommand::STATUS_VULNERABLE,
+            $tester->execute(['--format' => AuditFormat::JSON->value]),
+        );
+
+        /** @var array $document */
+        $document = json_decode($tester->getDisplay(), true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertSame(CveStatus::UNAVAILABLE->value, $document['advisories'][0]['cve_status']);
+    }
+
     public function testDefaultOptionsProduceASuccessfulTableAudit(): void
     {
         $runner = $this->createMock(AuditRunnerInterface::class);

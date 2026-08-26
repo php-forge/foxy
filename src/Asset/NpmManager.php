@@ -144,12 +144,7 @@ final class NpmManager extends AbstractAssetManager
             return [];
         }
 
-        if (
-            !is_array($packages)
-            || array_is_list($packages)
-            || !is_array($rootPackage)
-            || $workspacePatterns !== $lockedWorkspacePatterns
-        ) {
+        if ($workspacePatterns !== $lockedWorkspacePatterns) {
             throw $this->workspaceEnumerationFailure();
         }
 

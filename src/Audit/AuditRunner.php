@@ -8,7 +8,6 @@ use Foxy\Asset\AssetManagerInterface;
 use Foxy\Exception\RuntimeException;
 use Throwable;
 
-use function array_values;
 use function in_array;
 use function sprintf;
 use function trim;
@@ -86,7 +85,7 @@ final readonly class AuditRunner implements AuditRunnerInterface
     {
         $values = [...$left, ...$right];
 
-        $values = array_values(array_unique($values));
+        $values = array_unique($values);
         sort($values);
 
         return $values;
@@ -130,8 +129,6 @@ final readonly class AuditRunner implements AuditRunnerInterface
                 $this->mergeStrings($existing->dependencyPaths, $finding->dependencyPaths),
             );
         }
-
-        $normalized = array_values($normalized);
 
         usort(
             $normalized,

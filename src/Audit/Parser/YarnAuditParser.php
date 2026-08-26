@@ -31,7 +31,7 @@ final class YarnAuditParser extends AbstractAuditParser implements AuditParserIn
 
         foreach (explode("\n", $output) as $lineNumber => $line) {
             try {
-                $data = json_decode($line, false, 512, JSON_THROW_ON_ERROR);
+                $data = json_decode($line, false, flags: JSON_THROW_ON_ERROR);
             } catch (JsonException $exception) {
                 throw $this->malformed(sprintf('line %d contains invalid JSON', $lineNumber + 1), $exception);
             }
