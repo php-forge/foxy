@@ -71,7 +71,7 @@
                 </div>
                 <div class="alert-box">
                     <p class="alert-title"><strong>Stable execution</strong></p>
-                    <p class="alert-content">Restores CWD and preserves semantic, four-space JSON rewrites</p>
+                    <p class="alert-content">Keeps CWD unchanged and preserves semantic, four-space JSON rewrites</p>
                 </div>
             </div>
         </div>
