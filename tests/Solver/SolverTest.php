@@ -27,6 +27,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
+use Seld\JsonLint\ParsingException;
 use Xepozz\InternalMocker\MockerState;
 
 use function chdir;
@@ -901,6 +902,44 @@ class SolverTest extends TestCase
 
         self::assertSame($sourceContent, file_get_contents($source));
         self::assertFileDoesNotExist($target);
+    }
+
+    public function testSolveRestoresComposerWhenAssetManifestIsTruncated(): void
+    {
+        $sourceContent = '{"name":"source-package","version":"1.0.0"}';
+        ['source' => $source, 'target' => $target] = $this->prepareAssetPackageManifest($sourceContent);
+        $targetContent = JsonFile::encode(
+            ['name' => '@composer-asset/foo--bar', 'version' => '1.0.0'],
+        ) . "\n";
+        $truncatedTargetContent = substr($targetContent, 0, -2);
+
+        MockerState::addCondition(
+            'Composer\\Json',
+            'file_put_contents',
+            [$target, $targetContent, 0, null],
+            static function (string $filename, mixed $data, int $flags, mixed $context): false {
+                self::assertNotFalse(
+                    file_put_contents($filename, substr((string) $data, 0, -2), $flags, $context),
+                );
+
+                return false;
+            },
+        );
+
+        $this->manager->expects(self::never())->method('addDependencies');
+        $this->manager->expects(self::never())->method('run');
+        $this->composerFallback->expects(self::once())->method('restore');
+
+        try {
+            $this->solver->solve($this->composer, $this->io);
+            self::fail('Expected validating the generated asset manifest to fail.');
+        } catch (RuntimeException $exception) {
+            self::assertSame(sprintf('Unable to write asset manifest "%s".', $target), $exception->getMessage());
+            self::assertInstanceOf(ParsingException::class, $exception->getPrevious());
+        }
+
+        self::assertSame($sourceContent, file_get_contents($source));
+        self::assertSame($truncatedTargetContent, file_get_contents($target));
     }
 
     public function testSolveRestoresComposerWhenManagerThrows(): void
