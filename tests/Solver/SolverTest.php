@@ -95,12 +95,12 @@ class SolverTest extends TestCase
             {
                 "name": "source-package",
                 "version": "1.2.3",
+                "engines": {},
+                "bundleDependencies": [],
                 "scripts": {
                     "build": "ignored"
                 },
-                "dependencies": {
-                    "dependency": "^1.0"
-                }
+                "dependencies": {}
             }
             JSON;
 
@@ -123,14 +123,35 @@ class SolverTest extends TestCase
                 {
                     "name": "@composer-asset/foo--bar",
                     "version": "1.2.3",
-                    "dependencies": {
-                        "dependency": "^1.0"
-                    }
+                    "engines": {},
+                    "bundleDependencies": [],
+                    "dependencies": {}
                 }
 
                 JSON,
             file_get_contents($target),
         );
+    }
+
+    public function testGetMockPackagePathRejectsUnreadableSourceManifest(): void
+    {
+        $assetDir = "{$this->cwd}/unreadable-source-assets";
+        $source = "{$this->cwd}/source-package.json";
+
+        $package = $this->createMock(PackageInterface::class);
+        $package->method('getName')->willReturn('foo/bar');
+
+        MockerState::addCondition(
+            'Foxy\\Solver',
+            'file_get_contents',
+            [$source, false, null, 0, null],
+            false,
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(sprintf('Unable to read asset manifest "%s".', $source));
+
+        $this->invokeSolverMethod('getMockPackagePath', $package, $assetDir, $source);
     }
 
     public function testGetMockPackagePathWrapsDirectoryCreationFailure(): void

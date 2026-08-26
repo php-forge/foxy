@@ -62,6 +62,10 @@ final class InternalMockerExtension implements Extension
             ],
             [
                 'namespace' => 'Foxy\\Solver',
+                'name' => 'file_get_contents',
+            ],
+            [
+                'namespace' => 'Foxy\\Solver',
                 'name' => 'file_put_contents',
             ],
             [

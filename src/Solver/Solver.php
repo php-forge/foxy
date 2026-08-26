@@ -27,6 +27,7 @@ use function implode;
 use function is_dir;
 use function is_file;
 use function is_string;
+use function json_decode;
 use function realpath;
 use function rtrim;
 use function sprintf;
@@ -194,9 +195,19 @@ final readonly class Solver implements SolverInterface
             );
         }
 
-        $sourceJsonFile = new JsonFile($filename);
+        $sourceContent = file_get_contents($filename);
 
-        $packageValue = AssetUtil::formatPackage($package, $packageName, (array) $sourceJsonFile->read());
+        if (false === $sourceContent) {
+            throw new RuntimeException(
+                sprintf('Unable to read asset manifest "%s".', $filename),
+            );
+        }
+
+        $packageValue = AssetUtil::formatPackage(
+            $package,
+            $packageName,
+            (array) json_decode($sourceContent, false, flags: JSON_THROW_ON_ERROR),
+        );
 
         $targetJsonFile = new JsonFile($newFilename);
 
