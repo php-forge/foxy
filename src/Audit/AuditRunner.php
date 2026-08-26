@@ -110,21 +110,19 @@ final readonly class AuditRunner implements AuditRunnerInterface
                 continue;
             }
 
-            $severity = $finding->severity->isAtLeast($existing->severity)
-                ? $finding->severity
-                : $existing->severity;
+            $selected = $finding->severity->isAtLeast($existing->severity) ? $finding : $existing;
             $cves = $this->mergeStrings($existing->cves, $finding->cves);
 
             $normalized[$key] = new AuditFinding(
-                $existing->package,
-                $severity,
-                $existing->advisoryId,
-                $existing->sourceId,
-                $existing->title,
-                $existing->vulnerableVersions,
-                $existing->url ?? $finding->url,
+                $selected->package,
+                $selected->severity,
+                $selected->advisoryId,
+                $selected->sourceId,
+                $selected->title,
+                $selected->vulnerableVersions,
+                $selected->url,
                 $cves,
-                [] === $cves ? $existing->cveStatus : CveStatus::RESOLVED,
+                [] === $cves ? $selected->cveStatus : CveStatus::RESOLVED,
                 $this->mergeStrings($existing->affectedVersions, $finding->affectedVersions),
                 $this->mergeStrings($existing->dependencyPaths, $finding->dependencyPaths),
             );
