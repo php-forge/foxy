@@ -86,23 +86,27 @@ class SolverTest extends TestCase
 
     public function testGetMockPackagePathDoesNotCopySourceBeforeWritingFormattedManifest(): void
     {
-        $assetDir = $this->cwd . '/direct-write-assets';
-        $source = $this->cwd . '/source-package.json';
-        $target = $assetDir . '/foo/bar/source-package.json';
-        $sourceContent = <<<'JSON'
+        $assetDir = "{$this->cwd}/direct-write-assets";
+        $source = "{$this->cwd}/source-package.json";
+
+        $target = "{$assetDir}/foo/bar/source-package.json";
+
+        $sourceContent = <<<JSON
             {
-              "name": "source-package",
-              "version": "1.2.3",
-              "scripts": {
-                "build": "ignored"
-              },
-              "dependencies": {
-                "dependency": "^1.0"
-              }
+                "name": "source-package",
+                "version": "1.2.3",
+                "scripts": {
+                    "build": "ignored"
+                },
+                "dependencies": {
+                    "dependency": "^1.0"
+                }
             }
             JSON;
+
         $package = $this->createMock(PackageInterface::class);
         $package->method('getName')->willReturn('foo/bar');
+
         file_put_contents($source, $sourceContent);
 
         $fs = $this->getMockBuilder(Filesystem::class)->onlyMethods(['copy'])->getMock();
