@@ -84,23 +84,49 @@ class SolverTest extends TestCase
         );
     }
 
-    public function testGetMockPackagePathRejectsCopyFailure(): void
+    public function testGetMockPackagePathDoesNotCopySourceBeforeWritingFormattedManifest(): void
     {
-        $assetDir = $this->cwd . '/copy-failure-assets';
+        $assetDir = $this->cwd . '/direct-write-assets';
         $source = $this->cwd . '/source-package.json';
         $target = $assetDir . '/foo/bar/source-package.json';
+        $sourceContent = <<<'JSON'
+            {
+              "name": "source-package",
+              "version": "1.2.3",
+              "scripts": {
+                "build": "ignored"
+              },
+              "dependencies": {
+                "dependency": "^1.0"
+              }
+            }
+            JSON;
         $package = $this->createMock(PackageInterface::class);
         $package->method('getName')->willReturn('foo/bar');
-        file_put_contents($source, '{}');
+        file_put_contents($source, $sourceContent);
 
         $fs = $this->getMockBuilder(Filesystem::class)->onlyMethods(['copy'])->getMock();
-        $fs->expects(self::once())->method('copy')->with($source, $target)->willReturn(false);
+        $fs->expects(self::never())->method('copy');
         $solver = new Solver($this->manager, $this->config, $fs, $this->composerFallback);
 
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage(sprintf('Unable to copy asset manifest "%s".', $source));
+        $result = $this->invokeSolverMethodOn($solver, 'getMockPackagePath', $package, $assetDir, $source);
 
-        $this->invokeSolverMethodOn($solver, 'getMockPackagePath', $package, $assetDir, $source);
+        self::assertSame(['@composer-asset/foo--bar', $target], $result);
+        self::assertSame($sourceContent, file_get_contents($source));
+        self::assertFileExists($target);
+        self::assertSame(
+            <<<'JSON'
+                {
+                    "name": "@composer-asset/foo--bar",
+                    "version": "1.2.3",
+                    "dependencies": {
+                        "dependency": "^1.0"
+                    }
+                }
+
+                JSON,
+            file_get_contents($target),
+        );
     }
 
     public function testGetMockPackagePathWrapsDirectoryCreationFailure(): void

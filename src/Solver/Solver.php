@@ -173,7 +173,7 @@ final readonly class Solver implements SolverInterface
      * @param string $assetDir The asset directory.
      * @param string $filename The filename of asset package.
      *
-     * @throws Exception if the asset package cannot be copied or written.
+     * @throws Exception if the asset package cannot be read or written.
      *
      * @return array{0: string, 1: string} The package name and absolute generated manifest path.
      */
@@ -194,17 +194,13 @@ final readonly class Solver implements SolverInterface
             );
         }
 
-        if (!$this->fs->copy($filename, $newFilename)) {
-            throw new RuntimeException(
-                sprintf('Unable to copy asset manifest "%s".', $filename),
-            );
-        }
+        $sourceJsonFile = new JsonFile($filename);
 
-        $jsonFile = new JsonFile($newFilename);
+        $packageValue = AssetUtil::formatPackage($package, $packageName, (array) $sourceJsonFile->read());
 
-        $packageValue = AssetUtil::formatPackage($package, $packageName, (array) $jsonFile->read());
+        $targetJsonFile = new JsonFile($newFilename);
 
-        $jsonFile->write($packageValue);
+        $targetJsonFile->write($packageValue);
 
         return [$packageName, $newFilename];
     }
