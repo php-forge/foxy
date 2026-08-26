@@ -204,7 +204,7 @@ exclude a package that does. See [Package selection](config.md#package-selection
 - Existing project dependencies and development dependencies are retained.
 - `package.json` writes use four-space indentation and preserve empty object and array semantics.
 - `root-package-json-dir` controls project reads, writes, and manager working directory.
-- Foxy restores the original working directory after manager execution.
+- Manager execution does not change the PHP process working directory.
 - Asset restoration occurs when package merging or manager execution fails and `fallback-asset` is enabled.
 - Composer lock and vendor restoration occurs after any solve exception or non-zero manager result when
   `fallback-composer` is enabled.
