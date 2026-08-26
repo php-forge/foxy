@@ -213,6 +213,12 @@ final readonly class Solver implements SolverInterface
 
         $targetJsonFile->write($packageValue);
 
+        if (!$targetJsonFile->exists()) {
+            throw new RuntimeException(
+                sprintf('Unable to write asset manifest "%s".', $newFilename),
+            );
+        }
+
         return [$packageName, $newFilename];
     }
 
