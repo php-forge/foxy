@@ -47,7 +47,7 @@
                 </div>
                 <div class="alert-box">
                     <p class="alert-title"><strong>Native manager support</strong></p>
-                    <p class="alert-content">Delegates solving to Bun, npm, pnpm, or Yarn</p>
+                    <p class="alert-content">Delegates solving to Bun, Deno, npm, pnpm, or Yarn</p>
                 </div>
                 <div class="alert-box">
                     <p class="alert-title"><strong>Automatic selection</strong></p>

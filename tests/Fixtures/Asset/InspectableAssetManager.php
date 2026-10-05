@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Foxy\Tests\Fixtures\Asset;
 
-use Foxy\Asset\AbstractAssetManager;
+use Foxy\Asset\{AbstractAuditableAssetManager, AssetPackageInterface};
 
-final class InspectableAssetManager extends AbstractAssetManager
+final class InspectableAssetManager extends AbstractAuditableAssetManager
 {
     /**
      * @var array<string, string>|null
@@ -18,7 +18,18 @@ final class InspectableAssetManager extends AbstractAssetManager
      */
     private array|null $handledDependencies = null;
 
+    private array|null $mergedPackage = null;
+
+    private string|null $normalizedVersionOutput = null;
+
+    /**
+     * @var array<string, mixed>|null
+     */
+    private array|null $previousDependencies = null;
+
     private bool|null $validatedNoDev = null;
+
+    private string|null $versionOutput = null;
 
     public function buildCommandForTest(string $defaultBin, string $action, array|string $command): string
     {
@@ -58,6 +69,11 @@ final class InspectableAssetManager extends AbstractAssetManager
         return 'inspectable.lock';
     }
 
+    public function getMergedPackageForTest(): array|null
+    {
+        return $this->mergedPackage;
+    }
+
     public function getName(): string
     {
         return 'inspectable';
@@ -66,6 +82,14 @@ final class InspectableAssetManager extends AbstractAssetManager
     public function getNodeModulesPathForTest(): string
     {
         return $this->getNodeModulesPath();
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function getPreviousDependenciesForTest(): array|null
+    {
+        return $this->previousDependencies;
     }
 
     public function getRootPackageDirForTest(): string
@@ -83,6 +107,11 @@ final class InspectableAssetManager extends AbstractAssetManager
         return $this->getVersion();
     }
 
+    public function getVersionOutputForTest(): string|null
+    {
+        return $this->versionOutput;
+    }
+
     /**
      * @param array<string, string> $environment
      */
@@ -91,11 +120,26 @@ final class InspectableAssetManager extends AbstractAssetManager
         $this->auditEnvironment = $environment;
     }
 
+    public function setNormalizedVersionOutputForTest(string $output): void
+    {
+        $this->normalizedVersionOutput = $output;
+    }
+
     protected function actionWhenComposerDependenciesAreAlreadyInstalled(array $names): void
     {
         parent::actionWhenComposerDependenciesAreAlreadyInstalled($names);
 
         $this->handledDependencies = $names;
+    }
+
+    protected function actionWhenComposerDependenciesAreMerged(
+        AssetPackageInterface $assetPackage,
+        array $previousDependencies,
+    ): void {
+        parent::actionWhenComposerDependenciesAreMerged($assetPackage, $previousDependencies);
+
+        $this->mergedPackage = $assetPackage->getPackage();
+        $this->previousDependencies = $previousDependencies;
     }
 
     protected function getAuditCommand(bool $noDev): string
@@ -121,6 +165,13 @@ final class InspectableAssetManager extends AbstractAssetManager
     protected function getVersionCommand(): string
     {
         return $this->buildUnconfiguredCommand('inspectable', '--version');
+    }
+
+    protected function normalizeVersionOutput(string $output): string
+    {
+        $this->versionOutput = $output;
+
+        return $this->normalizedVersionOutput ?? parent::normalizeVersionOutput($output);
     }
 
     protected function validateAuditConfiguration(bool $noDev): void

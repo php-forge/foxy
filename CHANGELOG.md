@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - perf: write generated Composer asset manifests directly without first copying their source files.
 - fix: detect generated asset manifest write failures before running the frontend manager.
 - docs: clarify that manager execution does not change the PHP process working directory.
+- feat: add Deno `^2.9.7` as an asset manager that registers Composer assets as root `workspaces` members, while security audits stay limited to Bun, npm, pnpm, and Yarn.
 
 ## 0.2.0 January 24, 2026
 

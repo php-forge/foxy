@@ -14,7 +14,7 @@ use function str_contains;
 use function str_replace;
 use function trim;
 
-final class NpmManager extends AbstractAssetManager
+final class NpmManager extends AbstractAuditableAssetManager
 {
     public function getLockPackageName(): string
     {

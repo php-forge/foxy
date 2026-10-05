@@ -14,7 +14,7 @@ use function file_put_contents;
 use const DIRECTORY_SEPARATOR;
 use const PHP_BINARY;
 
-final class PnpmAssetManagerTest extends AssetManager
+final class PnpmAssetManagerTest extends AuditableAssetManager
 {
     public function testAuditPreventsPnpmfileHooksFromMutatingTheWorkspace(): void
     {

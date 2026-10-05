@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Foxy\Tests\Command;
 
+use Composer\IO\IOInterface;
 use Composer\Plugin\Capability\CommandProvider as ComposerCommandProvider;
 use Composer\Plugin\Capable;
-use Foxy\Asset\AssetManagerInterface;
+use Composer\Util\{Filesystem, ProcessExecutor};
+use Foxy\Asset\{AssetManagerInterface, DenoManager};
 use Foxy\Audit\{
     AuditProcessResult,
     AuditRequest,
@@ -103,6 +105,38 @@ final class FoxyCapabilityTest extends TestCase
             [ComposerCommandProvider::class => FoxyCommandProvider::class],
             $foxy->getCapabilities(),
         );
+    }
+
+    public function testThrowRuntimeExceptionWhenSelectedManagerIsDeno(): void
+    {
+        $executor = $this->createMock(ProcessExecutor::class);
+
+        $executor->expects(self::never())->method('execute');
+
+        $foxy = new Foxy();
+
+        self::setProperty(
+            $foxy,
+            'config',
+            new Config([], ['enabled' => true]),
+        );
+        self::setProperty(
+            $foxy,
+            'assetManager',
+            new DenoManager(
+                $this->createMock(IOInterface::class),
+                new Config([]),
+                $executor,
+                $this->createMock(Filesystem::class),
+            ),
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            'The selected asset manager does not support security audits.',
+        );
+
+        $foxy->audit(new AuditRequest());
     }
 
     private static function setProperty(Foxy $foxy, string $property, object $value): void

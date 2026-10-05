@@ -36,7 +36,7 @@ use function trim;
 
 use const DIRECTORY_SEPARATOR;
 
-final class BunManager extends AbstractAssetManager
+final class BunManager extends AbstractAuditableAssetManager
 {
     public function getLockPackageName(): string
     {

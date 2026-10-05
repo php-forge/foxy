@@ -22,7 +22,7 @@ use function sprintf;
 
 use const DIRECTORY_SEPARATOR;
 
-final class BunAssetManagerTest extends AssetManager
+final class BunAssetManagerTest extends AuditableAssetManager
 {
     /**
      * @var array<string, array{

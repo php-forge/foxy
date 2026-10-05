@@ -15,7 +15,7 @@ use Composer\Package\{Package, RootPackageInterface};
 use Composer\Repository\RepositoryManager;
 use Composer\Script\{Event, ScriptEvents};
 use Composer\Util\{Filesystem, ProcessExecutor};
-use Foxy\Asset\{AbstractAssetManager, AssetManagerInterface, NpmManager};
+use Foxy\Asset\{AbstractAssetManager, AssetManagerInterface, DenoManager, NpmManager};
 use Foxy\Config\Config as FoxyConfig;
 use Foxy\Exception\RuntimeException;
 use Foxy\Fallback\AssetFallback;
@@ -181,6 +181,26 @@ final class FoxyTest extends TestCase
         $this->expectExceptionMessage('Foxy requires the Composer\'s minimum version "^2.10.2"');
 
         $foxy->activate($this->composer, $this->io);
+    }
+
+    /**
+     * @throws ParsingException
+     */
+    public function testActivateResolvesDenoManager(): void
+    {
+        $this->package
+            ->method('getConfig')
+            ->willReturn(['foxy' => ['manager' => 'deno', 'run-asset-manager' => false]]);
+
+        $foxy = new Foxy();
+
+        $foxy->activate($this->composer, $this->io);
+
+        self::assertInstanceOf(
+            DenoManager::class,
+            $this->getFoxyProperty($foxy, 'assetManager'),
+            'The asset manager should be an instance of DenoManager',
+        );
     }
 
     /**

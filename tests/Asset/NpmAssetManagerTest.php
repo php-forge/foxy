@@ -17,7 +17,7 @@ use function implode;
 
 use const DIRECTORY_SEPARATOR;
 
-final class NpmAssetManagerTest extends AssetManager
+final class NpmAssetManagerTest extends AuditableAssetManager
 {
     #[DataProvider('workspaceLocksThatCannotBeEnumerated')]
     public function testAuditFailsClosedWhenWorkspaceGraphCannotBeEnumerated(string|null $manifest, string $lock): void

@@ -6,7 +6,7 @@ namespace Foxy\Asset;
 
 use Composer\Util\ProcessExecutor;
 
-final class PnpmManager extends AbstractAssetManager
+final class PnpmManager extends AbstractAuditableAssetManager
 {
     public function getLockPackageName(): string
     {
