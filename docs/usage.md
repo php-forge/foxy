@@ -45,7 +45,8 @@ composer foxy:audit
 The command requires the selected manager's native lockfile, validates the manager version, and asks the manager for a
 machine-readable security report. It reads the lockfile and does not run an install, update, fix, or fallback. Foxy
 supports npm audit report version 2 starting with npm 10.9.8 and the current report schemas emitted by pnpm 11, Yarn 4,
-and Bun 1.4; legacy report formats are rejected instead of being interpreted heuristically.
+and Bun 1.4; legacy report formats are rejected instead of being interpreted heuristically. `composer foxy:audit`
+rejects Deno with status `2` because `deno audit` does not provide a machine-readable report.
 
 Foxy reports every advisory returned by the manager. `--audit-level` controls only the CI exit threshold:
 

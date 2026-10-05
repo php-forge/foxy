@@ -1,8 +1,9 @@
 {
     "name": "php-forge/foxy",
-    "description": "Fast, reliable, and secure Bun/NPM/Yarn/pnpm bridge for Composer",
+    "description": "Fast, reliable, and secure Bun/Deno/NPM/Yarn/pnpm bridge for Composer",
     "keywords": [
         "bun",
+        "deno",
         "npm",
         "yarn",
         "composer",

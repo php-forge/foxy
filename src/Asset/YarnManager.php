@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Foxy\Asset;
 
-final class YarnManager extends AbstractAssetManager
+final class YarnManager extends AbstractAuditableAssetManager
 {
     private const array AUDIT_ENVIRONMENT = [
         'YARN_NPM_AUDIT_EXCLUDE_PACKAGES' => '__FOXY_AUDIT_NO_MATCH__',

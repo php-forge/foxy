@@ -325,6 +325,29 @@ final class AbstractAssetManagerTest extends TestCase
         self::assertTrue($this->createManager($converter)->isAvailable());
     }
 
+    public function testIsAvailableRejectsEmptyNormalizedVersionOutput(): void
+    {
+        $converter = $this->createMock(VersionConverterInterface::class);
+
+        $converter->expects(self::never())->method('convertVersion');
+
+        $this->executor->addExpectedValues(0, 'unrecognized output');
+
+        $manager = $this->createManager($converter);
+
+        $manager->setNormalizedVersionOutputForTest('');
+
+        self::assertFalse(
+            $manager->isAvailable(),
+            'The manager should not be available for empty normalized version output',
+        );
+        self::assertSame(
+            'unrecognized output',
+            $manager->getVersionOutputForTest(),
+            'The version output should match the expected unrecognized output',
+        );
+    }
+
     public function testIsAvailableRejectsWhitespaceOnlyVersion(): void
     {
         $converter = $this->createMock(VersionConverterInterface::class);
@@ -342,6 +365,74 @@ final class AbstractAssetManagerTest extends TestCase
         self::assertNull($this->config->get('manager-version'));
         self::assertTrue($this->createManager()->isAvailable());
         self::assertSame('>=42.0.0', $this->config->get('manager-version'));
+    }
+
+    public function testMergeHookReceivesMergedPackageAndPreviousDependencies(): void
+    {
+        $this->config = new Config([], ['run-asset-manager' => true]);
+
+        file_put_contents(
+            $this->cwd . DIRECTORY_SEPARATOR . 'package.json',
+            '{"dependencies":{"@composer-asset/foo--bar":"file:./path/foo/bar",'
+            . '"@composer-asset/old--dependency":"file:./path/old/dependency","lodash":"^4.17.21"}}',
+        );
+
+        $manager = $this->createManager();
+
+        $manager->addDependencies(
+            $this->rootPackage,
+            [
+                '@composer-asset/foo--bar' => 'path/foo/bar/package.json',
+                '@composer-asset/new--dependency' => 'path/new/dependency/package.json',
+            ],
+        );
+
+        self::assertSame(
+            [
+                '@composer-asset/foo--bar' => 'file:./path/foo/bar',
+                '@composer-asset/old--dependency' => 'file:./path/old/dependency',
+            ],
+            $manager->getPreviousDependenciesForTest(),
+            'The previous dependencies should match the expected array',
+        );
+        self::assertSame(
+            [
+                'dependencies' => [
+                    '@composer-asset/foo--bar' => 'file:./path/foo/bar',
+                    '@composer-asset/new--dependency' => 'file:./path/new/dependency',
+                    'lodash' => '^4.17.21',
+                ],
+            ],
+            $manager->getMergedPackageForTest(),
+            'The merged package should match the expected array',
+        );
+    }
+
+    public function testMergeHookRunsWhenManagerExecutionIsDisabled(): void
+    {
+        $this->config = new Config([], ['run-asset-manager' => false]);
+
+        $manager = $this->createManager();
+
+        $manager->addDependencies(
+            $this->rootPackage,
+            ['@composer-asset/foo--bar' => 'path/foo/bar/package.json'],
+        );
+
+        self::assertNull(
+            $manager->getHandledDependencies(),
+            'The handled dependencies should be null when manager execution is disabled',
+        );
+        self::assertSame(
+            [],
+            $manager->getPreviousDependenciesForTest(),
+            'The previous dependencies should be an empty array when manager execution is disabled',
+        );
+        self::assertSame(
+            ['dependencies' => ['@composer-asset/foo--bar' => 'file:./path/foo/bar']],
+            $manager->getMergedPackageForTest(),
+            'The merged package should match the expected array when manager execution is disabled',
+        );
     }
 
     #[DataProvider('relativeRootPackageDirectories')]
@@ -479,6 +570,34 @@ final class AbstractAssetManagerTest extends TestCase
 
         self::assertSame('', $manager->getVersionForTest());
         self::assertNull($this->executor->getLastCommand());
+    }
+
+    public function testVersionOutputHookResultIsConverted(): void
+    {
+        $converter = $this->createMock(VersionConverterInterface::class);
+
+        $converter
+            ->expects(self::once())
+            ->method('convertVersion')
+            ->with('42.0.0')
+            ->willReturn('42.0.0');
+
+        $this->executor->addExpectedValues(0, "  inspectable 42.0.0\n");
+
+        $manager = $this->createManager($converter);
+
+        $manager->setNormalizedVersionOutputForTest('42.0.0');
+
+        self::assertSame(
+            '42.0.0',
+            $manager->getVersionForTest(),
+            'The version for test should match the expected converted version',
+        );
+        self::assertSame(
+            'inspectable 42.0.0',
+            $manager->getVersionOutputForTest(),
+            'The version output should match the expected converted output',
+        );
     }
 
     protected function setUp(): void

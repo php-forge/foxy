@@ -10,7 +10,7 @@ Before updating, ensure the environment provides:
 
 - PHP 8.3 or later.
 - Composer 2.10.2 or later.
-- One supported frontend manager for automatic manager execution or explicit security audits: Bun `^1.4.0`, npm `>=10.9.8`, pnpm `^11.23.0`, or Yarn `^4.18.0`.
+- One supported frontend manager for automatic manager execution or explicit security audits: Bun `^1.4.0`, Deno `^2.9.7` (automatic manager execution only), npm `>=10.9.8`, pnpm `^11.23.0`, or Yarn `^4.18.0`.
 - For npm, use a Node.js version supported by the selected npm release.
 - For pnpm, Node.js `>=22.13.0`.
 - For Yarn, Node.js `>=18.12.0` on a release that still receives security updates.
@@ -131,11 +131,12 @@ The [Yarn migration guide](https://yarnpkg.com/migration/guide) documents the co
 
 Custom `AssetManagerInterface` implementations must add `getVersionConstraint(): string` and return their hard
 supported version range as a Composer constraint. Remove implementations and calls of the obsolete
-`isValidForUpdate()` method. Custom `AbstractAssetManager` subclasses must also implement
-`getAuditCommand(bool $noDev): string`. Foxy currently normalizes only the report schemas and manager names of its four
-built-in managers; arbitrary custom managers are not supported by `composer foxy:audit`. Direct `AssetManagerInterface`
-implementations that do not implement Foxy's auditable manager contract remain usable for asset solving, but the audit
-command reports that they cannot be audited reliably.
+`isValidForUpdate()` method. Custom managers that support `composer foxy:audit` must extend
+`AbstractAuditableAssetManager` and implement `getAuditCommand(bool $noDev): string`. Foxy currently normalizes only
+the report schemas and manager names of four of its five built-in managers: Bun, npm, pnpm, and Yarn. Deno is built in
+but not auditable, and arbitrary custom managers are not supported by `composer foxy:audit`. `AbstractAssetManager`
+subclasses and direct `AssetManagerInterface` implementations that do not implement Foxy's auditable manager contract
+remain usable for asset solving, but the audit command rejects them because they do not support security audits.
 
 `AbstractAssetManager` subclasses inherit the simplified update eligibility based on installation state and the
 `setUpdatable()` flag, concrete-version enforcement before every manager command, and version detection in the

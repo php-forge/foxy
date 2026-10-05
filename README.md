@@ -24,7 +24,7 @@
 </p>
 
 <p align="center">
-    <strong>Foxy is a Composer plugin that aggregates frontend dependencies declared by Composer packages into one package.json and delegates installation to Bun, npm, pnpm, or Yarn.</strong>
+    <strong>Foxy is a Composer plugin that aggregates frontend dependencies declared by Composer packages into one package.json and delegates installation to Bun, Deno, npm, pnpm, or Yarn.</strong>
 </p>
 
 ## Features
@@ -40,6 +40,7 @@
 - Composer 2.10.2 or later.
 - One supported frontend manager for automatic manager execution or explicit security audits:
   - Bun `^1.4.0`.
+  - Deno `^2.9.7` for automatic manager execution only; security audits are not supported.
   - npm `>=10.9.8` with a Node.js version supported by the selected npm release.
   - pnpm `^11.23.0` with Node.js `>=22.13.0`.
   - Yarn `^4.18.0` with Node.js `>=18.12.0`; use a Node.js release that still receives security updates.
@@ -71,9 +72,9 @@ Selecting a manager explicitly is recommended for reproducible local and CI beha
 }
 ```
 
-Valid manager values are `bun`, `npm`, `pnpm`, and `yarn`. When automatic manager execution is enabled and `manager` is
-omitted, Foxy first looks for one recognized native lockfile and then checks available executables. Configure the
-manager explicitly when the project contains lockfiles from more than one manager.
+Valid manager values are `bun`, `deno`, `npm`, `pnpm`, and `yarn`. When automatic manager execution is enabled and
+`manager` is omitted, Foxy first looks for one recognized native lockfile and then checks available executables.
+Configure the manager explicitly when the project contains lockfiles from more than one manager.
 
 During automatic Composer processing, `run-asset-manager=false` prevents Foxy from requiring or probing a manager
 binary. Automatic selection uses the single recognized lockfile when present, or npm as the manifest adapter when no
@@ -91,7 +92,8 @@ composer foxy:audit --format=summary --no-dev --audit-level=high
 Foxy normalizes the current npm, pnpm, Yarn, and Bun audit reports and identifies the affected package, advisory,
 severity, vulnerable range, and CVE identifiers when GitHub maps the advisory to a CVE. The command returns `0` when no
 advisory meets the configured threshold, `1` when at least one does, and `2` when the audit cannot be completed
-reliably. See the [usage guide](docs/usage.md#security-auditing) for formats and CI examples.
+reliably. Deno is not supported because `deno audit` does not provide a machine-readable report. See the
+[usage guide](docs/usage.md#security-auditing) for formats and CI examples.
 
 ## Quick start
 

@@ -14,7 +14,7 @@ use Composer\Plugin\{Capable, PluginInterface};
 use Composer\Script\{Event, ScriptEvents};
 use Composer\Util\{Filesystem, ProcessExecutor};
 use Foxy\Asset\{AbstractAssetManager, AssetManagerFinder, AssetManagerInterface};
-use Foxy\Asset\{BunManager, NpmManager, PnpmManager, YarnManager};
+use Foxy\Asset\{BunManager, DenoManager, NpmManager, PnpmManager, YarnManager};
 use Foxy\Audit\{AuditReport, AuditRequest, AuditRunner, AuditRunnerInterface, AuditableAssetManagerInterface};
 use Foxy\Command\FoxyCommandProvider;
 use Foxy\Config\{Config, ConfigBuilder};
@@ -42,6 +42,7 @@ final class Foxy implements PluginInterface, EventSubscriberInterface, Capable, 
         PnpmManager::class,
         YarnManager::class,
         BunManager::class,
+        DenoManager::class,
     ];
 
     private ComposerFallback $composerFallback;

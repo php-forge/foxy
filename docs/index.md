@@ -9,8 +9,8 @@
 ## Introduction
 
 Foxy is a Composer plugin that aggregates frontend dependencies declared by installed Composer packages. It creates
-local package representations and lets Bun, npm, pnpm, or Yarn resolve and install those dependencies with its native
-solver.
+local package representations and lets Bun, Deno, npm, pnpm, or Yarn resolve and install those dependencies with its
+native solver.
 
 An embedded `package.json` should be treated as an independently versioned frontend package. Foxy uses the Composer
 package version only when the embedded package does not declare its own version.
@@ -22,6 +22,7 @@ package version only when the embedded package does not declare its own version.
 | PHP         | 8.3 or later                                                                   |
 | Composer    | 2.10.2 or later                                                                |
 | Bun         | `^1.4.0`                                                                       |
+| Deno        | `^2.9.7`; automatic manager execution only, security audits are unsupported    |
 | npm         | `>=10.9.8`; use a Node.js version supported by the selected npm release        |
 | pnpm        | `^11.23.0`; Node.js `>=22.13.0`                                                |
 | Yarn        | `^4.18.0`; Node.js `>=18.12.0` on a release that still receives security fixes |
@@ -43,9 +44,9 @@ The plugin is installed in the configured Composer vendor directory, normally `v
 
 ## Manager selection
 
-Set `config.foxy.manager` to `bun`, `npm`, `pnpm`, or `yarn` when reproducible manager selection is required. When
-manager execution is enabled and the option is omitted, Foxy looks for one recognized native lockfile and then for an
-available manager executable. Multiple recognized lockfiles require explicit selection.
+Set `config.foxy.manager` to `bun`, `deno`, `npm`, `pnpm`, or `yarn` when reproducible manager selection is required.
+When manager execution is enabled and the option is omitted, Foxy looks for one recognized native lockfile and then for
+an available manager executable. Multiple recognized lockfiles require explicit selection.
 
 During automatic Composer processing, `run-asset-manager=false` makes Foxy select from a single lockfile or use npm as
 the manifest adapter without probing executables. An explicit `composer foxy:audit` still probes and runs the selected

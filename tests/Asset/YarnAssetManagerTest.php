@@ -14,7 +14,7 @@ use function putenv;
 
 use const DIRECTORY_SEPARATOR;
 
-final class YarnAssetManagerTest extends AssetManager
+final class YarnAssetManagerTest extends AuditableAssetManager
 {
     private const AUDIT_ENVIRONMENT_VARIABLES = [
         'YARN_NPM_AUDIT_EXCLUDE_PACKAGES',
