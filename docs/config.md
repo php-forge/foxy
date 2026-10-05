@@ -211,8 +211,9 @@ registers each Composer asset directory as a member of the `workspaces` list in 
 - Existing `workspaces` entries are preserved and kept before the Foxy-managed members. Foxy removes a member when its
   Composer asset is removed, and removes the `workspaces` field when no entry remains.
 - `workspaces` must be a list of strings. The object form with a `packages` key is rejected.
-- Composer assets must be located inside the root package directory because Deno rejects workspace members outside
-  it. A `root-package-json-dir` that excludes the Composer vendor directory, or a `composer-asset-dir` outside the root
+- Composer assets must be located in a subdirectory of the root package directory because Deno rejects workspace
+  members outside it. Foxy writes each member as a normalized path relative to that directory. A
+  `root-package-json-dir` that excludes the Composer vendor directory, or a `composer-asset-dir` outside the root
   package directory, is not supported with Deno.
 - Updates run `deno update --lockfile-only --recursive && deno install`. The first step updates `deno.lock` within the
   declared version ranges, and the second installs the locked dependencies. `manager-options` applies to both steps,

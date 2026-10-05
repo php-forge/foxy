@@ -6,7 +6,7 @@ namespace Foxy\Tests\Asset;
 
 use Composer\Json\JsonFile;
 use Composer\Package\RootPackageInterface;
-use Composer\Util\Platform;
+use Composer\Util\{Filesystem, Platform};
 use Foxy\Asset\{AssetPackageInterface, DenoManager};
 use Foxy\Audit\AuditableAssetManagerInterface;
 use Foxy\Config\Config;
@@ -129,6 +129,23 @@ final class DenoAssetManagerTest extends AssetManager
             $package,
             $this->addDependenciesFromPackage($package, [])->getPackage(),
             'The package should remain unchanged when no composer assets are added',
+        );
+    }
+
+    public function testAddDependenciesRemovesCanonicalMemberOfNonCanonicalStaleDependency(): void
+    {
+        $assetPackage = $this->addDependenciesFromPackage(
+            [
+                'dependencies' => ['@composer-asset/foo--bar' => 'file:./path/foo/bar/'],
+                'workspaces' => ['packages/*', 'path/foo/bar'],
+            ],
+            [],
+        );
+
+        self::assertSame(
+            ['packages/*'],
+            $assetPackage->getPackage()['workspaces'],
+            'The workspace members should match the expected value',
         );
     }
 
@@ -341,18 +358,6 @@ final class DenoAssetManagerTest extends AssetManager
         );
     }
 
-    #[DataProviderExternal(DenoAssetManagerProvider::class, 'outsideRootPackageDirectory')]
-    public function testThrowRuntimeExceptionForAssetOutsideRootPackageDirectory(string $dependency): void
-    {
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage(
-            'The Composer asset "@composer-asset/foo--bar" is located outside of the root package directory and '
-            . 'cannot be installed with deno.',
-        );
-
-        $this->addDependenciesFromPackage(['name' => 'app'], ['@composer-asset/foo--bar' => $dependency]);
-    }
-
     #[DataProviderExternal(DenoAssetManagerProvider::class, 'invalidWorkspaces')]
     public function testThrowRuntimeExceptionForInvalidWorkspaces(mixed $workspaces): void
     {
@@ -368,6 +373,18 @@ final class DenoAssetManagerTest extends AssetManager
             ['workspaces' => $workspaces],
             ['@composer-asset/foo--bar' => 'path/foo/bar/package.json'],
         );
+    }
+
+    #[DataProviderExternal(DenoAssetManagerProvider::class, 'nonNestedAssetPaths')]
+    public function testThrowRuntimeExceptionForNonNestedAssetPath(string $dependency): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            'The Composer asset "@composer-asset/foo--bar" must be located in a subdirectory of the root package '
+            . 'directory to be installed with deno.',
+        );
+
+        $this->addDependenciesFromPackage(['name' => 'app'], ['@composer-asset/foo--bar' => $dependency]);
     }
 
     public function testThrowRuntimeExceptionWhenNativeVersionOutputIsUnsupported(): void
@@ -389,8 +406,8 @@ final class DenoAssetManagerTest extends AssetManager
     {
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            'The Composer asset "@composer-asset/foo--bar" is located outside of the root package directory and '
-            . 'cannot be installed with deno.',
+            'The Composer asset "@composer-asset/foo--bar" must be located in a subdirectory of the root package '
+            . 'directory to be installed with deno.',
         );
 
         $this->addDependenciesFromPackage(
@@ -504,7 +521,7 @@ final class DenoAssetManagerTest extends AssetManager
 
     protected function getManager(): DenoManager
     {
-        return new DenoManager($this->io, $this->config, $this->executor, $this->fs, $this->fallback);
+        return new DenoManager($this->io, $this->config, $this->executor, new Filesystem(), $this->fallback);
     }
 
     protected function getUnsupportedVersion(): string

@@ -47,11 +47,11 @@ final class DenoManager extends AbstractAssetManager
         foreach ($assetPackage->getInstalledDependencies() as $name => $dependency) {
             $member = $this->getWorkspaceMember($dependency);
 
-            if ($this->isOutsideRootPackageDir($member)) {
+            if (!$this->isNestedInRootPackageDir($member)) {
                 throw new RuntimeException(
                     sprintf(
-                        'The Composer asset "%s" is located outside of the root package directory and cannot be '
-                        . 'installed with deno.',
+                        'The Composer asset "%s" must be located in a subdirectory of the root package directory to '
+                        . 'be installed with deno.',
                         $name,
                     ),
                 );
@@ -124,13 +124,11 @@ final class DenoManager extends AbstractAssetManager
     }
 
     /**
-     * Returns the workspace member path of a `file:` dependency relative to the root package directory.
+     * Returns the normalized workspace member path of a `file:` dependency relative to the root package directory.
      */
     private function getWorkspaceMember(string $dependency): string
     {
-        $member = substr($dependency, 5);
-
-        return str_starts_with($member, './') ? substr($member, 2) : $member;
+        return $this->fs->normalizePath(substr($dependency, 5));
     }
 
     private function isListOfStrings(mixed $value): bool
@@ -148,11 +146,12 @@ final class DenoManager extends AbstractAssetManager
         return true;
     }
 
-    private function isOutsideRootPackageDir(string $member): bool
+    private function isNestedInRootPackageDir(string $member): bool
     {
-        return '..' === $member
-            || str_starts_with($member, '../')
-            || str_starts_with($member, '/')
-            || 1 === preg_match('/^[A-Za-z]:/', $member);
+        return '' !== $member
+            && '..' !== $member
+            && !str_starts_with($member, '../')
+            && !str_starts_with($member, '/')
+            && 1 !== preg_match('/^[A-Za-z]:/', $member);
     }
 }
