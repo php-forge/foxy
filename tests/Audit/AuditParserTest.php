@@ -20,7 +20,7 @@ use function str_repeat;
 use const JSON_THROW_ON_ERROR;
 
 /**
- * Unit tests for {@see AuditParserFactory} and the npm, pnpm, Yarn, and Bun audit report parsers.
+ * Unit tests for {@see AuditParserFactory} and the npm, pnpm, Yarn, Bun, and Deno audit report parsers.
  *
  * {@see AuditParserProvider} for test case data providers.
  */
