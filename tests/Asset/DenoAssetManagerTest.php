@@ -6,20 +6,22 @@ namespace Foxy\Tests\Asset;
 
 use Composer\Json\JsonFile;
 use Composer\Package\RootPackageInterface;
-use Composer\Util\{Filesystem, Platform};
+use Composer\Util\{Filesystem, Platform, ProcessExecutor};
 use Foxy\Asset\{AssetPackageInterface, DenoManager};
-use Foxy\Audit\AuditableAssetManagerInterface;
 use Foxy\Config\Config;
 use Foxy\Exception\RuntimeException;
 use Foxy\Tests\Provider\DenoAssetManagerProvider;
-use PHPUnit\Framework\Attributes\{DataProviderExternal, PreserveGlobalState, RunInSeparateProcess};
+use PHPUnit\Framework\Attributes\{DataProviderExternal, PreserveGlobalState, RunInSeparateProcess, TestWith};
 
+use function array_key_exists;
 use function array_map;
 use function array_values;
 use function define;
 use function defined;
 use function file_get_contents;
 use function file_put_contents;
+use function getenv;
+use function putenv;
 use function sprintf;
 use function strlen;
 use function substr;
@@ -27,11 +29,11 @@ use function substr;
 use const DIRECTORY_SEPARATOR;
 
 /**
- * Unit tests for {@see DenoManager} commands, version detection, and Composer asset `workspaces` synchronization.
+ * Unit tests for {@see DenoManager} commands, version detection, audit scope, and `workspaces` synchronization.
  *
  * {@see DenoAssetManagerProvider} for test case data providers.
  */
-final class DenoAssetManagerTest extends AssetManager
+final class DenoAssetManagerTest extends AuditableAssetManager
 {
     #[DataProviderExternal(DenoAssetManagerProvider::class, 'insideRootPackageDirectory')]
     public function testAddDependenciesAcceptsWorkspaceMemberInsideRootPackageDirectory(
@@ -267,13 +269,91 @@ final class DenoAssetManagerTest extends AssetManager
         );
     }
 
-    public function testDoesNotImplementAuditableManagerContract(): void
+    #[TestWith([false], 'all dependencies')]
+    public function testAuditBuildsExactCommandWithoutInstallOptions(bool $noDev): void
     {
-        self::assertNotInstanceOf(
-            AuditableAssetManagerInterface::class,
-            $this->manager,
-            'The manager should not implement the AuditableAssetManagerInterface',
-        );
+        parent::testAuditBuildsExactCommandWithoutInstallOptions($noDev);
+    }
+
+    public function testAuditSetsNoColorOnlyWhileTheProcessRuns(): void
+    {
+        $process = getenv('NO_COLOR');
+        $envExists = array_key_exists('NO_COLOR', $_ENV);
+
+        $env = $_ENV['NO_COLOR'] ?? null;
+
+        $serverExists = array_key_exists('NO_COLOR', $_SERVER);
+
+        $server = $_SERVER['NO_COLOR'] ?? null;
+
+        try {
+            putenv('NO_COLOR');
+            unset($_ENV['NO_COLOR'], $_SERVER['NO_COLOR']);
+            file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'deno.lock', '{}');
+
+            $observed = [];
+            $position = 0;
+
+            $executor = $this->createMock(ProcessExecutor::class);
+
+            $executor
+                ->expects(self::exactly(2))
+                ->method('execute')
+                ->willReturnCallback(
+                    static function (mixed $command, mixed &$output = null) use (&$observed, &$position): int {
+                        if (0 === $position++) {
+                            $output = '2.9.7';
+
+                            return 0;
+                        }
+
+                        $observed = [getenv('NO_COLOR'), $_ENV['NO_COLOR'] ?? null, $_SERVER['NO_COLOR'] ?? null];
+                        $output = 'No known vulnerabilities found';
+
+                        return 0;
+                    },
+                );
+            $executor
+                ->expects(self::once())
+                ->method('getErrorOutput')
+                ->willReturn('');
+
+            (new DenoManager($this->io, $this->config, $executor, new Filesystem(), $this->fallback))->audit(false);
+
+            self::assertSame(
+                ['1', '1', '1'],
+                $observed,
+                'The audit process should run with `NO_COLOR` set in every environment source',
+            );
+            self::assertFalse(
+                getenv('NO_COLOR'),
+                'The process environment should no longer define `NO_COLOR` after the audit',
+            );
+            self::assertArrayNotHasKey(
+                'NO_COLOR',
+                $_ENV,
+                'The `$_ENV` superglobal should no longer define `NO_COLOR` after the audit',
+            );
+            self::assertArrayNotHasKey(
+                'NO_COLOR',
+                $_SERVER,
+                'The `$_SERVER` superglobal should no longer define `NO_COLOR` after the audit',
+            );
+        } finally {
+            putenv(false === $process ? 'NO_COLOR' : 'NO_COLOR=' . $process);
+
+            if ($envExists) {
+                $_ENV['NO_COLOR'] = $env;
+            } else {
+                unset($_ENV['NO_COLOR']);
+            }
+
+            if ($serverExists) {
+                $_SERVER['NO_COLOR'] = $server;
+            } else {
+                unset($_SERVER['NO_COLOR']);
+            }
+        }
     }
 
     public function testIsInstalledRequiresLockFile(): void
@@ -416,6 +496,31 @@ final class DenoAssetManagerTest extends AssetManager
         );
     }
 
+    public function testThrowRuntimeExceptionWhenProductionOnlyAuditIsRequested(): void
+    {
+        file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'deno.lock', '{}');
+
+        try {
+            $this->getManager()->audit(true);
+
+            self::fail(
+                'Expected the production-only deno audit to be rejected.',
+            );
+        } catch (RuntimeException $exception) {
+            self::assertSame(
+                'The deno audit cannot guarantee the requested dependency scope because "deno audit" cannot exclude '
+                . 'development dependencies.',
+                $exception->getMessage(),
+                'The exception message should explain why the dependency scope cannot be guaranteed',
+            );
+        }
+
+        self::assertNull(
+            $this->executor->getExecutedCommand(0),
+            'The rejection should happen before any process is executed',
+        );
+    }
+
     public function testThrowRuntimeExceptionWhenVersionOutputDoesNotStartWithDeno(): void
     {
         $this->executor->addExpectedValues(0, 'upgraded deno 2.9.7');
@@ -507,6 +612,17 @@ final class DenoAssetManagerTest extends AssetManager
             $this->executor->getLastCommand(),
             'The update command should use the normalized custom path for Windows',
         );
+
+        $this->executor->addExpectedValues(0, '2.9.7');
+        $this->executor->addExpectedValues(0, 'No known vulnerabilities found');
+
+        $this->getManager()->audit(false);
+
+        self::assertSame(
+            'C:\\tools\\deno.exe audit --level=low',
+            $this->executor->getLastCommand(),
+            'The audit command should use the normalized custom path for Windows',
+        );
     }
 
     protected function getExpectedPackage(array $package): array
@@ -527,6 +643,11 @@ final class DenoAssetManagerTest extends AssetManager
     protected function getUnsupportedVersion(): string
     {
         return '2.9.6';
+    }
+
+    protected function getValidAuditCommand(bool $noDev): string
+    {
+        return $this->getBinary() . ' audit --level=low';
     }
 
     protected function getValidInstallCommand(): string

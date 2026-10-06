@@ -22,7 +22,7 @@ package version only when the embedded package does not declare its own version.
 | PHP         | 8.3 or later                                                                   |
 | Composer    | 2.10.2 or later                                                                |
 | Bun         | `^1.4.0`                                                                       |
-| Deno        | `^2.9.7`; automatic manager execution only, security audits are unsupported    |
+| Deno        | `^2.9.7`                                                                       |
 | npm         | `>=10.9.8`; use a Node.js version supported by the selected npm release        |
 | pnpm        | `^11.23.0`; Node.js `>=22.13.0`                                                |
 | Yarn        | `^4.18.0`; Node.js `>=18.12.0` on a release that still receives security fixes |

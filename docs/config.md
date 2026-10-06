@@ -219,7 +219,8 @@ registers each Composer asset directory as a member of the `workspaces` list in 
   declared version ranges, and the second installs the locked dependencies. `manager-options` applies to both steps,
   `manager-update-options` to the update step, and `manager-install-options` to the install step.
 - Deno skips npm lifecycle scripts by default. Allow them with `--allow-scripts` in `manager-install-options`.
-- `composer foxy:audit` does not support Deno because `deno audit` does not provide a machine-readable report.
+- `composer foxy:audit` reads `deno.lock` and parses the text report of `deno audit`. `--no-dev` is rejected because
+  Deno cannot exclude development dependencies. See [Security auditing](usage.md#security-auditing).
 - When switching from Deno to another manager, remove the Foxy-managed entries from `workspaces`.
 
 ```json

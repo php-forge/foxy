@@ -40,7 +40,7 @@
 - Composer 2.10.2 or later.
 - One supported frontend manager for automatic manager execution or explicit security audits:
   - Bun `^1.4.0`.
-  - Deno `^2.9.7` for automatic manager execution only; security audits are not supported.
+  - Deno `^2.9.7`.
   - npm `>=10.9.8` with a Node.js version supported by the selected npm release.
   - pnpm `^11.23.0` with Node.js `>=22.13.0`.
   - Yarn `^4.18.0` with Node.js `>=18.12.0`; use a Node.js release that still receives security updates.
@@ -89,11 +89,11 @@ composer foxy:audit
 composer foxy:audit --format=summary --no-dev --audit-level=high
 ```
 
-Foxy normalizes the current npm, pnpm, Yarn, and Bun audit reports and identifies the affected package, advisory,
-severity, vulnerable range, and CVE identifiers when GitHub maps the advisory to a CVE. The command returns `0` when no
-advisory meets the configured threshold, `1` when at least one does, and `2` when the audit cannot be completed
-reliably. Deno is not supported because `deno audit` does not provide a machine-readable report. See the
-[usage guide](docs/usage.md#security-auditing) for formats and CI examples.
+Foxy normalizes the current npm, pnpm, Yarn, Bun, and Deno audit reports and identifies the affected package,
+advisory, severity, vulnerable range, and CVE identifiers when GitHub maps the advisory to a CVE. The command returns
+`0` when no advisory meets the configured threshold, `1` when at least one does, and `2` when the audit cannot be
+completed reliably. With Deno, `--no-dev` is rejected because `deno audit` cannot exclude development dependencies.
+See the [usage guide](docs/usage.md#security-auditing) for formats and CI examples.
 
 ## Quick start
 
