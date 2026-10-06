@@ -6,6 +6,7 @@ namespace Foxy\Audit\Parser;
 
 use Foxy\Audit\{AuditFinding, AuditParserInterface, Severity};
 
+use function array_keys;
 use function array_pop;
 use function count;
 use function explode;
@@ -20,17 +21,34 @@ use function trim;
 final class DenoAuditParser extends AbstractAuditParser implements AuditParserInterface
 {
     /**
-     * Line prefixes of an advisory block, in the order printed by `deno audit`.
+     * Line prefixes that open every advisory block, keyed by field, in the order printed by `deno audit`.
+     */
+    private const array ADVISORY_HEADER_PREFIXES = [
+        'title' => "\u{256D} ",
+        'severity' => "\u{2502} Severity:   ",
+        'package' => "\u{2502} Package:    ",
+        'vulnerable' => "\u{2502} Vulnerable: ",
+    ];
+
+    /**
+     * Line prefixes of an advisory block without a patched range, which closes on the `Info` line.
      */
     private const array ADVISORY_LINE_PREFIXES = [
-        "\u{256D} ",
-        "\u{2502} Severity:   ",
-        "\u{2502} Package:    ",
-        "\u{2502} Vulnerable: ",
-        "\u{2570} Info:       ",
+        ...self::ADVISORY_HEADER_PREFIXES,
+        'info' => "\u{2570} Info:       ",
     ];
 
     private const string CLEAN_REPORT = 'No known vulnerabilities found';
+
+    /**
+     * Line prefixes of an advisory block with a patched range, which adds the `Patched` and closing `Actions` lines.
+     */
+    private const array PATCHED_ADVISORY_LINE_PREFIXES = [
+        ...self::ADVISORY_HEADER_PREFIXES,
+        'patched' => "\u{2502} Patched:    ",
+        'info' => "\u{2502} Info:       ",
+        'actions' => "\u{2570} Actions:    ",
+    ];
 
     public function parse(string $output): array
     {
@@ -99,41 +117,56 @@ final class DenoAuditParser extends AbstractAuditParser implements AuditParserIn
         $context = sprintf('advisory %d', $index);
         $lines = explode("\n", $block);
 
-        if (count($lines) !== count(self::ADVISORY_LINE_PREFIXES)) {
-            throw $this->malformed(
-                sprintf('%s must contain exactly %d lines', $context, count(self::ADVISORY_LINE_PREFIXES)),
-            );
-        }
+        $prefixes = match (count($lines)) {
+            count(self::ADVISORY_LINE_PREFIXES) => self::ADVISORY_LINE_PREFIXES,
+            count(self::PATCHED_ADVISORY_LINE_PREFIXES) => self::PATCHED_ADVISORY_LINE_PREFIXES,
+            default => throw $this->malformed(
+                sprintf(
+                    '%s must contain %d or %d lines',
+                    $context,
+                    count(self::ADVISORY_LINE_PREFIXES),
+                    count(self::PATCHED_ADVISORY_LINE_PREFIXES),
+                ),
+            ),
+        };
 
         $values = [];
 
-        foreach (self::ADVISORY_LINE_PREFIXES as $position => $prefix) {
+        foreach (array_keys($prefixes) as $position => $field) {
             $line = $lines[$position];
-            $value = substr($line, strlen($prefix));
+            $value = substr($line, strlen($prefixes[$field]));
 
-            if (!str_starts_with($line, $prefix) || $value === '' || $value !== $this->sanitizeString($value)) {
+            if (
+                !str_starts_with($line, $prefixes[$field])
+                || $value === ''
+                || $value !== $this->sanitizeString($value)
+            ) {
                 throw $this->malformed(sprintf('%s line %d is not recognized', $context, $position + 1));
             }
 
-            $values[] = $value;
+            $values[$field] = $value;
         }
 
-        [$title, $severity, $package, $vulnerableVersions, $url] = $values;
+        $patchedVersions = $values['patched'] ?? null;
 
-        $severity = $this->getSeverity($severity, $context);
+        if ($patchedVersions !== null && $values['actions'] !== "update {$values['package']} to {$patchedVersions}") {
+            throw $this->malformed(sprintf('%s actions must update the package to its patched versions', $context));
+        }
+
+        $severity = $this->getSeverity($values['severity'], $context);
 
         if ($severity === Severity::INFO) {
             throw $this->malformed(sprintf('%s has an unsupported severity', $context));
         }
 
         return new AuditFinding(
-            $package,
+            $values['package'],
             $severity,
-            $this->getGhsaId($url) ?? $url,
+            $this->getGhsaId($values['info']) ?? $values['info'],
             null,
-            $title,
-            $vulnerableVersions,
-            $url,
+            $values['title'],
+            $values['vulnerable'],
+            $values['info'],
         );
     }
 

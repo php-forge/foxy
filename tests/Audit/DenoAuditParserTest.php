@@ -79,6 +79,57 @@ final class DenoAuditParserTest extends TestCase
         );
     }
 
+    public function testParseReadsPatchedReport(): void
+    {
+        $findings = (new DenoAuditParser())->parse(self::fixture('deno-patched.txt'));
+
+        self::assertCount(
+            2,
+            $findings,
+            'The report should contain one finding per advisory block',
+        );
+        self::assertSame(
+            '@denotest/with-vuln1',
+            $findings[0]->package,
+            'The package should match the expected value',
+        );
+        self::assertSame(
+            Severity::HIGH,
+            $findings[0]->severity,
+            'The severity should match the expected value',
+        );
+        self::assertSame(
+            '@denotest/with-vuln1 is susceptible to prototype pollution',
+            $findings[0]->title,
+            'The title should match the expected value',
+        );
+        self::assertSame(
+            '<1.1.0',
+            $findings[0]->vulnerableVersions,
+            'The vulnerable range should match the expected value',
+        );
+        self::assertSame(
+            'https://example.com/vuln/101010',
+            $findings[0]->url,
+            'The advisory URL should come from the Info line instead of the closing line',
+        );
+        self::assertSame(
+            'https://example.com/vuln/101010',
+            $findings[0]->advisoryId,
+            'The advisory ID should fall back to the advisory URL',
+        );
+        self::assertSame(
+            '@denotest/with-vuln2',
+            $findings[1]->package,
+            'The second package should match the expected value',
+        );
+        self::assertSame(
+            Severity::CRITICAL,
+            $findings[1]->severity,
+            'The second severity should match the expected value',
+        );
+    }
+
     public function testParseReadsPopulatedReport(): void
     {
         $findings = (new DenoAuditParser())->parse(self::fixture('deno-populated.txt'));
@@ -163,6 +214,44 @@ final class DenoAuditParserTest extends TestCase
             [],
             $finding->dependencyPaths,
             'The dependency paths should be empty because the report does not provide them',
+        );
+    }
+
+    public function testParseReadsReportMixingPatchedAndUnpatchedAdvisories(): void
+    {
+        $findings = (new DenoAuditParser())->parse(
+            "╭ Command Injection in lodash\n"
+            . "│ Severity:   high\n"
+            . "│ Package:    lodash\n"
+            . "│ Vulnerable: <4.17.21\n"
+            . "│ Patched:    >=4.17.21\n"
+            . "│ Info:       https://github.com/advisories/GHSA-35jh-r3h4-6jhm\n"
+            . "╰ Actions:    update lodash to >=4.17.21\n"
+            . "\n"
+            . "╭ Prototype Pollution in minimist\n"
+            . "│ Severity:   critical\n"
+            . "│ Package:    minimist\n"
+            . "│ Vulnerable: <1.2.6\n"
+            . "╰ Info:       https://github.com/advisories/GHSA-xvch-5gv4-984h\n"
+            . "\n"
+            . "Found 2 vulnerabilities\n"
+            . "Severity: 0 low, 0 moderate, 1 high, 1 critical\n",
+        );
+
+        self::assertSame(
+            ['GHSA-35jh-r3h4-6jhm', 'GHSA-xvch-5gv4-984h'],
+            array_map(static fn(AuditFinding $finding): string => $finding->advisoryId, $findings),
+            'The advisory IDs should be read from both layouts',
+        );
+        self::assertSame(
+            ['<4.17.21', '<1.2.6'],
+            array_map(static fn(AuditFinding $finding): string => $finding->vulnerableVersions, $findings),
+            'The vulnerable ranges should be read from both layouts',
+        );
+        self::assertSame(
+            [Severity::HIGH, Severity::CRITICAL],
+            array_map(static fn(AuditFinding $finding): Severity => $finding->severity, $findings),
+            'The severities should be read from both layouts',
         );
     }
 

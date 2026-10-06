@@ -59,7 +59,7 @@ final class DenoAuditParserProvider
         ];
         yield 'advisory with an unknown extra line' => [
             self::report(self::advisory() . "\n│ Fixed:      4.17.21", self::summary(1, 0, 0, 1, 0)),
-            'advisory 1 must contain exactly 5 lines',
+            'advisory 1 must contain 5 or 7 lines',
         ];
         yield 'advisory with an unsupported severity' => [
             self::report(self::advisory('severe'), self::summary(1, 0, 0, 1, 0)),
@@ -88,7 +88,7 @@ final class DenoAuditParserProvider
                 "╭ Command Injection in lodash\n│ Severity:   high\n│ Package:    lodash\n│ Vulnerable: <4.17.21",
                 self::summary(1, 0, 0, 1, 0),
             ),
-            'advisory 1 must contain exactly 5 lines',
+            'advisory 1 must contain 5 or 7 lines',
         ];
         yield 'ANSI-coloured advisory value' => [
             self::report(self::advisory("\e[31mhigh\e[0m"), self::summary(1, 0, 0, 1, 0)),
@@ -105,7 +105,7 @@ final class DenoAuditParserProvider
         yield 'empty output' => ['', 'the report is empty'];
         yield 'extra blank line between advisories' => [
             self::report(self::advisory() . "\n", self::advisory(), self::summary(2, 0, 0, 2, 0)),
-            'advisory 2 must contain exactly 5 lines',
+            'advisory 2 must contain 5 or 7 lines',
         ];
         yield 'low severity count mismatch' => [
             self::report(self::advisory(), self::summary(1, 1, 0, 0, 0)),
@@ -114,6 +114,45 @@ final class DenoAuditParserProvider
         yield 'missing summary' => [
             self::report(self::advisory()),
             'the report does not end with a recognized summary',
+        ];
+        yield 'patched advisory closed by the info line' => [
+            self::report(str_replace('│ Info:', '╰ Info:', self::patchedAdvisory()), self::summary(1, 0, 0, 1, 0)),
+            'advisory 1 line 6 is not recognized',
+        ];
+        yield 'patched advisory with a mismatched action package' => [
+            self::report(self::patchedAdvisory('update underscore to >=4.17.21'), self::summary(1, 0, 0, 1, 0)),
+            'advisory 1 actions must update the package to its patched versions',
+        ];
+        yield 'patched advisory with a mismatched action version' => [
+            self::report(self::patchedAdvisory('update lodash to >=4.17.20'), self::summary(1, 0, 0, 1, 0)),
+            'advisory 1 actions must update the package to its patched versions',
+        ];
+        yield 'patched advisory with an empty patched range' => [
+            self::report(
+                str_replace('│ Patched:    >=4.17.21', '│ Patched:    ', self::patchedAdvisory()),
+                self::summary(1, 0, 0, 1, 0),
+            ),
+            'advisory 1 line 5 is not recognized',
+        ];
+        yield 'patched advisory with swapped patched and info lines' => [
+            self::report(
+                "╭ Command Injection in lodash\n"
+                . "│ Severity:   high\n"
+                . "│ Package:    lodash\n"
+                . "│ Vulnerable: <4.17.21\n"
+                . "│ Info:       https://github.com/advisories/GHSA-35jh-r3h4-6jhm\n"
+                . "│ Patched:    >=4.17.21\n"
+                . '╰ Actions:    update lodash to >=4.17.21',
+                self::summary(1, 0, 0, 1, 0),
+            ),
+            'advisory 1 line 5 is not recognized',
+        ];
+        yield 'patched advisory without the actions line' => [
+            self::report(
+                str_replace("\n╰ Actions:    update lodash to >=4.17.21", '', self::patchedAdvisory()),
+                self::summary(1, 0, 0, 1, 0),
+            ),
+            'advisory 1 must contain 5 or 7 lines',
         ];
         yield 'report above the safety limit' => [
             str_repeat(' ', 16 * 1024 * 1024 + 1),
@@ -170,6 +209,10 @@ final class DenoAuditParserProvider
             self::report(self::advisory(), self::summary(1, 0, 0, 1, 0)),
             Severity::HIGH,
         ];
+        yield 'high severity with a patched range' => [
+            self::report(self::patchedAdvisory(), self::summary(1, 0, 0, 1, 0)),
+            Severity::HIGH,
+        ];
         yield 'low severity' => [
             self::report(self::advisory('low'), self::summary(1, 1, 0, 0, 0)),
             Severity::LOW,
@@ -189,6 +232,17 @@ final class DenoAuditParserProvider
             . "│ Package:    lodash\n"
             . "│ Vulnerable: <4.17.21\n"
             . "╰ Info:       {$info}";
+    }
+
+    private static function patchedAdvisory(string $actions = 'update lodash to >=4.17.21'): string
+    {
+        return "╭ Command Injection in lodash\n"
+            . "│ Severity:   high\n"
+            . "│ Package:    lodash\n"
+            . "│ Vulnerable: <4.17.21\n"
+            . "│ Patched:    >=4.17.21\n"
+            . "│ Info:       https://github.com/advisories/GHSA-35jh-r3h4-6jhm\n"
+            . "╰ Actions:    {$actions}";
     }
 
     private static function report(string ...$blocks): string
