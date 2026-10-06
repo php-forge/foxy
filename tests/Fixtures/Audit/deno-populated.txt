@@ -1,0 +1,50 @@
+╭ Command Injection in lodash
+│ Severity:   high
+│ Package:    lodash
+│ Vulnerable: <4.17.21
+╰ Info:       https://github.com/advisories/GHSA-35jh-r3h4-6jhm
+
+╭ lodash vulnerable to Prototype Pollution via array path bypass in `_.unset` and `_.omit`
+│ Severity:   moderate
+│ Package:    lodash
+│ Vulnerable: <=4.17.23
+╰ Info:       https://github.com/advisories/GHSA-f23m-r3pf-42rh
+
+╭ Prototype Pollution in lodash
+│ Severity:   high
+│ Package:    lodash
+│ Vulnerable: >=3.7.0 <4.17.19
+╰ Info:       https://github.com/advisories/GHSA-p6mc-m468-83gw
+
+╭ Regular Expression Denial of Service (ReDoS) in lodash
+│ Severity:   moderate
+│ Package:    lodash
+│ Vulnerable: >=4.0.0 <4.17.21
+╰ Info:       https://github.com/advisories/GHSA-29mw-wpgm-hmr9
+
+╭ Lodash has Prototype Pollution Vulnerability in `_.unset` and `_.omit` functions
+│ Severity:   moderate
+│ Package:    lodash
+│ Vulnerable: >=4.0.0 <=4.17.22
+╰ Info:       https://github.com/advisories/GHSA-xxjr-mmjv-4gpg
+
+╭ lodash vulnerable to Code Injection via `_.template` imports key names
+│ Severity:   high
+│ Package:    lodash
+│ Vulnerable: >=4.0.0 <=4.17.23
+╰ Info:       https://github.com/advisories/GHSA-r5fr-rjxr-66jc
+
+╭ Prototype Pollution in minimist
+│ Severity:   moderate
+│ Package:    minimist
+│ Vulnerable: <0.2.1
+╰ Info:       https://github.com/advisories/GHSA-vh95-rmgr-6w4m
+
+╭ Prototype Pollution in minimist
+│ Severity:   critical
+│ Package:    minimist
+│ Vulnerable: <0.2.4
+╰ Info:       https://github.com/advisories/GHSA-xvch-5gv4-984h
+
+Found 8 vulnerabilities
+Severity: 0 low, 4 moderate, 3 high, 1 critical

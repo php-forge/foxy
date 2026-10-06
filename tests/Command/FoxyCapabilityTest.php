@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace Foxy\Tests\Command;
 
-use Composer\IO\IOInterface;
 use Composer\Plugin\Capability\CommandProvider as ComposerCommandProvider;
 use Composer\Plugin\Capable;
-use Composer\Util\{Filesystem, ProcessExecutor};
-use Foxy\Asset\{AssetManagerInterface, DenoManager};
+use Foxy\Asset\AssetManagerInterface;
 use Foxy\Audit\{
     AuditProcessResult,
     AuditRequest,
@@ -30,6 +28,7 @@ final class FoxyCapabilityTest extends TestCase
         $manager = $this->createMockForIntersectionOfInterfaces(
             [AssetManagerInterface::class, AuditableAssetManagerInterface::class],
         );
+
         $manager->expects(self::once())->method('getName')->willReturn('npm');
         $manager
             ->expects(self::once())
@@ -42,24 +41,41 @@ final class FoxyCapabilityTest extends TestCase
                     ' manager diagnostic ',
                 ),
             );
+
         $foxy = new Foxy();
+
         self::setProperty($foxy, 'config', new Config([], ['enabled' => true]));
         self::setProperty($foxy, 'assetManager', $manager);
 
         $report = $foxy->audit(new AuditRequest(Severity::HIGH, true));
 
-        self::assertSame('npm', $report->manager);
-        self::assertSame([], $report->findings);
-        self::assertSame('manager diagnostic', $report->diagnostics);
+        self::assertSame(
+            'npm',
+            $report->manager,
+            'The manager name should match the expected value',
+        );
+        self::assertSame(
+            [],
+            $report->findings,
+            'The findings should match the expected value',
+        );
+        self::assertSame(
+            'manager diagnostic',
+            $report->diagnostics,
+            'The diagnostics should match the expected value',
+        );
     }
 
     public function testAuditRejectsDisabledPlugin(): void
     {
         $foxy = new Foxy();
+
         self::setProperty($foxy, 'config', new Config([], ['enabled' => false]));
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Foxy is disabled; frontend dependencies cannot be audited.');
+        $this->expectExceptionMessage(
+            'Foxy is disabled; frontend dependencies cannot be audited.',
+        );
 
         $foxy->audit(new AuditRequest());
     }
@@ -67,11 +83,14 @@ final class FoxyCapabilityTest extends TestCase
     public function testAuditRejectsManagerWithoutAuditCapability(): void
     {
         $foxy = new Foxy();
+
         self::setProperty($foxy, 'config', new Config([], ['enabled' => true]));
         self::setProperty($foxy, 'assetManager', $this->createMock(AssetManagerInterface::class));
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('The selected asset manager does not support security audits.');
+        $this->expectExceptionMessage(
+            'The selected asset manager does not support security audits.',
+        );
 
         $foxy->audit(new AuditRequest());
     }
@@ -79,10 +98,13 @@ final class FoxyCapabilityTest extends TestCase
     public function testAuditRejectsMissingAssetManager(): void
     {
         $foxy = new Foxy();
+
         self::setProperty($foxy, 'config', new Config([], ['enabled' => true]));
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('The selected asset manager does not support security audits.');
+        $this->expectExceptionMessage(
+            'The selected asset manager does not support security audits.',
+        );
 
         $foxy->audit(new AuditRequest());
     }
@@ -90,7 +112,9 @@ final class FoxyCapabilityTest extends TestCase
     public function testAuditRejectsUnactivatedPlugin(): void
     {
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Foxy is disabled; frontend dependencies cannot be audited.');
+        $this->expectExceptionMessage(
+            'Foxy is disabled; frontend dependencies cannot be audited.',
+        );
 
         (new Foxy())->audit(new AuditRequest());
     }
@@ -99,44 +123,21 @@ final class FoxyCapabilityTest extends TestCase
     {
         $foxy = new Foxy();
 
-        self::assertInstanceOf(Capable::class, $foxy);
-        self::assertInstanceOf(AuditRunnerInterface::class, $foxy);
+        self::assertInstanceOf(
+            Capable::class,
+            $foxy,
+            'The object should implement the Capable interface',
+        );
+        self::assertInstanceOf(
+            AuditRunnerInterface::class,
+            $foxy,
+            'The object should implement the AuditRunnerInterface',
+        );
         self::assertSame(
             [ComposerCommandProvider::class => FoxyCommandProvider::class],
             $foxy->getCapabilities(),
+            'The capabilities should match the expected mapping',
         );
-    }
-
-    public function testThrowRuntimeExceptionWhenSelectedManagerIsDeno(): void
-    {
-        $executor = $this->createMock(ProcessExecutor::class);
-
-        $executor->expects(self::never())->method('execute');
-
-        $foxy = new Foxy();
-
-        self::setProperty(
-            $foxy,
-            'config',
-            new Config([], ['enabled' => true]),
-        );
-        self::setProperty(
-            $foxy,
-            'assetManager',
-            new DenoManager(
-                $this->createMock(IOInterface::class),
-                new Config([]),
-                $executor,
-                $this->createMock(Filesystem::class),
-            ),
-        );
-
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage(
-            'The selected asset manager does not support security audits.',
-        );
-
-        $foxy->audit(new AuditRequest());
     }
 
     private static function setProperty(Foxy $foxy, string $property, object $value): void

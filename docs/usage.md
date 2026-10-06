@@ -43,10 +43,14 @@ composer foxy:audit
 ```
 
 The command requires the selected manager's native lockfile, validates the manager version, and asks the manager for a
-machine-readable security report. It reads the lockfile and does not run an install, update, fix, or fallback. Foxy
-supports npm audit report version 2 starting with npm 10.9.8 and the current report schemas emitted by pnpm 11, Yarn 4,
-and Bun 1.4; legacy report formats are rejected instead of being interpreted heuristically. `composer foxy:audit`
-rejects Deno with status `2` because `deno audit` does not provide a machine-readable report.
+security report. It reads the lockfile and does not run an install, update, fix, or fallback. Foxy supports npm audit
+report version 2 starting with npm 10.9.8 and the current report schemas emitted by pnpm 11, Yarn 4, and Bun 1.4;
+legacy report formats are rejected instead of being interpreted heuristically.
+
+Deno does not provide a machine-readable report. Foxy runs `deno audit --level=low` with `NO_COLOR=1` against
+`deno.lock` and parses its text report strictly. The parser is validated against Deno 2.9.7 and returns status `2`
+when the report layout is not recognized instead of guessing. Deno has no configuration setting that filters audit
+results, and Foxy does not forward manager options to the audit command.
 
 Foxy reports every advisory returned by the manager. `--audit-level` controls only the CI exit threshold:
 
@@ -63,6 +67,9 @@ composer foxy:audit --no-dev
 
 For npm workspace roots, Foxy explicitly includes every workspace and the root package so ambient npm workspace
 selection cannot silently narrow the audited lock graph.
+
+`deno audit` cannot exclude development dependencies, so a Deno audit with `--no-dev` returns status `2`. Run the
+Deno audit without `--no-dev` to cover the complete dependency graph.
 
 Foxy also overrides pnpm and Yarn settings that could silently filter the requested dependency graph or known
 advisories. Bun 1.4 cannot safely reset every inherited scope setting while retaining project registry and

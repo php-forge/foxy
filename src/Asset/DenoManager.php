@@ -16,8 +16,10 @@ use function sprintf;
 use function str_starts_with;
 use function substr;
 
-final class DenoManager extends AbstractAssetManager
+final class DenoManager extends AbstractAuditableAssetManager
 {
+    private const array AUDIT_ENVIRONMENT = ['NO_COLOR' => '1'];
+
     public function getLockPackageName(): string
     {
         return 'deno.lock';
@@ -95,6 +97,18 @@ final class DenoManager extends AbstractAssetManager
         $assetPackage->setPackage($package);
     }
 
+    protected function getAuditCommand(bool $noDev): string
+    {
+        $command = Platform::isWindows() ? 'deno.exe' : 'deno';
+
+        return $this->buildUnconfiguredCommand($command, ['audit', '--level=low']);
+    }
+
+    protected function getAuditEnvironment(): array
+    {
+        return self::AUDIT_ENVIRONMENT;
+    }
+
     protected function getInstallCommand(): string
     {
         $command = Platform::isWindows() ? 'deno.exe' : 'deno';
@@ -121,6 +135,16 @@ final class DenoManager extends AbstractAssetManager
     protected function normalizeVersionOutput(string $output): string
     {
         return 1 === preg_match('/^deno (\S+)/', $output, $matches) ? $matches[1] : $output;
+    }
+
+    protected function validateAuditConfiguration(bool $noDev): void
+    {
+        if ($noDev) {
+            throw new RuntimeException(
+                'The deno audit cannot guarantee the requested dependency scope because "deno audit" cannot exclude '
+                . 'development dependencies.',
+            );
+        }
     }
 
     /**

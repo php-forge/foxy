@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Foxy\Audit;
 
-use Foxy\Audit\Parser\{BunAuditParser, NpmAuditParser, PnpmAuditParser, YarnAuditParser};
+use Foxy\Audit\Parser\{BunAuditParser, DenoAuditParser, NpmAuditParser, PnpmAuditParser, YarnAuditParser};
 use Foxy\Exception\RuntimeException;
 
 use function sprintf;
@@ -18,6 +18,7 @@ abstract class AuditParserFactory
             'pnpm' => new PnpmAuditParser(),
             'yarn' => new YarnAuditParser(),
             'bun' => new BunAuditParser(),
+            'deno' => new DenoAuditParser(),
             default => throw new RuntimeException(
                 sprintf('The asset manager "%s" does not provide a supported audit report.', $manager),
             ),
