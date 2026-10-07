@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - docs: clarify that manager execution does not change the PHP process working directory.
 - feat: add Deno `^2.9.7` as an asset manager that registers Composer assets as root `workspaces` members.
 - feat: add `composer foxy:audit` support for Deno through a strict parser of the `deno audit` text report, rejecting `--no-dev` because Deno cannot exclude development dependencies.
-- chore: update branch alias to `0.4.x-dev` and remove deprecated preferred-install configuration.
+- chore: update branch alias to `0.4.x-dev` and remove the project-level `preferred-install` setting.
 
 ## 0.2.0 January 24, 2026
 
