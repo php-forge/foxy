@@ -62,9 +62,20 @@ final class PnpmAssetManagerTest extends AuditableAssetManager
 
         $result = $manager->audit(false);
 
-        self::assertSame('{}', $result->output);
-        self::assertSame('original', file_get_contents($lockPath));
-        self::assertFileDoesNotExist($workspacePath);
+        self::assertSame(
+            '{}',
+            $result->output,
+            'Audit output must be preserved.',
+        );
+        self::assertSame(
+            'original',
+            file_get_contents($lockPath),
+            'Lockfile contents must remain unchanged.',
+        );
+        self::assertFileDoesNotExist(
+            $workspacePath,
+            'Workspace file must not be created.',
+        );
     }
 
     protected function getManager(): PnpmManager

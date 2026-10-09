@@ -6,8 +6,7 @@ namespace Foxy\Tests\Event;
 
 use Composer\Package\PackageInterface;
 use Foxy\Event\AbstractSolveEvent;
-use PHPUnit\Framework\MockObject\Exception;
-use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\{Exception, MockObject};
 use PHPUnit\Framework\TestCase;
 
 use const DIRECTORY_SEPARATOR;
@@ -26,14 +25,22 @@ abstract class SolveEvent extends TestCase
     {
         $event = $this->getEvent();
 
-        self::assertSame($this->assetDir, $event->getAssetDir());
+        self::assertSame(
+            $this->assetDir,
+            $event->getAssetDir(),
+            'Asset directory must match the initialized value.',
+        );
     }
 
     public function testGetPackages(): void
     {
         $event = $this->getEvent();
 
-        self::assertSame($this->packages, $event->getPackages());
+        self::assertSame(
+            $this->packages,
+            $event->getPackages(),
+            'Packages must match the initialized value.',
+        );
     }
 
     /**

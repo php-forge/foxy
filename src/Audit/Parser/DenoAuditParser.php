@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Foxy\Audit\Parser;
 
 use Foxy\Audit\{AuditFinding, AuditParserInterface, Severity};
+use Foxy\Exception\Message;
 
 use function array_keys;
 use function array_pop;
@@ -56,7 +57,9 @@ final class DenoAuditParser extends AbstractAuditParser implements AuditParserIn
         $output = trim(str_replace(["\r\n", "\r"], "\n", $output));
 
         if ($output === '') {
-            throw $this->malformed('the report is empty');
+            throw $this->malformed(
+                Message::AUDIT_DENO_REPORT_EMPTY->getMessage(),
+            );
         }
 
         if ($output === self::CLEAN_REPORT) {
@@ -68,7 +71,9 @@ final class DenoAuditParser extends AbstractAuditParser implements AuditParserIn
         $summary = $this->parseSummary(array_pop($blocks));
 
         if ($blocks === []) {
-            throw $this->malformed('the report does not contain any advisory');
+            throw $this->malformed(
+                Message::AUDIT_DENO_REPORT_NO_ADVISORY->getMessage(),
+            );
         }
 
         $findings = [];
@@ -83,8 +88,7 @@ final class DenoAuditParser extends AbstractAuditParser implements AuditParserIn
 
         if ($summary['total'] !== count($findings)) {
             throw $this->malformed(
-                sprintf(
-                    'the summary reports %d vulnerabilities but the report contains %d advisories',
+                Message::AUDIT_DENO_SUMMARY_TOTAL_MISMATCH->getMessage(
                     $summary['total'],
                     count($findings),
                 ),
@@ -94,8 +98,7 @@ final class DenoAuditParser extends AbstractAuditParser implements AuditParserIn
         foreach ($counts as $severity => $count) {
             if ($summary[$severity] !== $count) {
                 throw $this->malformed(
-                    sprintf(
-                        'the summary reports %d %s vulnerabilities but the report contains %d',
+                    Message::AUDIT_DENO_SUMMARY_SEVERITY_MISMATCH->getMessage(
                         $summary[$severity],
                         $severity,
                         $count,
@@ -121,8 +124,7 @@ final class DenoAuditParser extends AbstractAuditParser implements AuditParserIn
             count(self::ADVISORY_LINE_PREFIXES) => self::ADVISORY_LINE_PREFIXES,
             count(self::PATCHED_ADVISORY_LINE_PREFIXES) => self::PATCHED_ADVISORY_LINE_PREFIXES,
             default => throw $this->malformed(
-                sprintf(
-                    '%s must contain %d or %d lines',
+                Message::AUDIT_DENO_ADVISORY_LINE_COUNT_INVALID->getMessage(
                     $context,
                     count(self::ADVISORY_LINE_PREFIXES),
                     count(self::PATCHED_ADVISORY_LINE_PREFIXES),
@@ -141,7 +143,9 @@ final class DenoAuditParser extends AbstractAuditParser implements AuditParserIn
                 || $value === ''
                 || $value !== $this->sanitizeString($value)
             ) {
-                throw $this->malformed(sprintf('%s line %d is not recognized', $context, $position + 1));
+                throw $this->malformed(
+                    Message::AUDIT_DENO_ADVISORY_LINE_UNRECOGNIZED->getMessage($context, $position + 1),
+                );
             }
 
             $values[$field] = $value;
@@ -150,13 +154,15 @@ final class DenoAuditParser extends AbstractAuditParser implements AuditParserIn
         $patchedVersions = $values['patched'] ?? null;
 
         if ($patchedVersions !== null && $values['actions'] !== "update {$values['package']} to {$patchedVersions}") {
-            throw $this->malformed(sprintf('%s actions must update the package to its patched versions', $context));
+            throw $this->malformed(Message::AUDIT_DENO_ADVISORY_ACTIONS_MISMATCH->getMessage($context));
         }
 
         $severity = $this->getSeverity($values['severity'], $context);
 
         if ($severity === Severity::INFO) {
-            throw $this->malformed(sprintf('%s has an unsupported severity', $context));
+            throw $this->malformed(
+                Message::AUDIT_VALUE_SEVERITY_UNSUPPORTED->getMessage($context),
+            );
         }
 
         return new AuditFinding(
@@ -182,7 +188,9 @@ final class DenoAuditParser extends AbstractAuditParser implements AuditParserIn
                 $matches,
             )
         ) {
-            throw $this->malformed('the report does not end with a recognized summary');
+            throw $this->malformed(
+                Message::AUDIT_DENO_SUMMARY_UNRECOGNIZED->getMessage(),
+            );
         }
 
         return [

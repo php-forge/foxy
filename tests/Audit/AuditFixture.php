@@ -18,7 +18,9 @@ trait AuditFixture
         $contents = file_get_contents($path);
 
         if (false === $contents) {
-            throw new RuntimeException(sprintf('Unable to read the audit fixture "%s".', $path));
+            throw new RuntimeException(
+                sprintf('Unable to read the audit fixture "%s".', $path),
+            );
         }
 
         return $contents;

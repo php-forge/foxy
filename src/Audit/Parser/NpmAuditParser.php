@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Foxy\Audit\Parser;
 
 use Foxy\Audit\{AuditFinding, AuditParserInterface};
+use Foxy\Exception\Message;
 use stdClass;
 
+use function array_push;
 use function count;
 use function is_array;
 use function is_bool;
@@ -27,9 +29,7 @@ final class NpmAuditParser extends AbstractAuditParser implements AuditParserInt
         $findings = [];
 
         foreach ($vulnerabilities as $package => $vulnerability) {
-            foreach ($this->parseVulnerability($package, $vulnerability) as $finding) {
-                $findings[] = $finding;
-            }
+            array_push($findings, ...$this->parseVulnerability($package, $vulnerability));
         }
 
         $this->validateMetadata($metadata, count($vulnerabilities));
@@ -58,7 +58,9 @@ final class NpmAuditParser extends AbstractAuditParser implements AuditParserInt
             }
 
             if (!$advisory instanceof stdClass) {
-                throw $this->malformed(sprintf('%s.via.%d must be a string or object', $context, $index));
+                throw $this->malformed(
+                    Message::AUDIT_NPM_VIA_ENTRY_INVALID->getMessage($context, $index),
+                );
             }
 
             $advisoryContext = sprintf('%s.via.%d', $context, $index);
@@ -88,7 +90,9 @@ final class NpmAuditParser extends AbstractAuditParser implements AuditParserInt
     private function parseVulnerability(int|string $package, mixed $vulnerability): array
     {
         if ('' === $package) {
-            throw $this->malformed('each vulnerability must be keyed by a package name');
+            throw $this->malformed(
+                Message::AUDIT_NPM_VULNERABILITY_KEY_REQUIRED->getMessage(),
+            );
         }
 
         $package = (string) $package;
@@ -99,7 +103,9 @@ final class NpmAuditParser extends AbstractAuditParser implements AuditParserInt
         $name = $this->getString($vulnerability, 'name', $context);
 
         if ($package !== $name) {
-            throw $this->malformed(sprintf('%s.name must match its vulnerability key', $context));
+            throw $this->malformed(
+                Message::AUDIT_NPM_NAME_KEY_MISMATCH->getMessage($context),
+            );
         }
 
         $this->getSeverity($vulnerability['severity'] ?? null, $context);
@@ -108,17 +114,22 @@ final class NpmAuditParser extends AbstractAuditParser implements AuditParserInt
         $via = $vulnerability['via'] ?? null;
 
         if (!is_array($via) || [] === $via) {
-            throw $this->malformed(sprintf('%s.via must be a non-empty list', $context));
+            throw $this->malformed(
+                Message::AUDIT_NPM_VIA_LIST_EMPTY->getMessage($context),
+            );
         }
 
         $this->getStringList($vulnerability['effects'] ?? null, $context . '.effects');
         $this->getString($vulnerability, 'range', $context);
+
         $paths = $this->getStringList($vulnerability['nodes'] ?? null, "{$context}.nodes");
 
         $fixAvailable = $vulnerability['fixAvailable'] ?? null;
 
         if (!is_bool($fixAvailable) && !$fixAvailable instanceof stdClass) {
-            throw $this->malformed(sprintf('%s.fixAvailable must be a boolean or object', $context));
+            throw $this->malformed(
+                Message::AUDIT_NPM_FIX_AVAILABLE_INVALID->getMessage($context),
+            );
         }
 
         return $this->parseViaAdvisories($via, $package, $paths, $context);
@@ -137,7 +148,9 @@ final class NpmAuditParser extends AbstractAuditParser implements AuditParserInt
         }
 
         if ($severityTotal !== $vulnerabilityCount) {
-            throw $this->malformed('metadata vulnerability counts must equal the vulnerability entries');
+            throw $this->malformed(
+                Message::AUDIT_NPM_METADATA_COUNT_MISMATCH->getMessage(),
+            );
         }
     }
 
@@ -146,12 +159,12 @@ final class NpmAuditParser extends AbstractAuditParser implements AuditParserInt
      */
     private function validateReportHeader(array $data): void
     {
-        if (isset($data['error'])) {
-            throw $this->malformed('the manager returned an error document');
-        }
+        $this->assertNotErrorDocument($data);
 
         if (2 !== ($data['auditReportVersion'] ?? null)) {
-            throw $this->malformed('auditReportVersion must be 2');
+            throw $this->malformed(
+                Message::AUDIT_NPM_REPORT_VERSION_UNSUPPORTED->getMessage(),
+            );
         }
     }
 }

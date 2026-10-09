@@ -13,7 +13,7 @@ use Exception;
 use Foxy\Asset\AssetManagerInterface;
 use Foxy\Config\Config;
 use Foxy\Event\{GetAssetsEvent, PostSolveEvent, PreSolveEvent};
-use Foxy\Exception\RuntimeException;
+use Foxy\Exception\{Message, RuntimeException};
 use Foxy\Fallback\FallbackInterface;
 use Foxy\FoxyEvents;
 use Foxy\Util\AssetUtil;
@@ -30,7 +30,6 @@ use function is_string;
 use function json_decode;
 use function realpath;
 use function rtrim;
-use function sprintf;
 use function str_ends_with;
 use function str_starts_with;
 use function trim;
@@ -45,10 +44,10 @@ final readonly class Solver implements SolverInterface
      * @param FallbackInterface|null $composerFallback The composer fallback instance.
      */
     public function __construct(
-        private readonly AssetManagerInterface $assetManager,
-        private readonly Config $config,
-        private readonly Filesystem $fs,
-        private readonly FallbackInterface|null $composerFallback = null,
+        private AssetManagerInterface $assetManager,
+        private Config $config,
+        private Filesystem $fs,
+        private FallbackInterface|null $composerFallback = null,
     ) {}
 
     public function setUpdatable($updatable): self
@@ -63,9 +62,7 @@ final readonly class Solver implements SolverInterface
      */
     public function solve(Composer $composer, IOInterface $io): void
     {
-        $enabled = $this->config->get('enabled');
-
-        if ($enabled !== true && $enabled !== 1 && $enabled !== '1') {
+        if (!$this->config->isEnabled('enabled')) {
             return;
         }
 
@@ -81,7 +78,9 @@ final readonly class Solver implements SolverInterface
             );
 
             if (!is_string($configuredAssetDir)) {
-                throw new RuntimeException('The Composer asset directory must be a string.');
+                throw new RuntimeException(
+                    Message::SOLVER_ASSET_DIR_NOT_STRING->getMessage(),
+                );
             }
 
             $assetDir = $this->validateAssetDirectory($configuredAssetDir, $vendorDir);
@@ -96,7 +95,7 @@ final readonly class Solver implements SolverInterface
 
             if (0 !== $res) {
                 throw new RuntimeException(
-                    sprintf('The asset manager ended with error code %d', $res),
+                    Message::SOLVER_ASSET_MANAGER_FAILED->getMessage($res),
                 );
             }
         } catch (Throwable $exception) {
@@ -114,6 +113,7 @@ final readonly class Solver implements SolverInterface
         }
 
         $path = $this->fs->normalizePath($path);
+
         $suffix = [];
         $existingPath = $path;
 
@@ -189,7 +189,7 @@ final readonly class Solver implements SolverInterface
             $this->fs->ensureDirectoryExists($packagePath);
         } catch (Throwable $exception) {
             throw new RuntimeException(
-                sprintf('Unable to create asset directory "%s".', $packagePath),
+                Message::SOLVER_PACKAGE_DIR_CREATE_FAILED->getMessage($packagePath),
                 0,
                 $exception,
             );
@@ -199,7 +199,7 @@ final readonly class Solver implements SolverInterface
 
         if (false === $sourceContent) {
             throw new RuntimeException(
-                sprintf('Unable to read asset manifest "%s".', $filename),
+                Message::SOLVER_MANIFEST_READ_FAILED->getMessage($filename),
             );
         }
 
@@ -217,7 +217,7 @@ final readonly class Solver implements SolverInterface
             $targetJsonFile->read();
         } catch (Throwable $exception) {
             throw new RuntimeException(
-                sprintf('Unable to write asset manifest "%s".', $newFilename),
+                Message::SOLVER_MANIFEST_WRITE_FAILED->getMessage($newFilename),
                 0,
                 $exception,
             );
@@ -227,29 +227,40 @@ final readonly class Solver implements SolverInterface
     }
 
     /**
-     * Reset an owned asset directory and create its ownership marker.
+     * Returns the current working directory used as the project root.
      */
-    private function prepareAssetDirectory(string $assetDir, string $vendorDir): void
+    private function getProjectDirectory(): string
     {
         $projectDir = getcwd();
 
         if (false === $projectDir) {
             throw new RuntimeException(
-                'Unable to get the current working directory.',
+                Message::CURRENT_WORKING_DIRECTORY_UNAVAILABLE->getMessage(),
             );
         }
 
-        $defaultAssetDir = $this->canonicalizePath("{$vendorDir}/php-forge/composer-asset", $projectDir);
+        return $projectDir;
+    }
+
+    /**
+     * Reset an owned asset directory and create its ownership marker.
+     */
+    private function prepareAssetDirectory(string $assetDir, string $vendorDir): void
+    {
+        $defaultAssetDir = $this->canonicalizePath(
+            "{$vendorDir}/php-forge/composer-asset",
+            $this->getProjectDirectory(),
+        );
 
         if (is_link($assetDir)) {
             throw new RuntimeException(
-                sprintf('The Composer asset directory "%s" must not be a symbolic link.', $assetDir),
+                Message::SOLVER_ASSET_DIR_SYMLINK->getMessage($assetDir),
             );
         }
 
         if (file_exists($assetDir) && !is_dir($assetDir)) {
             throw new RuntimeException(
-                sprintf('The Composer asset path "%s" is not a directory.', $assetDir),
+                Message::SOLVER_ASSET_PATH_NOT_DIRECTORY->getMessage($assetDir),
             );
         }
 
@@ -258,7 +269,7 @@ final readonly class Solver implements SolverInterface
 
             if (false === $entries) {
                 throw new RuntimeException(
-                    sprintf('Unable to inspect Composer asset directory "%s".', $assetDir),
+                    Message::SOLVER_ASSET_DIR_INSPECT_FAILED->getMessage($assetDir),
                 );
             }
 
@@ -267,10 +278,7 @@ final readonly class Solver implements SolverInterface
 
             if (!$isEmpty && !$isOwned) {
                 throw new RuntimeException(
-                    sprintf(
-                        'The Composer asset directory "%s" is not marked as managed by Foxy.',
-                        $assetDir,
-                    ),
+                    Message::SOLVER_ASSET_DIR_UNMANAGED->getMessage($assetDir),
                 );
             }
 
@@ -278,7 +286,7 @@ final readonly class Solver implements SolverInterface
 
             if (file_exists($assetDir)) {
                 throw new RuntimeException(
-                    sprintf('Unable to reset Composer asset directory "%s".', $assetDir),
+                    Message::SOLVER_ASSET_DIR_RESET_FAILED->getMessage($assetDir),
                 );
             }
         }
@@ -287,7 +295,7 @@ final readonly class Solver implements SolverInterface
             $this->fs->ensureDirectoryExists($assetDir);
         } catch (Throwable $exception) {
             throw new RuntimeException(
-                sprintf('Unable to create Composer asset directory "%s".', $assetDir),
+                Message::SOLVER_ASSET_DIR_CREATE_FAILED->getMessage($assetDir),
                 0,
                 $exception,
             );
@@ -295,7 +303,7 @@ final readonly class Solver implements SolverInterface
 
         if (false === file_put_contents("{$assetDir}/" . self::MANAGED_MARKER, "Managed by php-forge/foxy.\n")) {
             throw new RuntimeException(
-                sprintf('Unable to mark Composer asset directory "%s".', $assetDir),
+                Message::SOLVER_ASSET_DIR_MARK_FAILED->getMessage($assetDir),
             );
         }
     }
@@ -311,7 +319,7 @@ final readonly class Solver implements SolverInterface
 
         if (false === $resolvedPath) {
             throw new RuntimeException(
-                sprintf('Unable to resolve path "%s".', $path),
+                Message::SOLVER_PATH_RESOLVE_FAILED->getMessage($path),
             );
         }
 
@@ -337,7 +345,7 @@ final readonly class Solver implements SolverInterface
             $this->composerFallback->restore();
         } catch (Throwable $fallbackException) {
             throw new RuntimeException(
-                sprintf('Asset solving failed and Composer fallback restoration failed: %s', $fallbackException->getMessage()),
+                Message::SOLVER_COMPOSER_FALLBACK_RESTORE_FAILED->getMessage($fallbackException->getMessage()),
                 0,
                 $exception,
             );
@@ -351,17 +359,11 @@ final readonly class Solver implements SolverInterface
      */
     private function validateAssetDirectory(string $assetDir, string $vendorDir): string
     {
-        $projectDir = getcwd();
-
-        if (false === $projectDir) {
-            throw new RuntimeException(
-                'Unable to get the current working directory.',
-            );
-        }
+        $projectDir = $this->getProjectDirectory();
 
         if ('' === trim($assetDir)) {
             throw new RuntimeException(
-                'The Composer asset directory must not be empty.',
+                Message::SOLVER_ASSET_DIR_EMPTY->getMessage(),
             );
         }
 
@@ -369,7 +371,7 @@ final readonly class Solver implements SolverInterface
 
         if (is_link($configuredAssetDir)) {
             throw new RuntimeException(
-                sprintf('The Composer asset directory "%s" must not be a symbolic link.', $configuredAssetDir),
+                Message::SOLVER_ASSET_DIR_SYMLINK->getMessage($configuredAssetDir),
             );
         }
 
@@ -380,14 +382,14 @@ final readonly class Solver implements SolverInterface
 
         if ($this->fs->normalizePath(dirname($assetDir)) === $assetDir) {
             throw new RuntimeException(
-                'The Composer asset directory must not be a filesystem root.',
+                Message::SOLVER_ASSET_DIR_IS_ROOT->getMessage(),
             );
         }
 
         foreach ([$projectDir, $vendorDir] as $protectedPath) {
             if ($assetDir === $protectedPath || str_starts_with($protectedPath, $assetDirPrefix)) {
                 throw new RuntimeException(
-                    sprintf('The Composer asset directory "%s" overlaps a protected project path.', $assetDir),
+                    Message::SOLVER_ASSET_DIR_OVERLAPS_PROTECTED->getMessage($assetDir),
                 );
             }
         }

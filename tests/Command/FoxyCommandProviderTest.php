@@ -7,27 +7,25 @@ namespace Foxy\Tests\Command;
 use Composer\Composer;
 use Composer\IO\IOInterface;
 use Foxy\Command\{AuditCommand, FoxyCommandProvider};
-use Foxy\Exception\RuntimeException;
+use Foxy\Exception\{Message, RuntimeException};
 use Foxy\Foxy;
-use PHPUnit\Framework\Attributes\DataProvider;
+use Foxy\Tests\Provider\FoxyCommandProviderProvider;
+use PHPUnit\Framework\Attributes\DataProviderExternal;
 use PHPUnit\Framework\TestCase;
 use stdClass;
 
+/**
+ * Unit tests for {@see FoxyCommandProvider} capability argument validation and audit command registration.
+ *
+ * {@see FoxyCommandProviderProvider} for test case data providers.
+ */
 final class FoxyCommandProviderTest extends TestCase
 {
-    public static function invalidArguments(): array
-    {
-        return [
-            'composer' => ['composer'],
-            'io' => ['io'],
-            'plugin' => ['plugin'],
-        ];
-    }
-
     public function testProvidesAuditCommandWithActiveComposerAndIo(): void
     {
         $composer = $this->createMock(Composer::class);
         $io = $this->createMock(IOInterface::class);
+
         $provider = new FoxyCommandProvider(
             [
                 'composer' => $composer,
@@ -38,13 +36,29 @@ final class FoxyCommandProviderTest extends TestCase
 
         $commands = $provider->getCommands();
 
-        self::assertCount(1, $commands);
-        self::assertInstanceOf(AuditCommand::class, $commands[0]);
-        self::assertSame($composer, $commands[0]->requireComposer());
-        self::assertSame($io, $commands[0]->getIO());
+        self::assertCount(
+            1,
+            $commands,
+            'Provider must register exactly one command.',
+        );
+        self::assertInstanceOf(
+            AuditCommand::class,
+            $commands[0],
+            'Registered command must be an audit command.',
+        );
+        self::assertSame(
+            $composer,
+            $commands[0]->requireComposer(),
+            'Command must retain the Composer instance.',
+        );
+        self::assertSame(
+            $io,
+            $commands[0]->getIO(),
+            'Command must retain the IO instance.',
+        );
     }
 
-    #[DataProvider('invalidArguments')]
+    #[DataProviderExternal(FoxyCommandProviderProvider::class, 'invalidArguments')]
     public function testRejectsInvalidCapabilityArgument(string $argument): void
     {
         $arguments = [
@@ -52,10 +66,13 @@ final class FoxyCommandProviderTest extends TestCase
             'io' => $this->createMock(IOInterface::class),
             'plugin' => new Foxy(),
         ];
+
         $arguments[$argument] = new stdClass();
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Composer provided invalid Foxy command capability arguments.');
+        $this->expectExceptionMessage(
+            Message::COMMAND_CAPABILITY_ARGUMENTS_INVALID->getMessage(),
+        );
 
         new FoxyCommandProvider($arguments);
     }
@@ -63,7 +80,9 @@ final class FoxyCommandProviderTest extends TestCase
     public function testRejectsMissingCapabilityArguments(): void
     {
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Composer provided invalid Foxy command capability arguments.');
+        $this->expectExceptionMessage(
+            Message::COMMAND_CAPABILITY_ARGUMENTS_INVALID->getMessage(),
+        );
 
         new FoxyCommandProvider([]);
     }

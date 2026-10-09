@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Foxy\Audit\Parser;
 
 use Foxy\Audit\{AuditFinding, AuditParserInterface};
+use Foxy\Exception\Message;
 use JsonException;
 use stdClass;
 
@@ -33,11 +34,16 @@ final class YarnAuditParser extends AbstractAuditParser implements AuditParserIn
             try {
                 $data = json_decode($line, false, flags: JSON_THROW_ON_ERROR);
             } catch (JsonException $exception) {
-                throw $this->malformed(sprintf('line %d contains invalid JSON', $lineNumber + 1), $exception);
+                throw $this->malformed(
+                    Message::AUDIT_YARN_LINE_JSON_INVALID->getMessage($lineNumber + 1),
+                    $exception,
+                );
             }
 
             if (!$data instanceof stdClass) {
-                throw $this->malformed(sprintf('line %d is not an audit finding', $lineNumber + 1));
+                throw $this->malformed(
+                    Message::AUDIT_YARN_LINE_NOT_FINDING->getMessage($lineNumber + 1),
+                );
             }
 
             $data = get_object_vars($data);

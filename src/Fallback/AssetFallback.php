@@ -7,20 +7,17 @@ namespace Foxy\Fallback;
 use Composer\IO\IOInterface;
 use Composer\Util\Filesystem;
 use Foxy\Config\Config;
-use Foxy\Exception\RuntimeException;
+use Foxy\Exception\{Message, RuntimeException};
 use Throwable;
 
 use function is_file;
 use function is_link;
-use function sprintf;
 
 final class AssetFallback implements FallbackInterface
 {
     private readonly Filesystem $fs;
 
-    private string $originalContent = '';
-
-    private bool $originalExisted = false;
+    private string|null $originalContent = null;
 
     private bool $snapshotSaved = false;
 
@@ -43,8 +40,8 @@ final class AssetFallback implements FallbackInterface
 
         $this->assertPathIsFileIfExists();
 
-        if ($this->originalExisted) {
-            $this->writeOriginalContent();
+        if (null !== $this->originalContent) {
+            $this->writeOriginalContent($this->originalContent);
 
             return;
         }
@@ -69,12 +66,11 @@ final class AssetFallback implements FallbackInterface
 
             if (false === $content) {
                 throw new RuntimeException(
-                    sprintf('Unable to read fallback asset file "%s".', $this->path),
+                    Message::FALLBACK_ASSET_READ_FAILED->getMessage($this->path),
                 );
             }
 
             $this->originalContent = $content;
-            $this->originalExisted = true;
         }
 
         $this->snapshotSaved = true;
@@ -86,16 +82,14 @@ final class AssetFallback implements FallbackInterface
     {
         if ($this->pathExists() && !is_file($this->path)) {
             throw new RuntimeException(
-                sprintf('The fallback asset path "%s" must be a regular file.', $this->path),
+                Message::FALLBACK_ASSET_PATH_NOT_FILE->getMessage($this->path),
             );
         }
     }
 
     private function isEnabled(): bool
     {
-        $fallbackAsset = $this->config->get('fallback-asset');
-
-        return $fallbackAsset === true || $fallbackAsset === 1 || $fallbackAsset === '1';
+        return $this->config->isEnabled('fallback-asset');
     }
 
     private function pathExists(): bool
@@ -109,7 +103,7 @@ final class AssetFallback implements FallbackInterface
             $removed = $this->fs->remove($this->path);
         } catch (Throwable $exception) {
             throw new RuntimeException(
-                sprintf('Unable to remove fallback asset file "%s".', $this->path),
+                Message::FALLBACK_ASSET_REMOVE_FAILED->getMessage($this->path),
                 0,
                 $exception,
             );
@@ -117,25 +111,24 @@ final class AssetFallback implements FallbackInterface
 
         if (true !== $removed) {
             throw new RuntimeException(
-                sprintf('Unable to remove fallback asset file "%s".', $this->path),
+                Message::FALLBACK_ASSET_REMOVE_FAILED->getMessage($this->path),
             );
         }
     }
 
     private function resetSnapshot(): void
     {
-        $this->originalContent = '';
-        $this->originalExisted = false;
+        $this->originalContent = null;
         $this->snapshotSaved = false;
     }
 
-    private function writeOriginalContent(): void
+    private function writeOriginalContent(string $content): void
     {
         try {
-            $result = file_put_contents($this->path, $this->originalContent);
+            $result = file_put_contents($this->path, $content);
         } catch (Throwable $exception) {
             throw new RuntimeException(
-                sprintf('Unable to write fallback asset file "%s".', $this->path),
+                Message::FALLBACK_ASSET_WRITE_FAILED->getMessage($this->path),
                 0,
                 $exception,
             );
@@ -143,7 +136,7 @@ final class AssetFallback implements FallbackInterface
 
         if (false === $result) {
             throw new RuntimeException(
-                sprintf('Unable to write fallback asset file "%s".', $this->path),
+                Message::FALLBACK_ASSET_WRITE_FAILED->getMessage($this->path),
             );
         }
     }

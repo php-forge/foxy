@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Foxy\Audit\Parser;
 
 use Foxy\Audit\{AuditFinding, AuditParserInterface, CveStatus};
+use Foxy\Exception\Message;
 
+use function array_push;
 use function count;
 use function is_array;
 use function is_int;
@@ -17,9 +19,7 @@ final class PnpmAuditParser extends AbstractAuditParser implements AuditParserIn
     {
         $data = $this->decodeObject($output);
 
-        if (isset($data['error'])) {
-            throw $this->malformed('the manager returned an error document');
-        }
+        $this->assertNotErrorDocument($data);
 
         $advisories = $this->getObject($data['advisories'] ?? null, 'advisories');
         $metadata = $this->getObject($data['metadata'] ?? null, 'metadata');
@@ -67,6 +67,16 @@ final class PnpmAuditParser extends AbstractAuditParser implements AuditParserIn
     }
 
     /**
+     * @param array<mixed> $data
+     */
+    private function getNonEmptyStringOrNull(array $data, string $key, string $context): string|null
+    {
+        $value = $this->getString($data, $key, $context, true);
+
+        return '' === $value ? null : $value;
+    }
+
+    /**
      * @param array<mixed> $advisory
      *
      * @return array{sourceId: string, url: string|null, ghsaId: string|null}
@@ -76,22 +86,21 @@ final class PnpmAuditParser extends AbstractAuditParser implements AuditParserIn
         $id = $advisory['id'] ?? null;
 
         if (!is_int($id) || $id < 0) {
-            throw $this->malformed(sprintf('%s.id must be a non-negative integer', $context));
+            throw $this->malformed(
+                Message::AUDIT_PNPM_ID_INVALID->getMessage($context),
+            );
         }
 
         $sourceId = (string) $id;
 
         if ((string) $key !== $sourceId) {
-            throw $this->malformed(sprintf('%s.id must match its advisory key', $context));
+            throw $this->malformed(
+                Message::AUDIT_PNPM_ID_KEY_MISMATCH->getMessage($context),
+            );
         }
 
-        $url = $this->getString($advisory, 'url', $context, true);
-
-        $url = '' === $url ? null : $url;
-
-        $ghsaId = $this->getString($advisory, 'github_advisory_id', $context, true);
-
-        $ghsaId = '' === $ghsaId ? null : $ghsaId;
+        $url = $this->getNonEmptyStringOrNull($advisory, 'url', $context);
+        $ghsaId = $this->getNonEmptyStringOrNull($advisory, 'github_advisory_id', $context);
 
         $this->getString($advisory, 'cwe', $context, true);
 
@@ -108,7 +117,9 @@ final class PnpmAuditParser extends AbstractAuditParser implements AuditParserIn
         $findingsData = $advisory['findings'] ?? null;
 
         if (!is_array($findingsData) || [] === $findingsData) {
-            throw $this->malformed(sprintf('%s.findings must be a non-empty list', $context));
+            throw $this->malformed(
+                Message::AUDIT_PNPM_FINDINGS_EMPTY->getMessage($context),
+            );
         }
 
         $versions = [];
@@ -119,10 +130,8 @@ final class PnpmAuditParser extends AbstractAuditParser implements AuditParserIn
 
             $finding = $this->getObject($finding, $findingContext);
             $versions[] = $this->getString($finding, 'version', $findingContext);
-            $paths = [
-                ...$paths,
-                ...$this->getStringList($finding['paths'] ?? null, $findingContext . '.paths'),
-            ];
+
+            array_push($paths, ...$this->getStringList($finding['paths'] ?? null, $findingContext . '.paths'));
 
             $this->getBoolean($finding, 'dev', $findingContext);
             $this->getBoolean($finding, 'optional', $findingContext);
@@ -144,7 +153,9 @@ final class PnpmAuditParser extends AbstractAuditParser implements AuditParserIn
         }
 
         if ($severityTotal !== $advisoryCount) {
-            throw $this->malformed('metadata vulnerability counts must equal the advisory entries');
+            throw $this->malformed(
+                Message::AUDIT_PNPM_METADATA_COUNT_MISMATCH->getMessage(),
+            );
         }
     }
 }

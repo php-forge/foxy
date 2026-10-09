@@ -20,6 +20,7 @@ final class PostSolveEventTest extends SolveEvent
         self::assertSame(
             42,
             $event->getRunResult(),
+            'Run result must be preserved.',
         );
     }
 }

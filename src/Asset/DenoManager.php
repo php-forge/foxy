@@ -5,14 +5,13 @@ declare(strict_types=1);
 namespace Foxy\Asset;
 
 use Composer\Util\Platform;
-use Foxy\Exception\RuntimeException;
+use Foxy\Exception\{Message, RuntimeException};
 
 use function array_diff;
 use function array_is_list;
 use function is_array;
 use function is_string;
 use function preg_match;
-use function sprintf;
 use function str_starts_with;
 use function substr;
 
@@ -51,11 +50,7 @@ final class DenoManager extends AbstractAuditableAssetManager
 
             if (!$this->isNestedInRootPackageDir($member)) {
                 throw new RuntimeException(
-                    sprintf(
-                        'The Composer asset "%s" must be located in a subdirectory of the root package directory to '
-                        . 'be installed with deno.',
-                        $name,
-                    ),
+                    Message::ASSET_DENO_COMPOSER_ASSET_NOT_NESTED->getMessage($name),
                 );
             }
 
@@ -79,10 +74,7 @@ final class DenoManager extends AbstractAuditableAssetManager
 
         if (!$this->isListOfStrings($workspaces)) {
             throw new RuntimeException(
-                sprintf(
-                    'The "workspaces" field of "%s" must be a list of strings to install Composer assets with deno.',
-                    $this->getPackageJsonPath(),
-                ),
+                Message::ASSET_DENO_WORKSPACES_INVALID->getMessage($this->getPackageJsonPath()),
             );
         }
 
@@ -99,9 +91,7 @@ final class DenoManager extends AbstractAuditableAssetManager
 
     protected function getAuditCommand(bool $noDev): string
     {
-        $command = Platform::isWindows() ? 'deno.exe' : 'deno';
-
-        return $this->buildUnconfiguredCommand($command, ['audit', '--level=low']);
+        return $this->buildUnconfiguredCommand($this->getBinary(), ['audit', '--level=low']);
     }
 
     protected function getAuditEnvironment(): array
@@ -111,25 +101,19 @@ final class DenoManager extends AbstractAuditableAssetManager
 
     protected function getInstallCommand(): string
     {
-        $command = Platform::isWindows() ? 'deno.exe' : 'deno';
-
-        return $this->buildCommand($command, 'install', 'install');
+        return $this->buildCommand($this->getBinary(), 'install', 'install');
     }
 
     protected function getUpdateCommand(): string
     {
-        $command = Platform::isWindows() ? 'deno.exe' : 'deno';
-
-        return $this->buildCommand($command, 'update', ['update', '--lockfile-only', '--recursive'])
+        return $this->buildCommand($this->getBinary(), 'update', ['update', '--lockfile-only', '--recursive'])
             . ' && '
             . $this->getInstallCommand();
     }
 
     protected function getVersionCommand(): string
     {
-        $command = Platform::isWindows() ? 'deno.exe' : 'deno';
-
-        return $this->buildUnconfiguredCommand($command, '--version');
+        return $this->buildUnconfiguredCommand($this->getBinary(), '--version');
     }
 
     protected function normalizeVersionOutput(string $output): string
@@ -141,10 +125,17 @@ final class DenoManager extends AbstractAuditableAssetManager
     {
         if ($noDev) {
             throw new RuntimeException(
-                'The deno audit cannot guarantee the requested dependency scope because "deno audit" cannot exclude '
-                . 'development dependencies.',
+                Message::ASSET_DENO_AUDIT_NO_DEV_UNSUPPORTED->getMessage(),
             );
         }
+    }
+
+    /**
+     * Returns the platform-specific Deno binary name.
+     */
+    private function getBinary(): string
+    {
+        return Platform::isWindows() ? 'deno.exe' : 'deno';
     }
 
     /**

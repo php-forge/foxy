@@ -19,16 +19,19 @@ final class GetAssetsEventTest extends SolveEvent
     {
         $assetPackageName = '@composer-asset/bar--foo';
         $assetPackagePath = 'file:./vendor/foxy/composer-asset/bar/foo';
+
         $event = $this->getEvent();
 
         self::assertFalse(
             $event->hasAsset($assetPackageName),
+            'New asset must not exist before it is added.',
         );
 
         $event->addAsset($assetPackageName, $assetPackagePath);
 
         self::assertTrue(
             $event->hasAsset($assetPackageName),
+            'Added asset must be present in the event.',
         );
     }
 
@@ -39,6 +42,7 @@ final class GetAssetsEventTest extends SolveEvent
         self::assertSame(
             $this->assets,
             $event->getAssets(),
+            'Initial assets must be preserved.',
         );
 
         $expectedAssets = [
@@ -51,6 +55,7 @@ final class GetAssetsEventTest extends SolveEvent
         self::assertSame(
             $expectedAssets,
             $event->getAssets(),
+            'Asset collection must include the added entry.',
         );
     }
 
@@ -60,6 +65,7 @@ final class GetAssetsEventTest extends SolveEvent
 
         self::assertTrue(
             $event->hasAsset('@composer-asset/foo--bar'),
+            'Configured asset must be present.',
         );
     }
 }

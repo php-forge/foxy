@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace Foxy\Audit;
 
 use Foxy\Asset\AssetManagerInterface;
-use Foxy\Exception\RuntimeException;
+use Foxy\Exception\{Message, RuntimeException};
 use Throwable;
 
 use function in_array;
-use function sprintf;
 use function trim;
 use function usort;
 
@@ -25,12 +24,12 @@ final readonly class AuditRunner implements AuditRunnerInterface
         $diagnostics = trim($result->errorOutput);
 
         if (!in_array($result->exitCode, [0, 1], true)) {
-            throw $this->executionFailure($manager, $result);
+            throw $this->executionFailure($manager, $result->exitCode, $diagnostics);
         }
 
         if ('bun' === $manager && '' !== $diagnostics) {
             throw new RuntimeException(
-                "The bun audit command produced diagnostics and may have returned a partial report. {$diagnostics}",
+                Message::AUDIT_BUN_PARTIAL_REPORT->getMessage($diagnostics),
             );
         }
 
@@ -40,10 +39,13 @@ final readonly class AuditRunner implements AuditRunnerInterface
             $message = $exception->getMessage();
 
             if ($diagnostics !== '') {
-                $message .= " Manager error: {$diagnostics}";
+                $message = Message::AUDIT_MANAGER_ERROR_APPENDED->getMessage($message, $diagnostics);
             }
 
-            throw new RuntimeException($message, previous: $exception);
+            throw new RuntimeException(
+                $message,
+                previous: $exception,
+            );
         }
 
         $findings = $this->normalize($findings);
@@ -51,28 +53,25 @@ final readonly class AuditRunner implements AuditRunnerInterface
         $report = new AuditReport($manager, $findings, $diagnostics);
 
         if (1 === $result->exitCode && [] === $findings) {
-            throw $this->executionFailure($manager, $result);
+            throw $this->executionFailure($manager, $result->exitCode, $diagnostics);
         }
 
         if (0 === $result->exitCode && $report->hasFindingAtLeast(Severity::LOW)) {
             throw new RuntimeException(
-                sprintf('The %s audit report contains vulnerabilities but the manager returned a successful status.', $manager),
+                Message::AUDIT_SUCCESS_STATUS_WITH_FINDINGS->getMessage($manager),
             );
         }
 
         return $report;
     }
 
-    private function executionFailure(string $manager, AuditProcessResult $result): RuntimeException
+    private function executionFailure(string $manager, int $exitCode, string $diagnostics): RuntimeException
     {
-        $message = sprintf('The %s audit command failed with status code %d.', $manager, $result->exitCode);
-        $diagnostics = trim($result->errorOutput);
+        $message = '' === $diagnostics
+            ? Message::AUDIT_COMMAND_FAILED->getMessage($manager, $exitCode)
+            : Message::AUDIT_COMMAND_FAILED_WITH_DIAGNOSTICS->getMessage($manager, $exitCode, $diagnostics);
 
-        if ($diagnostics !== '') {
-            $message .= " {$diagnostics}";
-        }
-
-        return new RuntimeException($message, $result->exitCode);
+        return new RuntimeException($message, $exitCode);
     }
 
     /**
@@ -83,12 +82,7 @@ final readonly class AuditRunner implements AuditRunnerInterface
      */
     private function mergeStrings(array $left, array $right): array
     {
-        $values = [...$left, ...$right];
-
-        $values = array_unique($values);
-        sort($values);
-
-        return $values;
+        return AuditNormalizer::uniqueSorted([...$left, ...$right]);
     }
 
     /**

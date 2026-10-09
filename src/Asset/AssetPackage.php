@@ -8,7 +8,7 @@ use Composer\Json\JsonFile;
 use Composer\Package\RootPackageInterface;
 use Composer\Util\Filesystem;
 use Exception;
-use Foxy\Exception\RuntimeException;
+use Foxy\Exception\{Message, RuntimeException};
 use Seld\JsonLint\ParsingException;
 
 use function array_diff_key;
@@ -169,7 +169,9 @@ final class AssetPackage implements AssetPackageInterface
         $currentDirectory = getcwd();
 
         if (false === $currentDirectory) {
-            throw new RuntimeException('Unable to get the current working directory.');
+            throw new RuntimeException(
+                Message::CURRENT_WORKING_DIRECTORY_UNAVAILABLE->getMessage(),
+            );
         }
 
         $manifestPath = $this->fs->isAbsolutePath($path)

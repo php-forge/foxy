@@ -18,7 +18,7 @@ use Foxy\Asset\{BunManager, DenoManager, NpmManager, PnpmManager, YarnManager};
 use Foxy\Audit\{AuditReport, AuditRequest, AuditRunner, AuditRunnerInterface, AuditableAssetManagerInterface};
 use Foxy\Command\FoxyCommandProvider;
 use Foxy\Config\{Config, ConfigBuilder};
-use Foxy\Exception\RuntimeException;
+use Foxy\Exception\{Message, RuntimeException};
 use Foxy\Fallback\{AssetFallback, ComposerFallback};
 use Foxy\Solver\{Solver, SolverInterface};
 use Foxy\Util\{ComposerUtil, ConsoleUtil};
@@ -105,11 +105,15 @@ final class Foxy implements PluginInterface, EventSubscriberInterface, Capable, 
     public function audit(AuditRequest $request): AuditReport
     {
         if (!isset($this->config) || !$this->isEnabled()) {
-            throw new RuntimeException('Foxy is disabled; frontend dependencies cannot be audited.');
+            throw new RuntimeException(
+                Message::FOXY_AUDIT_DISABLED->getMessage(),
+            );
         }
 
         if (!isset($this->assetManager) || !$this->assetManager instanceof AuditableAssetManagerInterface) {
-            throw new RuntimeException('The selected asset manager does not support security audits.');
+            throw new RuntimeException(
+                Message::FOXY_AUDIT_UNSUPPORTED_MANAGER->getMessage(),
+            );
         }
 
         return (new AuditRunner($this->assetManager))->audit($request);
@@ -140,19 +144,21 @@ final class Foxy implements PluginInterface, EventSubscriberInterface, Capable, 
      */
     public function init(): void
     {
-        if (!$this->initialized) {
-            $this->initialized = true;
+        if ($this->initialized) {
+            return;
+        }
 
-            if (!$this->isEnabled()) {
-                return;
-            }
+        $this->initialized = true;
 
-            $this->assetFallback->save();
-            $this->composerFallback->save();
+        if (!$this->isEnabled()) {
+            return;
+        }
 
-            if ($this->isEnabled('run-asset-manager')) {
-                $this->assetManager->validate();
-            }
+        $this->assetFallback->save();
+        $this->composerFallback->save();
+
+        if ($this->isEnabled('run-asset-manager')) {
+            $this->assetManager->validate();
         }
     }
 

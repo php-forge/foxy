@@ -6,29 +6,26 @@ namespace Foxy\Tests\Asset;
 
 use Foxy\Audit\AuditableAssetManagerInterface;
 use Foxy\Config\Config;
-use Foxy\Exception\RuntimeException;
-use PHPUnit\Framework\Attributes\DataProvider;
+use Foxy\Exception\{Message, RuntimeException};
+use Foxy\Tests\Provider\AuditableAssetManagerProvider;
+use PHPUnit\Framework\Attributes\DataProviderExternal;
 
 use function explode;
 use function file_put_contents;
 use function getcwd;
-use function sprintf;
 
 use const DIRECTORY_SEPARATOR;
 
+/**
+ * Base unit tests for {@see AuditableAssetManagerInterface} asset managers, shared by the audit-capable manager tests.
+ *
+ * {@see AuditableAssetManagerProvider} for test case data providers.
+ */
 abstract class AuditableAssetManager extends AssetManager
 {
     abstract protected function getValidAuditCommand(bool $noDev): string;
 
-    public static function getAuditCommandData(): array
-    {
-        return [
-            'all dependencies' => [false],
-            'production dependencies' => [true],
-        ];
-    }
-
-    #[DataProvider('getAuditCommandData')]
+    #[DataProviderExternal(AuditableAssetManagerProvider::class, 'auditScopes')]
     public function testAuditBuildsExactCommandWithoutInstallOptions(bool $noDev): void
     {
         $this->config = new Config(
@@ -104,8 +101,7 @@ abstract class AuditableAssetManager extends AssetManager
             );
         } catch (RuntimeException $exception) {
             self::assertSame(
-                sprintf(
-                    'The %s lock file "%s" was not found.',
+                Message::ASSET_MANAGER_LOCK_FILE_MISSING->getMessage(
                     $this->manager->getName(),
                     $this->cwd . DIRECTORY_SEPARATOR . $this->manager->getLockPackageName(),
                 ),

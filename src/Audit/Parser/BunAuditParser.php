@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Foxy\Audit\Parser;
 
 use Foxy\Audit\{AuditFinding, AuditParserInterface};
+use Foxy\Exception\Message;
 
 use function sprintf;
 
@@ -18,13 +19,16 @@ final class BunAuditParser extends AbstractAuditParser implements AuditParserInt
 
         foreach ($packages as $package => $advisories) {
             if ($package === '' || !is_array($advisories)) {
-                throw $this->malformed('each package must contain a list of advisories');
+                throw $this->malformed(
+                    Message::AUDIT_BUN_PACKAGE_ADVISORIES_REQUIRED->getMessage(),
+                );
             }
 
             $package = (string) $package;
 
             foreach ($advisories as $index => $advisory) {
                 $context = sprintf('%s.%d', $package, $index);
+
                 $advisory = $this->getObject($advisory, $context);
                 $sourceId = $this->getSourceId($advisory['id'] ?? null, $context . '.id');
                 $url = $this->getOptionalString($advisory, 'url', $context);

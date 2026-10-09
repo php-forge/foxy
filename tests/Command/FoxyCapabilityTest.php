@@ -7,16 +7,10 @@ namespace Foxy\Tests\Command;
 use Composer\Plugin\Capability\CommandProvider as ComposerCommandProvider;
 use Composer\Plugin\Capable;
 use Foxy\Asset\AssetManagerInterface;
-use Foxy\Audit\{
-    AuditProcessResult,
-    AuditRequest,
-    AuditRunnerInterface,
-    AuditableAssetManagerInterface,
-    Severity
-};
+use Foxy\Audit\{AuditProcessResult, AuditRequest, AuditRunnerInterface, AuditableAssetManagerInterface, Severity};
 use Foxy\Command\FoxyCommandProvider;
 use Foxy\Config\Config;
-use Foxy\Exception\RuntimeException;
+use Foxy\Exception\{Message, RuntimeException};
 use Foxy\Foxy;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
@@ -29,7 +23,10 @@ final class FoxyCapabilityTest extends TestCase
             [AssetManagerInterface::class, AuditableAssetManagerInterface::class],
         );
 
-        $manager->expects(self::once())->method('getName')->willReturn('npm');
+        $manager
+            ->expects(self::once())
+            ->method('getName')
+            ->willReturn('npm');
         $manager
             ->expects(self::once())
             ->method('audit')
@@ -52,17 +49,17 @@ final class FoxyCapabilityTest extends TestCase
         self::assertSame(
             'npm',
             $report->manager,
-            'The manager name should match the expected value',
+            'Report must identify the selected package manager.',
         );
         self::assertSame(
             [],
             $report->findings,
-            'The findings should match the expected value',
+            'Empty audit result must contain no findings.',
         );
         self::assertSame(
             'manager diagnostic',
             $report->diagnostics,
-            'The diagnostics should match the expected value',
+            'Manager diagnostics must be trimmed.',
         );
     }
 
@@ -74,7 +71,7 @@ final class FoxyCapabilityTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            'Foxy is disabled; frontend dependencies cannot be audited.',
+            Message::FOXY_AUDIT_DISABLED->getMessage(),
         );
 
         $foxy->audit(new AuditRequest());
@@ -89,7 +86,7 @@ final class FoxyCapabilityTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            'The selected asset manager does not support security audits.',
+            Message::FOXY_AUDIT_UNSUPPORTED_MANAGER->getMessage(),
         );
 
         $foxy->audit(new AuditRequest());
@@ -103,7 +100,7 @@ final class FoxyCapabilityTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            'The selected asset manager does not support security audits.',
+            Message::FOXY_AUDIT_UNSUPPORTED_MANAGER->getMessage(),
         );
 
         $foxy->audit(new AuditRequest());
@@ -113,7 +110,7 @@ final class FoxyCapabilityTest extends TestCase
     {
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            'Foxy is disabled; frontend dependencies cannot be audited.',
+            Message::FOXY_AUDIT_DISABLED->getMessage(),
         );
 
         (new Foxy())->audit(new AuditRequest());
@@ -126,17 +123,17 @@ final class FoxyCapabilityTest extends TestCase
         self::assertInstanceOf(
             Capable::class,
             $foxy,
-            'The object should implement the Capable interface',
+            'Plugin must expose Composer capability support.',
         );
         self::assertInstanceOf(
             AuditRunnerInterface::class,
             $foxy,
-            'The object should implement the AuditRunnerInterface',
+            'Plugin must implement the audit runner contract.',
         );
         self::assertSame(
             [ComposerCommandProvider::class => FoxyCommandProvider::class],
             $foxy->getCapabilities(),
-            'The capabilities should match the expected mapping',
+            'Command capability must map to its provider.',
         );
     }
 

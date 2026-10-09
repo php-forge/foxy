@@ -7,13 +7,13 @@ namespace Foxy\Converter;
 use Composer\Package\Version\VersionParser;
 use Composer\Pcre\Preg;
 
+use function explode;
 use function in_array;
 use function preg_match;
 use function preg_match_all;
 use function sprintf;
 use function str_starts_with;
 use function strlen;
-use function strpos;
 use function strtolower;
 use function substr;
 
@@ -27,11 +27,9 @@ abstract class SemverUtil
     public static function convertDateVersion(string $version): string
     {
         if (preg_match('/^\d{7,}\./', $version)) {
-            $pos = strpos($version, '.');
+            [$head, $tail] = explode('.', $version, 2);
 
-            if ($pos !== false) {
-                $version = substr($version, 0, $pos) . self::convertDateMinorVersion(substr($version, $pos + 1));
-            }
+            return $head . self::convertDateMinorVersion($tail);
         }
 
         return $version;
@@ -138,10 +136,7 @@ abstract class SemverUtil
      */
     private static function matchVersion(string $version, string $type): array
     {
-        $type = match ($type) {
-            'dev' => 'dev',
-            default => in_array($type, ['alpha', 'beta', 'RC'], true) ? $type : 'patch',
-        };
+        $type = in_array($type, ['dev', 'alpha', 'beta', 'RC'], true) ? $type : 'patch';
 
         $patchVersion = $type !== 'dev';
         $version .= $type;

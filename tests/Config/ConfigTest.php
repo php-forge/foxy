@@ -10,8 +10,9 @@ use Composer\Package\RootPackageInterface;
 use Exception;
 use Foxy\Config\Config as FoxyConfig;
 use Foxy\Config\ConfigBuilder;
-use Foxy\Exception\RuntimeException;
-use PHPUnit\Framework\Attributes\DataProvider;
+use Foxy\Exception\{Message, RuntimeException};
+use Foxy\Tests\Provider\ConfigProvider;
+use PHPUnit\Framework\Attributes\DataProviderExternal;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Seld\JsonLint\ParsingException;
@@ -26,6 +27,11 @@ use function substr;
 
 use const DIRECTORY_SEPARATOR;
 
+/**
+ * Unit tests for {@see ConfigBuilder} configuration merging and {@see FoxyConfig} value resolution.
+ *
+ * {@see ConfigProvider} for test case data providers.
+ */
 final class ConfigTest extends TestCase
 {
     private Composer|MockObject|null $composer = null;
@@ -33,69 +39,17 @@ final class ConfigTest extends TestCase
     private IOInterface|MockObject|null $io = null;
     private MockObject|RootPackageInterface|null $package = null;
 
-    public static function getDataForGetArrayConfig(): array
-    {
-        return [['foo', [], []], ['foo', [42], [42]], ['foo', [42], [], ['foo' => [42]]]];
-    }
-
-    public static function getDataForGetConfig(): array
-    {
-        return [
-            ['foo', 42, 42],
-            ['bar', 'foo', 'empty'],
-            ['baz', false, true],
-            ['test', 0, 0],
-            ['manager-bar', 23, 0],
-            ['manager-baz', 0, 0],
-            ['global-composer-foo', 90, 0],
-            ['global-composer-bar', 70, 0],
-            ['global-config-foo', 23, 0],
-            ['env-boolean', false, true, 'FOXY__ENV_BOOLEAN=false'],
-            ['env-boolean-uppercase', true, false, 'FOXY__ENV_BOOLEAN_UPPERCASE=TRUE'],
-            ['env-integer', -32, 0, 'FOXY__ENV_INTEGER=-32'],
-            ['env-invalid-integer', '--1', 0, 'FOXY__ENV_INVALID_INTEGER=--1'],
-            ['env-integer-suffix', '32px', 0, 'FOXY__ENV_INTEGER_SUFFIX=32px'],
-            ['env-json', ['foo' => 'bar'], [], 'FOXY__ENV_JSON="{"foo": "bar"}"'],
-            ['env-json-array', [['foo' => 'bar']], [], 'FOXY__ENV_JSON_ARRAY="[{"foo": "bar"}]"'],
-            [
-                'env-json-multiple',
-                ['foo' => 'bar', 'baz' => 'qux'],
-                [],
-                'FOXY__ENV_JSON_MULTIPLE={"foo":"bar","baz":"qux"}',
-            ],
-            ['env-string', 'baz', 'foo', 'FOXY__ENV_STRING=baz'],
-            ['env-padded-string', 'baz', 'foo', 'FOXY__ENV_PADDED_STRING=  baz  '],
-            ['env-single-quoted-string', 'baz', 'foo', "FOXY__ENV_SINGLE_QUOTED_STRING='baz'"],
-            ['env-double-quoted-string', 'baz', 'foo', 'FOXY__ENV_DOUBLE_QUOTED_STRING="baz"'],
-            ['test-p1', 'def', 'def', null, []],
-            ['test-p1', 'def', 'def', null, ['test-p1' => 'ok']],
-            ['test-p1', 'ok', null, null, ['test-p1' => 'ok']],
-        ];
-    }
-
-    public static function getEnabledData(): array
-    {
-        return [
-            'boolean true' => [true, true],
-            'integer one' => [1, true],
-            'string one' => ['1', true],
-            'boolean false' => [false, false],
-            'integer zero' => [0, false],
-            'string zero' => ['0', false],
-            'other integer' => [2, false],
-            'other string' => ['true', false],
-            'null' => [null, false],
-        ];
-    }
-
     /**
      * @throws ParsingException
      */
     public function testBuildIgnoresNonArrayGlobalConfig(): void
     {
         $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . uniqid('foxy_config_test_', true);
+
         $filesystem = new Filesystem();
+
         $filesystem->mkdir($directory);
+
         file_put_contents($directory . '/composer.json', '{"config":{"foxy":"invalid"}}');
 
         $this->composerConfig
@@ -103,12 +57,19 @@ final class ConfigTest extends TestCase
             ->method('get')
             ->with('home')
             ->willReturn($directory);
-        $this->package->expects(self::once())->method('getConfig')->willReturn([]);
+        $this->package
+            ->expects(self::once())
+            ->method('getConfig')
+            ->willReturn([]);
 
         try {
             $config = ConfigBuilder::build($this->composer, [], $this->io);
 
-            self::assertSame('fallback', $config->get('missing', 'fallback'));
+            self::assertSame(
+                'fallback',
+                $config->get('missing', 'fallback'),
+                'Missing keys must return the supplied fallback.',
+            );
         } finally {
             $filesystem->remove($directory);
         }
@@ -122,7 +83,7 @@ final class ConfigTest extends TestCase
      *
      * @throws ParsingException
      */
-    #[DataProvider('getDataForGetArrayConfig')]
+    #[DataProviderExternal(ConfigProvider::class, 'arrayConfigValues')]
     public function testGetArrayConfig(string $key, array $expected, array $default, array $defaults = []): void
     {
         $config = ConfigBuilder::build($this->composer, $defaults, $this->io);
@@ -130,6 +91,7 @@ final class ConfigTest extends TestCase
         self::assertSame(
             $expected,
             $config->getArray($key, $default),
+            'Array configuration must match the expected value.',
         );
     }
 
@@ -142,7 +104,7 @@ final class ConfigTest extends TestCase
      *
      * @throws ParsingException
      */
-    #[DataProvider('getDataForGetConfig')]
+    #[DataProviderExternal(ConfigProvider::class, 'configValues')]
     public function testGetConfig(
         string $key,
         mixed $expected,
@@ -160,9 +122,16 @@ final class ConfigTest extends TestCase
 
         $globalPath = realpath(__DIR__ . '/../Fixtures/package/global');
 
-        $this->composerConfig->expects(self::any())->method('has')->with('home')->willReturn(true);
-        $this->composerConfig->expects(self::any())->method('get')->with('home')->willReturn($globalPath);
-
+        $this->composerConfig
+            ->expects(self::any())
+            ->method('has')
+            ->with('home')
+            ->willReturn(true);
+        $this->composerConfig
+            ->expects(self::any())
+            ->method('get')
+            ->with('home')
+            ->willReturn($globalPath);
         $this->package
             ->expects(self::any())
             ->method('getConfig')
@@ -185,7 +154,10 @@ final class ConfigTest extends TestCase
             );
 
         if (str_starts_with($key, 'global-')) {
-            $this->io->expects(self::atLeast(2))->method('isDebug')->willReturn(true);
+            $this->io
+                ->expects(self::atLeast(2))
+                ->method('isDebug')
+                ->willReturn(true);
 
             $globalLogComposer = false;
             $globalLogConfig = false;
@@ -210,6 +182,7 @@ final class ConfigTest extends TestCase
         }
 
         $config = ConfigBuilder::build($this->composer, $defaults, $this->io);
+
         $value = $config->get($key, $default);
 
         // remove env variables
@@ -220,22 +193,27 @@ final class ConfigTest extends TestCase
 
             self::assertFalse(
                 getenv($envKey),
+                'Environment variable must be unset after reading.',
             );
         }
 
         self::assertTrue(
             $globalLogComposer,
+            'Composer configuration loading must be logged.',
         );
         self::assertTrue(
             $globalLogConfig,
+            'Global configuration loading must be logged.',
         );
         self::assertSame(
             $expected,
             $value,
+            'Resolved configuration value must match the expected value.',
         );
         self::assertSame(
             $expected,
             $config->get($key, $default),
+            'Repeated reads must return the same configuration value.',
         );
     }
 
@@ -245,11 +223,14 @@ final class ConfigTest extends TestCase
     public function testGetEnvConfigWithInvalidJson(): void
     {
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('The "FOXY__ENV_JSON" environment variable isn\'t a valid JSON');
+        $this->expectExceptionMessage(
+            Message::CONFIG_ENV_JSON_INVALID->getMessage('FOXY__ENV_JSON'),
+        );
 
         putenv('FOXY__ENV_JSON="{"foo"}"');
 
         $config = ConfigBuilder::build($this->composer, [], $this->io);
+
         $ex = null;
 
         try {
@@ -262,21 +243,28 @@ final class ConfigTest extends TestCase
 
         self::assertFalse(
             getenv('FOXY__ENV_JSON'),
+            'Invalid JSON environment variable must be unset.',
         );
 
         if (null === $ex) {
-            throw new RuntimeException('The expected exception was not thrown');
+            throw new RuntimeException(
+                'The expected exception was not thrown',
+            );
         }
 
         throw $ex;
     }
 
-    #[DataProvider('getEnabledData')]
+    #[DataProviderExternal(ConfigProvider::class, 'enabledValues')]
     public function testIsEnabled(mixed $value, bool $expected): void
     {
         $config = new FoxyConfig(['feature' => $value]);
 
-        self::assertSame($expected, $config->isEnabled('feature'));
+        self::assertSame(
+            $expected,
+            $config->isEnabled('feature'),
+            'Feature state must match the configured value.',
+        );
     }
 
     public function testResolvedManagerSelectsManagerSpecificDefaults(): void
@@ -286,11 +274,18 @@ final class ConfigTest extends TestCase
             ['manager-version' => ['npm' => '>=10.9.8', 'yarn' => '^4.18.0']],
         );
 
-        self::assertNull($config->get('manager-version'));
+        self::assertNull(
+            $config->get('manager-version'),
+            'Manager-specific default must remain unresolved initially.',
+        );
 
         $config->setResolvedManager('yarn');
 
-        self::assertSame('^4.18.0', $config->get('manager-version'));
+        self::assertSame(
+            '^4.18.0',
+            $config->get('manager-version'),
+            'Resolved manager must select its configured version constraint.',
+        );
     }
 
     protected function setUp(): void
@@ -300,7 +295,13 @@ final class ConfigTest extends TestCase
         $this->io = $this->createMock(IOInterface::class);
         $this->package = $this->createMock(RootPackageInterface::class);
 
-        $this->composer->expects(self::any())->method('getPackage')->willReturn($this->package);
-        $this->composer->expects(self::any())->method('getConfig')->willReturn($this->composerConfig);
+        $this->composer
+            ->expects(self::any())
+            ->method('getPackage')
+            ->willReturn($this->package);
+        $this->composer
+            ->expects(self::any())
+            ->method('getConfig')
+            ->willReturn($this->composerConfig);
     }
 }

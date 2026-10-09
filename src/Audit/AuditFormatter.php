@@ -90,12 +90,6 @@ final readonly class AuditFormatter
 
     private function writePlain(AuditReport $report, OutputInterface $output): void
     {
-        if ([] === $report->findings) {
-            $output->writeln('No known frontend vulnerabilities found.', OutputInterface::OUTPUT_RAW);
-
-            return;
-        }
-
         foreach ($report->findings as $finding) {
             $fields = [
                 $finding->severity->value,

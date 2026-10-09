@@ -7,11 +7,17 @@ namespace Foxy\Tests\Audit;
 use Composer\Util\Http\Response;
 use Composer\Util\HttpDownloader;
 use Foxy\Audit\{CveStatus, GitHubAdvisoryCveResolver};
-use Foxy\Exception\RuntimeException;
-use PHPUnit\Framework\Attributes\DataProvider;
+use Foxy\Exception\{Message, RuntimeException};
+use Foxy\Tests\Provider\GitHubAdvisoryCveResolverProvider;
+use PHPUnit\Framework\Attributes\DataProviderExternal;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Unit tests for {@see GitHubAdvisoryCveResolver} GHSA validation and CVE resolution from GitHub advisories.
+ *
+ * {@see GitHubAdvisoryCveResolverProvider} for test case data providers.
+ */
 final class GitHubAdvisoryCveResolverTest extends TestCase
 {
     use AuditFixture;
@@ -19,22 +25,6 @@ final class GitHubAdvisoryCveResolverTest extends TestCase
     private const string GHSA_ID = 'GHSA-35jh-r3h4-6jhm';
     private const string GHSA_WITH_CVES_ID = 'GHSA-aaaa-bbbb-cccc';
     private const string GHSA_WITHOUT_CVE_ID = 'GHSA-dddd-eeee-ffff';
-
-    public static function ghsaIdsWithSurroundingText(): array
-    {
-        return [
-            'prefix' => ['prefix-GHSA-35jh-r3h4-6jhm'],
-            'suffix' => ['GHSA-35jh-r3h4-6jhm-suffix'],
-        ];
-    }
-
-    public static function invalidIdentifiers(): array
-    {
-        return [
-            'not an array' => ['"invalid"'],
-            'not a list' => ['{"type":"CVE","value":"CVE-2021-23337"}'],
-        ];
-    }
 
     public function testResolverCollectsDeduplicatesAndSortsCves(): void
     {
@@ -47,8 +37,16 @@ final class GitHubAdvisoryCveResolverTest extends TestCase
 
         $resolution = $resolver->resolve(' ghsa-AAaa-bBBb-CccC ');
 
-        self::assertSame(CveStatus::RESOLVED, $resolution->status);
-        self::assertSame(['CVE-2020-8203', 'CVE-2021-23337'], $resolution->cves);
+        self::assertSame(
+            CveStatus::RESOLVED,
+            $resolution->status,
+            'Resolution status must be marked as resolved.',
+        );
+        self::assertSame(
+            ['CVE-2020-8203', 'CVE-2021-23337'],
+            $resolution->cves,
+            'CVE identifiers must be unique and sorted.',
+        );
     }
 
     public function testResolverDistinguishesAdvisoryWithoutAssignedCve(): void
@@ -62,8 +60,16 @@ final class GitHubAdvisoryCveResolverTest extends TestCase
 
         $resolution = $resolver->resolve(self::GHSA_WITHOUT_CVE_ID);
 
-        self::assertSame(CveStatus::NONE_ASSIGNED, $resolution->status);
-        self::assertSame([], $resolution->cves);
+        self::assertSame(
+            CveStatus::NONE_ASSIGNED,
+            $resolution->status,
+            'Unassigned advisories must use the `NONE_ASSIGNED` status.',
+        );
+        self::assertSame(
+            [],
+            $resolution->cves,
+            'No CVE identifiers must be returned.',
+        );
     }
 
     public function testResolverNormalizesAndFiltersCveIdentifiers(): void
@@ -89,18 +95,27 @@ final class GitHubAdvisoryCveResolverTest extends TestCase
 
         $resolution = $resolver->resolve(self::GHSA_ID);
 
-        self::assertSame(CveStatus::RESOLVED, $resolution->status);
+        self::assertSame(
+            CveStatus::RESOLVED,
+            $resolution->status,
+            'Valid identifiers must produce a resolved status.',
+        );
         self::assertSame(
             ['CVE-2021-9999', 'CVE-2022-0001', 'CVE-2023-0002'],
             $resolution->cves,
+            'CVE identifiers must be normalized, validated, and sorted.',
         );
     }
 
-    #[DataProvider('ghsaIdsWithSurroundingText')]
+    #[DataProviderExternal(GitHubAdvisoryCveResolverProvider::class, 'ghsaIdsWithSurroundingText')]
     public function testResolverRejectsGhsaWithSurroundingTextBeforeRequest(string $ghsaId): void
     {
         $downloader = $this->createMock(HttpDownloader::class);
-        $downloader->expects(self::never())->method('get');
+
+        $downloader
+            ->expects(self::never())
+            ->method('get');
+
         $resolver = new GitHubAdvisoryCveResolver($downloader);
 
         $this->expectException(RuntimeException::class);
@@ -111,16 +126,22 @@ final class GitHubAdvisoryCveResolverTest extends TestCase
     public function testResolverRejectsInvalidGhsaBeforeRequest(): void
     {
         $downloader = $this->createMock(HttpDownloader::class);
-        $downloader->expects(self::never())->method('get');
+
+        $downloader
+            ->expects(self::never())
+            ->method('get');
+
         $resolver = new GitHubAdvisoryCveResolver($downloader);
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('The advisory identifier "not-a-ghsa" is not a valid GHSA identifier.');
+        $this->expectExceptionMessage(
+            Message::AUDIT_GHSA_ID_INVALID->getMessage('not-a-ghsa'),
+        );
 
         $resolver->resolve('not-a-ghsa');
     }
 
-    #[DataProvider('invalidIdentifiers')]
+    #[DataProviderExternal(GitHubAdvisoryCveResolverProvider::class, 'invalidIdentifiers')]
     public function testResolverRejectsInvalidIdentifiers(string $identifiers): void
     {
         $resolver = new GitHubAdvisoryCveResolver(
@@ -132,7 +153,7 @@ final class GitHubAdvisoryCveResolverTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            'GitHub returned invalid identifiers for GHSA-35jh-r3h4-6jhm.',
+            Message::AUDIT_GITHUB_IDENTIFIERS_INVALID->getMessage('GHSA-35jh-r3h4-6jhm'),
         );
 
         $resolver->resolve(self::GHSA_ID);
@@ -149,7 +170,7 @@ final class GitHubAdvisoryCveResolverTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            'GitHub returned a mismatched advisory document for GHSA-35jh-r3h4-6jhm.',
+            Message::AUDIT_GITHUB_ADVISORY_MISMATCHED->getMessage('GHSA-35jh-r3h4-6jhm'),
         );
 
         $resolver->resolve(self::GHSA_ID);
@@ -163,7 +184,7 @@ final class GitHubAdvisoryCveResolverTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            'GitHub returned an invalid advisory document for GHSA-35jh-r3h4-6jhm.',
+            Message::AUDIT_GITHUB_ADVISORY_INVALID->getMessage('GHSA-35jh-r3h4-6jhm'),
         );
 
         $resolver->resolve(self::GHSA_ID);

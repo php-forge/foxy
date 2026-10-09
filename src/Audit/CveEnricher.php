@@ -6,7 +6,6 @@ namespace Foxy\Audit;
 
 use Throwable;
 
-use function preg_match;
 use function sprintf;
 
 final readonly class CveEnricher
@@ -29,7 +28,7 @@ final readonly class CveEnricher
                 continue;
             }
 
-            $ghsaId = $this->getGhsaId($finding->advisoryId);
+            $ghsaId = AuditNormalizer::normalizeGhsaId($finding->advisoryId);
 
             if (null === $ghsaId) {
                 $findings[] = $finding->withCveResolution([], CveStatus::UNAVAILABLE);
@@ -51,14 +50,5 @@ final readonly class CveEnricher
         }
 
         return $report->withFindings($findings);
-    }
-
-    private function getGhsaId(string $advisoryId): string|null
-    {
-        if (1 !== preg_match('/^GHSA-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/i', $advisoryId)) {
-            return null;
-        }
-
-        return $advisoryId;
     }
 }

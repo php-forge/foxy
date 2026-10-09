@@ -4,23 +4,19 @@ declare(strict_types=1);
 
 namespace Foxy\Audit\Parser;
 
-use Foxy\Audit\Severity;
-use Foxy\Exception\RuntimeException;
+use Foxy\Audit\{AuditNormalizer, Severity};
+use Foxy\Exception\{Message, RuntimeException};
 use JsonException;
 use stdClass;
 
 use function array_map;
-use function array_unique;
 use function get_object_vars;
 use function is_array;
 use function is_bool;
 use function is_int;
 use function is_string;
 use function json_decode;
-use function preg_match;
 use function preg_replace;
-use function sort;
-use function sprintf;
 use function strlen;
 use function strtolower;
 use function strtoupper;
@@ -34,10 +30,24 @@ abstract class AbstractAuditParser
 
     abstract protected function getManagerName(): string;
 
+    /**
+     * @param array<mixed> $data
+     */
+    final protected function assertNotErrorDocument(array $data): void
+    {
+        if (isset($data['error'])) {
+            throw $this->malformed(
+                Message::AUDIT_REPORT_ERROR_DOCUMENT->getMessage(),
+            );
+        }
+    }
+
     final protected function assertOutputSize(string $output): void
     {
         if (strlen($output) > self::MAX_OUTPUT_BYTES) {
-            throw $this->malformed('the report exceeds the 16 MiB safety limit');
+            throw $this->malformed(
+                Message::AUDIT_REPORT_SIZE_LIMIT_EXCEEDED->getMessage(),
+            );
         }
     }
 
@@ -50,13 +60,18 @@ abstract class AbstractAuditParser
         $output = trim($output);
 
         if ($output === '' || $output[0] !== '{') {
-            throw $this->malformed('expected a JSON object');
+            throw $this->malformed(
+                Message::AUDIT_REPORT_JSON_OBJECT_EXPECTED->getMessage(),
+            );
         }
 
         try {
             $data = json_decode($output, flags: JSON_THROW_ON_ERROR);
         } catch (JsonException $exception) {
-            throw $this->malformed('invalid JSON', $exception);
+            throw $this->malformed(
+                Message::AUDIT_REPORT_JSON_INVALID->getMessage(),
+                $exception,
+            );
         }
 
         return get_object_vars($data);
@@ -72,7 +87,9 @@ abstract class AbstractAuditParser
         $value = $data[$key] ?? null;
 
         if (!is_bool($value)) {
-            throw $this->malformed(sprintf('%s.%s must be a boolean', $context, $key));
+            throw $this->malformed(
+                Message::AUDIT_FIELD_BOOLEAN_REQUIRED->getMessage($context, $key),
+            );
         }
 
         return $value;
@@ -90,8 +107,10 @@ abstract class AbstractAuditParser
         $cves = $this->getStringList($value, $context);
 
         foreach ($cves as $cve) {
-            if (1 !== preg_match('/^CVE-\d{4}-\d{4,}$/i', $cve)) {
-                throw $this->malformed(sprintf('%s contains an invalid CVE identifier', $context));
+            if (!AuditNormalizer::isCveId($cve)) {
+                throw $this->malformed(
+                    Message::AUDIT_VALUE_CVE_INVALID->getMessage($context),
+                );
             }
         }
 
@@ -100,18 +119,7 @@ abstract class AbstractAuditParser
 
     final protected function getGhsaId(string|null $value): string|null
     {
-        if (
-            null === $value
-            || 1 !== preg_match(
-                '{^(?:https://github\.com/advisories/)?GHSA-([A-Z0-9]{4})-([A-Z0-9]{4})-([A-Z0-9]{4})/?$}i',
-                $value,
-                $matches,
-            )
-        ) {
-            return null;
-        }
-
-        return 'GHSA-' . strtolower($matches[1] . '-' . $matches[2] . '-' . $matches[3]);
+        return null === $value ? null : AuditNormalizer::normalizeGhsaReference($value);
     }
 
     final protected function getNonNegativeInteger(array $data, string $key, string $context): int
@@ -119,7 +127,9 @@ abstract class AbstractAuditParser
         $value = $data[$key] ?? null;
 
         if (!is_int($value) || $value < 0) {
-            throw $this->malformed(sprintf('%s.%s must be a non-negative integer', $context, $key));
+            throw $this->malformed(
+                Message::AUDIT_FIELD_NON_NEGATIVE_INTEGER_REQUIRED->getMessage($context, $key),
+            );
         }
 
         return $value;
@@ -131,7 +141,9 @@ abstract class AbstractAuditParser
     final protected function getObject(mixed $value, string $context): array
     {
         if (!$value instanceof stdClass) {
-            throw $this->malformed(sprintf('%s must be an object', $context));
+            throw $this->malformed(
+                Message::AUDIT_VALUE_OBJECT_REQUIRED->getMessage($context),
+            );
         }
 
         return get_object_vars($value);
@@ -146,7 +158,9 @@ abstract class AbstractAuditParser
         $value = $data[$key];
 
         if (!is_string($value)) {
-            throw $this->malformed(sprintf('%s.%s must be a string', $context, $key));
+            throw $this->malformed(
+                Message::AUDIT_FIELD_STRING_REQUIRED->getMessage($context, $key),
+            );
         }
 
         return trim($value) === '' ? null : $this->sanitizeString($value);
@@ -155,7 +169,9 @@ abstract class AbstractAuditParser
     final protected function getSeverity(mixed $value, string $context): Severity
     {
         if (!is_string($value) || null === $severity = Severity::tryFrom(strtolower($value))) {
-            throw $this->malformed(sprintf('%s has an unsupported severity', $context));
+            throw $this->malformed(
+                Message::AUDIT_VALUE_SEVERITY_UNSUPPORTED->getMessage($context),
+            );
         }
 
         return $severity;
@@ -171,7 +187,9 @@ abstract class AbstractAuditParser
         }
 
         if ($requireTotal && $this->getNonNegativeInteger($counts, 'total', $context . '.vulnerabilities') !== $total) {
-            throw $this->malformed(sprintf('%s.vulnerabilities.total must equal the severity counts', $context));
+            throw $this->malformed(
+                Message::AUDIT_SEVERITY_TOTAL_MISMATCH->getMessage($context),
+            );
         }
 
         return $total;
@@ -180,13 +198,17 @@ abstract class AbstractAuditParser
     final protected function getSourceId(mixed $value, string $context): string
     {
         if (!is_int($value) && !is_string($value)) {
-            throw $this->malformed(sprintf('%s must be a string or integer', $context));
+            throw $this->malformed(
+                Message::AUDIT_VALUE_STRING_OR_INTEGER_REQUIRED->getMessage($context),
+            );
         }
 
         $sourceId = $this->sanitizeString((string) $value);
 
         if ($sourceId === '') {
-            throw $this->malformed(sprintf('%s must not be empty', $context));
+            throw $this->malformed(
+                Message::AUDIT_VALUE_EMPTY->getMessage($context),
+            );
         }
 
         return $sourceId;
@@ -197,7 +219,9 @@ abstract class AbstractAuditParser
         $value = $data[$key] ?? null;
 
         if (!is_string($value) || (!$allowEmpty && trim($value) === '')) {
-            throw $this->malformed(sprintf('%s.%s must be a string', $context, $key));
+            throw $this->malformed(
+                Message::AUDIT_FIELD_STRING_REQUIRED->getMessage($context, $key),
+            );
         }
 
         return $this->sanitizeString($value);
@@ -209,12 +233,16 @@ abstract class AbstractAuditParser
     final protected function getStringList(mixed $value, string $context): array
     {
         if (!is_array($value)) {
-            throw $this->malformed(sprintf('%s must be a list', $context));
+            throw $this->malformed(
+                Message::AUDIT_VALUE_LIST_REQUIRED->getMessage($context),
+            );
         }
 
         foreach ($value as $index => $item) {
             if (!is_string($item)) {
-                throw $this->malformed(sprintf('%s must contain only strings', $context));
+                throw $this->malformed(
+                    Message::AUDIT_VALUE_STRINGS_ONLY->getMessage($context),
+                );
             }
 
             $value[$index] = $this->sanitizeString($item);
@@ -227,7 +255,7 @@ abstract class AbstractAuditParser
     final protected function malformed(string $reason, \Throwable|null $previous = null): RuntimeException
     {
         return new RuntimeException(
-            sprintf('The %s audit output is malformed: %s.', $this->getManagerName(), $reason),
+            Message::AUDIT_OUTPUT_MALFORMED->getMessage($this->getManagerName(), $reason),
             previous: $previous,
         );
     }
@@ -244,9 +272,6 @@ abstract class AbstractAuditParser
      */
     final protected function uniqueStrings(array $values): array
     {
-        $values = array_unique($values);
-        sort($values);
-
-        return $values;
+        return AuditNormalizer::uniqueSorted($values);
     }
 }
