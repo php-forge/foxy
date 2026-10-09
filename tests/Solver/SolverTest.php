@@ -1030,7 +1030,7 @@ class SolverTest extends TestCase
             );
         } catch (RuntimeException $exception) {
             self::assertSame(
-                Message::SOLVER_ASSET_DIR_SYMLINK->getMessage($linkDir),
+                Message::SOLVER_ASSET_DIR_SYMLINK->getMessage($this->fs->normalizePath($linkDir)),
                 $exception->getMessage(),
                 'Message must name the configured symbolic link.',
             );
