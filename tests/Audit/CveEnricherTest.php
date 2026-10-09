@@ -196,6 +196,46 @@ final class CveEnricherTest extends TestCase
         );
     }
 
+    public function testEnricherSharesResolutionForGhsaIdsDifferingInCase(): void
+    {
+        $resolver = $this->createMock(CveResolverInterface::class);
+
+        $resolver
+            ->expects(self::once())
+            ->method('resolve')
+            ->with('GHSA-35jh-r3h4-6jhm')
+            ->willReturn(new CveResolution(['CVE-2021-23337'], CveStatus::RESOLVED));
+
+        $report = new AuditReport(
+            'npm',
+            [
+                $this->finding('lodash', 'ghsa-35JH-R3H4-6JHM'),
+                $this->finding('dependent-package', 'GHSA-35jh-r3h4-6jhm'),
+            ],
+        );
+
+        $enriched = (new CveEnricher($resolver))->enrich(
+            $report,
+            static fn(string $warning) => self::fail($warning),
+        );
+
+        self::assertSame(
+            ['CVE-2021-23337'],
+            $enriched->findings[0]->cves,
+            'Mixed-case identifier must receive the resolved CVE identifiers.',
+        );
+        self::assertSame(
+            ['CVE-2021-23337'],
+            $enriched->findings[1]->cves,
+            'Canonical identifier must reuse the cached resolution.',
+        );
+        self::assertSame(
+            'ghsa-35JH-R3H4-6JHM',
+            $enriched->findings[0]->advisoryId,
+            'Original advisory identifier must be preserved.',
+        );
+    }
+
     public function testEnricherWarnsOnceAndPreservesFindingsWhenResolutionFails(): void
     {
         $resolver = $this->createMock(CveResolverInterface::class);

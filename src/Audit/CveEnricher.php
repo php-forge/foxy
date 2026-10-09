@@ -28,7 +28,7 @@ final readonly class CveEnricher
                 continue;
             }
 
-            $ghsaId = $this->getGhsaId($finding->advisoryId);
+            $ghsaId = AuditNormalizer::normalizeGhsaId($finding->advisoryId);
 
             if (null === $ghsaId) {
                 $findings[] = $finding->withCveResolution([], CveStatus::UNAVAILABLE);
@@ -50,10 +50,5 @@ final readonly class CveEnricher
         }
 
         return $report->withFindings($findings);
-    }
-
-    private function getGhsaId(string $advisoryId): string|null
-    {
-        return null === AuditNormalizer::normalizeGhsaId($advisoryId) ? null : $advisoryId;
     }
 }

@@ -389,18 +389,22 @@ final class BunAssetManagerTest extends AuditableAssetManager
 
     public function testAuditReadsXdgBunfigBeforeHomeBunfig(): void
     {
+        $home = $this->cwd . DIRECTORY_SEPARATOR . 'home';
         $xdgConfigHome = $this->cwd . DIRECTORY_SEPARATOR . 'xdg-config';
 
-        $this->sfs->mkdir($xdgConfigHome);
+        $this->sfs->mkdir([$home, $xdgConfigHome]);
 
+        putenv("HOME={$home}");
         putenv("XDG_CONFIG_HOME={$xdgConfigHome}");
 
+        $_ENV['HOME'] = $home;
+        $_SERVER['HOME'] = $home;
         $_ENV['XDG_CONFIG_HOME'] = $xdgConfigHome;
         $_SERVER['XDG_CONFIG_HOME'] = $xdgConfigHome;
         $xdgBunfig = $xdgConfigHome . DIRECTORY_SEPARATOR . '.bunfig.toml';
 
         file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'bun.lock', '{}');
-        file_put_contents($this->cwd . DIRECTORY_SEPARATOR . '.bunfig.toml', "[install]\nproduction = false\n");
+        file_put_contents($home . DIRECTORY_SEPARATOR . '.bunfig.toml', "[install]\noptional = false\n");
         file_put_contents($xdgBunfig, "[install]\nproduction = true\n");
 
         try {
