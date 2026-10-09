@@ -193,7 +193,7 @@ final class ComposerFallbackTest extends TestCase
             ->with('./composer.lock')
             ->willReturnCallback(
                 function (string $path): bool {
-                $this->sfs->remove($path);
+                    $this->sfs->remove($path);
 
                     return false;
                 }
