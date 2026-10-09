@@ -44,13 +44,21 @@ abstract class AssetManager extends TestCase
     protected \Symfony\Component\Filesystem\Filesystem|null $sfs = null;
 
     abstract protected function getManager(): AssetManagerInterface;
+
     abstract protected function getUnsupportedVersion(): string;
+
     abstract protected function getValidInstallCommand(): string;
+
     abstract protected function getValidLockPackageName(): string;
+
     abstract protected function getValidName(): string;
+
     abstract protected function getValidUpdateCommand(): string;
+
     abstract protected function getValidVersion(): string;
+
     abstract protected function getValidVersionCommand(): string;
+
     abstract protected function getValidVersionConstraint(): string;
 
     /**

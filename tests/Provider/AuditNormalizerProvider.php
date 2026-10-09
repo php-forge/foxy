@@ -49,7 +49,7 @@ final class AuditNormalizerProvider
         ];
         yield 'advisory URL with double trailing slash' => [
             'https://github.com/advisories/GHSA-35jh-r3h4-6jhm//',
-             null,
+            null,
         ];
         yield 'advisory URL with trailing slash' => [
             'https://github.com/advisories/GHSA-35jh-r3h4-6jhm/',

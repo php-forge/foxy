@@ -17,8 +17,8 @@ use Xepozz\InternalMocker\MockerState;
 
 use function chdir;
 use function file_get_contents;
-
 use function sprintf;
+
 use const DIRECTORY_SEPARATOR;
 
 final class JsonFileTest extends TestCase
@@ -272,7 +272,8 @@ final class JsonFileTest extends TestCase
 
         foreach ($mapKeys as $key) {
             self::assertStringContainsString(
-                sprintf('"%s": {}', $key), $content,
+                sprintf('"%s": {}', $key),
+                $content,
                 "The content of the package JSON file should contain the key: {$key}",
             );
         }

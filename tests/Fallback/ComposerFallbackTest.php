@@ -675,7 +675,7 @@ final class ComposerFallbackTest extends TestCase
         self::assertInstanceOf(
             PlatformRequirementFilterInterface::class,
             $filter,
-            "Expected platform requirement filter to be an instance of PlatformRequirementFilterInterface",
+            'Expected platform requirement filter to be an instance of PlatformRequirementFilterInterface',
         );
         self::assertFalse(
             $filter->isIgnored('php'),
@@ -725,7 +725,7 @@ final class ComposerFallbackTest extends TestCase
         self::assertInstanceOf(
             PlatformRequirementFilterInterface::class,
             $filter,
-            "Expected platform requirement filter to be an instance of PlatformRequirementFilterInterface",
+            'Expected platform requirement filter to be an instance of PlatformRequirementFilterInterface',
         );
         self::assertTrue(
             $filter->isIgnored('php'),
@@ -763,7 +763,7 @@ final class ComposerFallbackTest extends TestCase
         self::assertInstanceOf(
             PlatformRequirementFilterInterface::class,
             $filter,
-            "Expected platform requirement filter to be an instance of PlatformRequirementFilterInterface",
+            'Expected platform requirement filter to be an instance of PlatformRequirementFilterInterface',
         );
         self::assertTrue(
             $filter->isIgnored('php'),

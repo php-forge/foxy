@@ -148,7 +148,9 @@ class SolverTest extends TestCase
         $result = $this->invokeSolverMethodOn($solver, 'getMockPackagePath', $package, $assetDir, $source);
 
         self::assertSame(
-            ['@composer-asset/foo--bar', $target], $result);
+            ['@composer-asset/foo--bar', $target],
+            $result
+        );
         self::assertSame($sourceContent, file_get_contents($source));
         self::assertFileExists($target);
         self::assertSame(
