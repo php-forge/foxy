@@ -37,16 +37,8 @@ final class PnpmManager extends AbstractAuditableAssetManager
             '--lockfile-dir=.',
             '--ignore-pnpmfile',
             '--only=null',
-        ];
-
-        if ($noDev) {
-            $command = [...$command, '--prod', '--optional=true'];
-        } else {
-            $command = [...$command, '--prod=false', '--dev=false', '--optional=true'];
-        }
-
-        $command = [
-            ...$command,
+            ...($noDev ? ['--prod'] : ['--prod=false', '--dev=false']),
+            '--optional=true',
             '--ignore-registry-errors=false',
             '--ignore-unfixable=false',
             ProcessExecutor::escape('--config.auditConfig={ignoreGhsas:[]}'),

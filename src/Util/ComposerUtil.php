@@ -6,10 +6,9 @@ namespace Foxy\Util;
 
 use Composer\Installer\InstallerEvents;
 use Composer\Semver\Semver;
-use Foxy\Exception\RuntimeException;
+use Foxy\Exception\{Message, RuntimeException};
 
 use function preg_match;
-use function sprintf;
 use function str_contains;
 
 final class ComposerUtil
@@ -34,10 +33,8 @@ final class ComposerUtil
         $isSnapshot = 1 === preg_match('/^[0-9a-f]{40}$/i', $composerVersion);
 
         if (!$isBranch && !$isSnapshot && !Semver::satisfies($composerVersion, $requiredVersion)) {
-            $msg = 'Foxy requires the Composer\'s minimum version "%s", current version is "%s"';
-
             throw new RuntimeException(
-                sprintf($msg, $requiredVersion, $composerVersion),
+                Message::UTIL_COMPOSER_VERSION_UNSUPPORTED->getMessage($requiredVersion, $composerVersion),
             );
         }
     }

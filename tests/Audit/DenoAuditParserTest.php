@@ -6,7 +6,7 @@ namespace Foxy\Tests\Audit;
 
 use Foxy\Audit\{AuditFinding, CveStatus, Severity};
 use Foxy\Audit\Parser\DenoAuditParser;
-use Foxy\Exception\RuntimeException;
+use Foxy\Exception\{Message, RuntimeException};
 use Foxy\Tests\Provider\DenoAuditParserProvider;
 use PHPUnit\Framework\Attributes\DataProviderExternal;
 use PHPUnit\Framework\TestCase;
@@ -14,7 +14,6 @@ use PHPUnit\Framework\TestCase;
 use function array_count_values;
 use function array_map;
 use function ksort;
-use function sprintf;
 use function str_replace;
 
 /**
@@ -282,7 +281,7 @@ final class DenoAuditParserTest extends TestCase
     {
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            sprintf('The deno audit output is malformed: %s.', $reason),
+            Message::AUDIT_OUTPUT_MALFORMED->getMessage('deno', $reason),
         );
 
         (new DenoAuditParser())->parse($output);

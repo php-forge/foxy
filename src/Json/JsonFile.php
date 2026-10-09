@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Foxy\Json;
 
-use Foxy\Exception\RuntimeException;
+use Foxy\Exception\{Message, RuntimeException};
 
 use function array_diff;
+use function array_push;
 use function is_array;
 use function is_string;
-use function sprintf;
 
 final class JsonFile extends \Composer\Json\JsonFile
 {
@@ -39,8 +39,6 @@ final class JsonFile extends \Composer\Json\JsonFile
 
     private array $mapKeys = [];
 
-    private bool $parsed = false;
-
     /**
      * Encode package manifest data as JSON.
      *
@@ -64,9 +62,7 @@ final class JsonFile extends \Composer\Json\JsonFile
      */
     public function getArrayKeys(): array
     {
-        if (!$this->parsed) {
-            $this->parseOriginalContent();
-        }
+        $this->ensureParsed();
 
         return $this->arrayKeys;
     }
@@ -76,11 +72,7 @@ final class JsonFile extends \Composer\Json\JsonFile
      */
     public function getIndent(): int
     {
-        if ($this->indent === null) {
-            $this->parseOriginalContent();
-        }
-
-        return $this->indent ?? JsonFormatter::DEFAULT_INDENT;
+        return $this->ensureParsed();
     }
 
     public function read(): array
@@ -126,10 +118,38 @@ final class JsonFile extends \Composer\Json\JsonFile
                 continue;
             }
 
-            $keys = [...$keys, ...$this->collectEmptyArrayKeys($value)];
+            array_push($keys, ...$this->collectEmptyArrayKeys($value));
         }
 
         return $keys;
+    }
+
+    /**
+     * Parses the original JSON document once and returns its detected indent.
+     */
+    private function ensureParsed(): int
+    {
+        if (null !== $this->indent) {
+            return $this->indent;
+        }
+
+        $content = '';
+
+        if ($this->exists()) {
+            $path = $this->getPath();
+            $content = file_get_contents($path);
+
+            if (false === $content) {
+                throw new RuntimeException(
+                    Message::JSON_FILE_UNREADABLE->getMessage($path),
+                );
+            }
+        }
+
+        $this->arrayKeys = JsonFormatter::getArrayKeys($content);
+        $this->mapKeys = JsonFormatter::getMapKeys($content);
+
+        return $this->indent = JsonFormatter::getIndent($content);
     }
 
     /**
@@ -139,32 +159,8 @@ final class JsonFile extends \Composer\Json\JsonFile
      */
     private function getMapKeys(): array
     {
-        if (!$this->parsed) {
-            $this->parseOriginalContent();
-        }
+        $this->ensureParsed();
 
         return $this->mapKeys;
-    }
-
-    private function parseOriginalContent(): void
-    {
-        $content = '';
-
-        if ($this->exists()) {
-            $path = $this->getPath();
-            $content = file_get_contents($path);
-
-            if (false === $content) {
-                throw new RuntimeException(
-                    sprintf('Unable to read json file "%s".', $path),
-                );
-            }
-        }
-
-        $this->arrayKeys = JsonFormatter::getArrayKeys($content);
-        $this->mapKeys = JsonFormatter::getMapKeys($content);
-        $this->indent = JsonFormatter::getIndent($content);
-
-        $this->parsed = true;
     }
 }

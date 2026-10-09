@@ -6,13 +6,12 @@ namespace Foxy\Asset;
 
 use Composer\IO\IOInterface;
 use Composer\Package\RootPackageInterface;
-use Composer\Semver\Constraint\Constraint;
-use Composer\Semver\VersionParser;
+use Composer\Semver\{Semver, VersionParser};
 use Composer\Util\{Filesystem, Platform, ProcessExecutor};
 use Exception;
 use Foxy\Config\Config;
 use Foxy\Converter\{SemverConverter, VersionConverterInterface};
-use Foxy\Exception\RuntimeException;
+use Foxy\Exception\{Message, RuntimeException};
 use Foxy\Fallback\FallbackInterface;
 use Foxy\Json\JsonFile;
 use Seld\JsonLint\ParsingException;
@@ -98,7 +97,7 @@ abstract class AbstractAssetManager implements AssetManagerInterface
 
     public function getPackageJsonPath(): string
     {
-        return rtrim($this->getRootPackageDir(), '/\\') . DIRECTORY_SEPARATOR . $this->getPackageName();
+        return $this->getRootPackagePath($this->getPackageName());
     }
 
     public function getPackageName(): string
@@ -143,27 +142,23 @@ abstract class AbstractAssetManager implements AssetManagerInterface
 
         $this->io->write($info);
 
-        $timeout = ProcessExecutor::getTimeout();
+        $res = $this->withManagerTimeout(
+            function () use ($updatable, $managerWorkingDirectory): int {
+                try {
+                    $cmd = $updatable ? $this->getUpdateCommand() : $this->getInstallCommand();
 
-        /** @var int $managerTimeout */
-        $managerTimeout = $this->config->get('manager-timeout', PHP_INT_MAX);
+                    return $this->executeManagerCommand($cmd, $managerWorkingDirectory);
+                } catch (Throwable $exception) {
+                    $this->restoreAfterFailure($exception);
 
-        ProcessExecutor::setTimeout($managerTimeout);
-
-        try {
-            $cmd = $updatable ? $this->getUpdateCommand() : $this->getInstallCommand();
-            $res = $this->executeManagerCommand($cmd, $managerWorkingDirectory);
-        } catch (Throwable $exception) {
-            $this->restoreAfterFailure($exception);
-
-            throw $exception;
-        } finally {
-            ProcessExecutor::setTimeout($timeout);
-        }
+                    throw $exception;
+                }
+            },
+        );
 
         if (0 !== $res && null !== $this->fallback) {
             $this->restoreAfterFailure(
-                new RuntimeException(sprintf('The asset manager exited with status code %d.', $res), $res),
+                new RuntimeException(Message::ASSET_MANAGER_EXITED_WITH_STATUS->getMessage($res), $res),
             );
         }
 
@@ -191,46 +186,44 @@ abstract class AbstractAssetManager implements AssetManagerInterface
         $version = $this->getVersion();
 
         if (null === $version) {
-            throw new RuntimeException(sprintf('The binary of "%s" must be installed', $this->getName()));
+            throw new RuntimeException(
+                Message::ASSET_MANAGER_BINARY_NOT_INSTALLED->getMessage($this->getName()),
+            );
         }
-
-        $parser = new VersionParser();
 
         $supportedVersion = $this->getVersionConstraint();
 
-        $unsupportedVersionMessage = sprintf(
-            'The installed %s version "%s" doesn\'t match with the supported version constraint "%s"',
+        $unsupportedVersionMessage = Message::ASSET_VERSION_UNSUPPORTED->getMessage(
             $this->getName(),
             $version,
             $supportedVersion,
         );
 
         try {
-            $versionConstraint = new Constraint('==', $parser->normalize($version));
+            (new VersionParser())->normalize($version);
         } catch (UnexpectedValueException) {
-            throw new RuntimeException($unsupportedVersionMessage);
+            throw new RuntimeException(
+                $unsupportedVersionMessage,
+            );
         }
 
-        if (!$parser->parseConstraints($supportedVersion)->matches($versionConstraint)) {
-            throw new RuntimeException($unsupportedVersionMessage);
+        if (!Semver::satisfies($version, $supportedVersion)) {
+            throw new RuntimeException(
+                $unsupportedVersionMessage,
+            );
         }
 
         /** @var string|null $constraintVersion */
         $constraintVersion = $this->config->get('manager-version');
 
-        if (is_string($constraintVersion) && $constraintVersion !== '') {
-            $constraint = $parser->parseConstraints($constraintVersion);
-
-            if (!$constraint->matches($versionConstraint)) {
-                throw new RuntimeException(
-                    sprintf(
-                        'The installed %s version "%s" doesn\'t match with the constraint version "%s"',
-                        $this->getName(),
-                        $version,
-                        $constraintVersion,
-                    ),
-                );
-            }
+        if (
+            is_string($constraintVersion)
+            && $constraintVersion !== ''
+            && !Semver::satisfies($version, $constraintVersion)
+        ) {
+            throw new RuntimeException(
+                Message::ASSET_VERSION_CONSTRAINT_MISMATCH->getMessage($this->getName(), $version, $constraintVersion),
+            );
         }
     }
 
@@ -267,13 +260,9 @@ abstract class AbstractAssetManager implements AssetManagerInterface
         $gOptions = trim((string) $this->config->get('manager-options', ''));
         $options = trim((string) $this->config->get("manager-{$action}-options", ''));
 
-        return sprintf(
-            '%s %s%s%s',
-            $this->getManagerBinary($defaultBin),
-            implode(' ', (array) $command),
-            $gOptions === '' ? '' : " {$gOptions}",
-            $options === '' ? '' : " {$options}",
-        );
+        return $this->buildUnconfiguredCommand($defaultBin, $command)
+            . ($gOptions === '' ? '' : " {$gOptions}")
+            . ($options === '' ? '' : " {$options}");
     }
 
     /**
@@ -293,16 +282,16 @@ abstract class AbstractAssetManager implements AssetManagerInterface
 
     protected function getManagerWorkingDirectory(): string|null
     {
-        $rootPackageDir = $this->config->get('root-package-json-dir');
-
-        if (!is_string($rootPackageDir) || $rootPackageDir === '') {
+        if (null === $this->getConfiguredRootPackageDir()) {
             return null;
         }
 
         $rootPackageDir = $this->getRootPackageDir();
 
         if (!is_dir($rootPackageDir)) {
-            throw new RuntimeException(sprintf('The root package directory "%s" doesn\'t exist.', $rootPackageDir));
+            throw new RuntimeException(
+                Message::ASSET_ROOT_PACKAGE_DIR_MISSING->getMessage($rootPackageDir),
+            );
         }
 
         return $rootPackageDir;
@@ -315,37 +304,25 @@ abstract class AbstractAssetManager implements AssetManagerInterface
 
     protected function getRootPackageDir(): string
     {
-        $rootPackageDir = $this->config->get('root-package-json-dir');
+        $rootPackageDir = $this->getConfiguredRootPackageDir();
 
-        if (is_string($rootPackageDir) && '' !== $rootPackageDir) {
-            $rootPackageDir = rtrim($rootPackageDir, '/\\');
+        if (null === $rootPackageDir) {
+            return $this->getCurrentDirectory();
+        }
 
-            if ('' === $rootPackageDir) {
-                $rootPackageDir = DIRECTORY_SEPARATOR;
-            } elseif (1 === preg_match('/^[A-Za-z]:$/', $rootPackageDir)) {
-                $rootPackageDir .= DIRECTORY_SEPARATOR;
-            }
+        $rootPackageDir = rtrim($rootPackageDir, '/\\');
 
-            if (!$this->isAbsolutePath($rootPackageDir)) {
-                $currentDir = getcwd();
+        if ('' === $rootPackageDir) {
+            $rootPackageDir = DIRECTORY_SEPARATOR;
+        } elseif (1 === preg_match('/^[A-Za-z]:$/', $rootPackageDir)) {
+            $rootPackageDir .= DIRECTORY_SEPARATOR;
+        }
 
-                if (false === $currentDir) {
-                    throw new RuntimeException('Unable to get the current working directory.');
-                }
-
-                $rootPackageDir = rtrim($currentDir, '/\\') . DIRECTORY_SEPARATOR . $rootPackageDir;
-            }
-
+        if ($this->isAbsolutePath($rootPackageDir)) {
             return $rootPackageDir;
         }
 
-        $currentDir = getcwd();
-
-        if (false === $currentDir) {
-            throw new RuntimeException('Unable to get the current working directory.');
-        }
-
-        return $currentDir;
+        return rtrim($this->getCurrentDirectory(), '/\\') . DIRECTORY_SEPARATOR . $rootPackageDir;
     }
 
     protected function getRootPackagePath(string $path): string
@@ -381,6 +358,32 @@ abstract class AbstractAssetManager implements AssetManagerInterface
     }
 
     /**
+     * Runs the callback with the process timeout set to the `manager-timeout` option and restores the previous timeout
+     * afterward, even when the callback throws.
+     *
+     * @template T
+     *
+     * @param callable(): T $callback The operation to run under the manager timeout.
+     *
+     * @return T The callback result.
+     */
+    final protected function withManagerTimeout(callable $callback): mixed
+    {
+        $timeout = ProcessExecutor::getTimeout();
+
+        /** @var int $managerTimeout */
+        $managerTimeout = $this->config->get('manager-timeout', PHP_INT_MAX);
+
+        ProcessExecutor::setTimeout($managerTimeout);
+
+        try {
+            return $callback();
+        } finally {
+            ProcessExecutor::setTimeout($timeout);
+        }
+    }
+
+    /**
      * Execute a manager command without changing the PHP process working directory.
      */
     private function executeManagerCommand(string $command, string|null $workingDirectory): int
@@ -396,6 +399,34 @@ abstract class AbstractAssetManager implements AssetManagerInterface
         };
 
         return $this->executor->execute($command, $outputHandler, $workingDirectory);
+    }
+
+    /**
+     * Returns the configured `root-package-json-dir` value, or `null` when it is unset or empty.
+     */
+    private function getConfiguredRootPackageDir(): string|null
+    {
+        $rootPackageDir = $this->config->get('root-package-json-dir');
+
+        return is_string($rootPackageDir) && '' !== $rootPackageDir ? $rootPackageDir : null;
+    }
+
+    /**
+     * Returns the current working directory of the PHP process.
+     *
+     * @throws RuntimeException if the current working directory cannot be determined.
+     */
+    private function getCurrentDirectory(): string
+    {
+        $currentDir = getcwd();
+
+        if (false === $currentDir) {
+            throw new RuntimeException(
+                Message::CURRENT_WORKING_DIRECTORY_UNAVAILABLE->getMessage(),
+            );
+        }
+
+        return $currentDir;
     }
 
     private function getManagerBinary(string $defaultBin): string
@@ -428,10 +459,7 @@ abstract class AbstractAssetManager implements AssetManagerInterface
             $this->fallback->restore();
         } catch (Throwable $fallbackException) {
             throw new RuntimeException(
-                sprintf(
-                    'The asset manager failed and its fallback could not be restored: %s',
-                    $fallbackException->getMessage(),
-                ),
+                Message::ASSET_MANAGER_FALLBACK_RESTORE_FAILED->getMessage($fallbackException->getMessage()),
                 previous: $exception,
             );
         }

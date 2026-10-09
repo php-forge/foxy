@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Foxy\Tests\Json;
 
 use Exception;
-use Foxy\Exception\RuntimeException;
+use Foxy\Exception\{Message, RuntimeException};
 use Foxy\Json\JsonFile;
 use Foxy\Tests\Support\JsonFixture;
 use PHPForge\Support\LineEndingNormalizer;
@@ -18,6 +18,7 @@ use Xepozz\InternalMocker\MockerState;
 use function chdir;
 use function file_get_contents;
 
+use function sprintf;
 use const DIRECTORY_SEPARATOR;
 
 final class JsonFileTest extends TestCase
@@ -33,13 +34,21 @@ final class JsonFileTest extends TestCase
      */
     public function testEncodeAndWriteEmptyManifestAsObject(): void
     {
-        self::assertSame('{}', JsonFile::encode([]));
+        self::assertSame(
+            '{}',
+            JsonFile::encode([]),
+            'Encoding an empty array should result in an empty JSON object.',
+        );
 
         $jsonFile = new JsonFile('./empty-package.json');
 
         $jsonFile->write([]);
 
-        self::assertSame("{}\n", file_get_contents('./empty-package.json'));
+        self::assertSame(
+            "{}\n",
+            file_get_contents('./empty-package.json'),
+            'The empty package JSON file should contain an empty JSON object followed by a newline.',
+        );
     }
 
     public function testEncodeUsesCustomOptionsWithoutReformatting(): void
@@ -47,6 +56,7 @@ final class JsonFileTest extends TestCase
         self::assertSame(
             '{"url":"https://example.com"}',
             JsonFile::encode(['url' => 'https://example.com'], JSON_UNESCAPED_SLASHES),
+            'Encoding with custom options should not reformat the JSON.',
         );
     }
 
@@ -55,6 +65,7 @@ final class JsonFileTest extends TestCase
         self::assertSame(
             self::fixtureWithoutFinalNewline('encoded-default-four-space.json'),
             JsonFile::encode(['html' => '<tag>', 'url' => 'https://example.com/é']),
+            'Encoding with default options should use four-space indentation without reformatting.',
         );
     }
 
@@ -64,14 +75,24 @@ final class JsonFileTest extends TestCase
 
         file_put_contents($filename, '{}');
 
-        self::assertFileExists($filename);
+        self::assertFileExists(
+            $filename,
+            'The package JSON file should exist before attempting to read it.',
+        );
 
-        MockerState::addCondition('Foxy\\Json', 'file_get_contents', [$filename, false, null, 0, null], false);
+        MockerState::addCondition(
+            'Foxy\\Json',
+            'file_get_contents',
+            [$filename, false, null, 0, null],
+            false,
+        );
 
         $jsonFile = new JsonFile($filename);
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessageMatches('/Unable to read json file ".+package\.json"\./');
+        $this->expectExceptionMessage(
+            Message::JSON_FILE_UNREADABLE->getMessage($jsonFile->getPath()),
+        );
 
         $jsonFile->getArrayKeys();
     }
@@ -79,17 +100,25 @@ final class JsonFileTest extends TestCase
     public function testGetArrayKeysWithExistingFile(): void
     {
         $expected = ['contributors'];
+
         $content = self::fixture('package-two-space.json');
 
         $filename = './package.json';
 
         file_put_contents($filename, $content);
 
-        self::assertFileExists($filename);
+        self::assertFileExists(
+            $filename,
+            'The package JSON file should exist before attempting to read it.',
+        );
 
         $jsonFile = new JsonFile($filename);
 
-        self::assertSame($expected, $jsonFile->getArrayKeys());
+        self::assertSame(
+            $expected,
+            $jsonFile->getArrayKeys(),
+            'The array keys should match the expected keys.',
+        );
     }
 
     public function testGetArrayKeysWithoutFile(): void
@@ -98,7 +127,11 @@ final class JsonFileTest extends TestCase
 
         $jsonFile = new JsonFile($filename);
 
-        self::assertSame([], $jsonFile->getArrayKeys());
+        self::assertSame(
+            [],
+            $jsonFile->getArrayKeys(),
+            'The array keys should be empty when the file does not exist.',
+        );
     }
 
     public function testGetIndentWithExistingFile(): void
@@ -109,19 +142,31 @@ final class JsonFileTest extends TestCase
 
         file_put_contents($filename, $content);
 
-        self::assertFileExists($filename);
+        self::assertFileExists(
+            $filename,
+            'The package JSON file should exist before attempting to read it.',
+        );
 
         $jsonFile = new JsonFile($filename);
 
-        self::assertSame(2, $jsonFile->getIndent());
+        self::assertSame(
+            2,
+            $jsonFile->getIndent(),
+            'The indent should match the expected value.',
+        );
     }
 
     public function testGetIndentWithoutFile(): void
     {
         $filename = './package.json';
+
         $jsonFile = new JsonFile($filename);
 
-        self::assertSame(4, $jsonFile->getIndent());
+        self::assertSame(
+            4,
+            $jsonFile->getIndent(),
+            'The indent should default to four spaces when the file does not exist.',
+        );
     }
 
     /**
@@ -132,9 +177,11 @@ final class JsonFileTest extends TestCase
         file_put_contents('./package.json', '{"metadata":{}}');
 
         $jsonFile = new JsonFile('./package.json');
+
         $data = $jsonFile->read();
 
         file_put_contents('./package.json', '{"metadata":[]}');
+
         $jsonFile->write($data);
 
         self::assertStringContainsString(
@@ -158,6 +205,7 @@ final class JsonFileTest extends TestCase
         self::assertStringContainsString(
             '"custom": {}',
             JsonFile::encode(['custom' => []]),
+            'The encoding state should be cleared after a failed write attempt.',
         );
     }
 
@@ -173,7 +221,10 @@ final class JsonFileTest extends TestCase
 
         file_put_contents($filename, $content);
 
-        self::assertFileExists($filename);
+        self::assertFileExists(
+            $filename,
+            'The package JSON file should exist before attempting to read it.',
+        );
 
         $jsonFile = new JsonFile($filename);
 
@@ -183,13 +234,17 @@ final class JsonFileTest extends TestCase
 
         $jsonFile->write($data);
 
-        self::assertFileExists($filename);
+        self::assertFileExists(
+            $filename,
+            'The package JSON file should exist after writing.',
+        );
 
         $content = file_get_contents($filename);
 
         self::assertSame(
             LineEndingNormalizer::normalize($expected),
             LineEndingNormalizer::normalize($content),
+            'The content of the package JSON file should match the expected content after writing.',
         );
     }
 
@@ -210,12 +265,16 @@ final class JsonFileTest extends TestCase
         $data = array_fill_keys($mapKeys, []);
 
         $jsonFile = new JsonFile('./package.json');
+
         $jsonFile->write($data);
 
         $content = (string) file_get_contents('./package.json');
 
         foreach ($mapKeys as $key) {
-            self::assertStringContainsString(sprintf('"%s": {}', $key), $content);
+            self::assertStringContainsString(
+                sprintf('"%s": {}', $key), $content,
+                "The content of the package JSON file should contain the key: {$key}",
+            );
         }
     }
 
@@ -227,11 +286,13 @@ final class JsonFileTest extends TestCase
         file_put_contents('./package.json', '{"metadata":{}}');
 
         $jsonFile = new JsonFile('./package.json');
+
         $jsonFile->write(['metadata' => []]);
 
         self::assertStringContainsString(
             '"metadata": {}',
             (string) file_get_contents('./package.json'),
+            'The content of the package JSON file should contain the metadata key.',
         );
     }
 
@@ -241,12 +302,14 @@ final class JsonFileTest extends TestCase
     public function testWritePreservesNestedEmptyArraysWithoutSpaces(): void
     {
         $content = '{"name":"test","workspaces":[],"overrides":{"pkg":{"files":[]}},"dependencies":{}}';
-
         $filename = './package.json';
 
         file_put_contents($filename, $content);
 
-        self::assertFileExists($filename);
+        self::assertFileExists(
+            $filename,
+            'The package JSON file should exist before attempting to read it.',
+        );
 
         $jsonFile = new JsonFile($filename);
 
@@ -256,14 +319,33 @@ final class JsonFileTest extends TestCase
 
         $jsonFile->write($data);
 
-        self::assertFileExists($filename);
+        self::assertFileExists(
+            $filename,
+            'The package JSON file should exist after writing.',
+        );
 
         $content = file_get_contents($filename);
 
-        self::assertStringContainsString('"workspaces": []', $content);
-        self::assertStringContainsString('"files": []', $content);
-        self::assertStringContainsString('"dependencies": {}', $content);
-        self::assertMatchesRegularExpression('/^ {4}"dependencies": \{\}/m', $content);
+        self::assertStringContainsString(
+            '"workspaces": []',
+            $content,
+            'The content of the package JSON file should contain the workspaces key.',
+        );
+        self::assertStringContainsString(
+            '"files": []',
+            $content,
+            'The content of the package JSON file should contain the files key.',
+        );
+        self::assertStringContainsString(
+            '"dependencies": {}',
+            $content,
+            'The content of the package JSON file should contain the dependencies key.',
+        );
+        self::assertMatchesRegularExpression(
+            '/^ {4}"dependencies": \{\}/m',
+            $content,
+            'The content of the package JSON file should have the dependencies key indented with four spaces.',
+        );
     }
 
     /**
@@ -274,15 +356,25 @@ final class JsonFileTest extends TestCase
         file_put_contents('./package.json', '{"dependencies":{}}');
 
         $jsonFile = new JsonFile('./package.json');
+
         $data = $jsonFile->read();
+
         $data['metadata'] = ['files' => []];
 
         $jsonFile->write($data);
 
         $content = (string) file_get_contents('./package.json');
 
-        self::assertStringContainsString('"dependencies": {}', $content);
-        self::assertStringContainsString('"files": []', $content);
+        self::assertStringContainsString(
+            '"dependencies": {}',
+            $content,
+            'The content of the package JSON file should contain the dependencies key.',
+        );
+        self::assertStringContainsString(
+            '"files": []',
+            $content,
+            'The content of the package JSON file should contain the files key.',
+        );
     }
 
     /**
@@ -296,6 +388,7 @@ final class JsonFileTest extends TestCase
         self::assertStringContainsString(
             '"html": "<tag>"',
             (string) file_get_contents('./package.json'),
+            'The content of the package JSON file should contain the html key.',
         );
     }
 
@@ -311,7 +404,10 @@ final class JsonFileTest extends TestCase
 
         file_put_contents($filename, $content);
 
-        self::assertFileExists($filename);
+        self::assertFileExists(
+            $filename,
+            'The package JSON file should exist before writing to it.',
+        );
 
         $jsonFile = new JsonFile($filename);
 
@@ -321,13 +417,17 @@ final class JsonFileTest extends TestCase
 
         $jsonFile->write($data);
 
-        self::assertFileExists($filename);
+        self::assertFileExists(
+            $filename,
+            'The package JSON file should exist after writing to it.',
+        );
 
         $content = file_get_contents($filename);
 
         self::assertSame(
             LineEndingNormalizer::normalize($expected),
             LineEndingNormalizer::normalize($content),
+            'The content of the package JSON file should match the expected content.',
         );
     }
 
@@ -345,13 +445,17 @@ final class JsonFileTest extends TestCase
 
         $jsonFile->write($data);
 
-        self::assertFileExists($filename);
+        self::assertFileExists(
+            $filename,
+            'The package JSON file should exist after writing to it.',
+        );
 
         $content = file_get_contents($filename);
 
         self::assertSame(
             LineEndingNormalizer::normalize($expected),
             LineEndingNormalizer::normalize($content),
+            'The content of the package JSON file should match the expected content.',
         );
     }
 

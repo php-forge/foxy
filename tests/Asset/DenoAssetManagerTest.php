@@ -9,7 +9,7 @@ use Composer\Package\RootPackageInterface;
 use Composer\Util\{Filesystem, Platform, ProcessExecutor};
 use Foxy\Asset\{AssetPackageInterface, DenoManager};
 use Foxy\Config\Config;
-use Foxy\Exception\RuntimeException;
+use Foxy\Exception\{Message, RuntimeException};
 use Foxy\Tests\Provider\DenoAssetManagerProvider;
 use PHPUnit\Framework\Attributes\{DataProviderExternal, PreserveGlobalState, RunInSeparateProcess, TestWith};
 
@@ -197,12 +197,15 @@ final class DenoAssetManagerTest extends AuditableAssetManager
                 ['workspaces' => 'packages/*'],
                 ['@composer-asset/foo--bar' => 'path/foo/bar/package.json'],
             );
+
             self::fail(
                 'Expected invalid workspaces to be rejected.',
             );
         } catch (RuntimeException $exception) {
-            self::assertStringStartsWith(
-                'The "workspaces" field of ',
+            self::assertSame(
+                Message::ASSET_DENO_WORKSPACES_INVALID->getMessage(
+                    $this->cwd . DIRECTORY_SEPARATOR . 'package.json',
+                ),
                 $exception->getMessage(),
                 'The exception message should indicate the invalid workspaces',
             );
@@ -443,10 +446,7 @@ final class DenoAssetManagerTest extends AuditableAssetManager
     {
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            sprintf(
-                'The "workspaces" field of "%s" must be a list of strings to install Composer assets with deno.',
-                $this->cwd . DIRECTORY_SEPARATOR . 'package.json',
-            ),
+            Message::ASSET_DENO_WORKSPACES_INVALID->getMessage($this->cwd . DIRECTORY_SEPARATOR . 'package.json'),
         );
 
         $this->addDependenciesFromPackage(
@@ -460,8 +460,7 @@ final class DenoAssetManagerTest extends AuditableAssetManager
     {
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            'The Composer asset "@composer-asset/foo--bar" must be located in a subdirectory of the root package '
-            . 'directory to be installed with deno.',
+            Message::ASSET_DENO_COMPOSER_ASSET_NOT_NESTED->getMessage('@composer-asset/foo--bar'),
         );
 
         $this->addDependenciesFromPackage(['name' => 'app'], ['@composer-asset/foo--bar' => $dependency]);
@@ -475,9 +474,7 @@ final class DenoAssetManagerTest extends AuditableAssetManager
         );
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage(
-            'The installed deno version "2.9.6" doesn\'t match with the supported version constraint "^2.9.7"',
-        );
+        $this->expectExceptionMessage(Message::ASSET_VERSION_UNSUPPORTED->getMessage('deno', '2.9.6', '^2.9.7'));
 
         $this->manager->validate();
     }
@@ -486,8 +483,7 @@ final class DenoAssetManagerTest extends AuditableAssetManager
     {
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            'The Composer asset "@composer-asset/foo--bar" must be located in a subdirectory of the root package '
-            . 'directory to be installed with deno.',
+            Message::ASSET_DENO_COMPOSER_ASSET_NOT_NESTED->getMessage('@composer-asset/foo--bar'),
         );
 
         $this->addDependenciesFromPackage(
@@ -508,8 +504,7 @@ final class DenoAssetManagerTest extends AuditableAssetManager
             );
         } catch (RuntimeException $exception) {
             self::assertSame(
-                'The deno audit cannot guarantee the requested dependency scope because "deno audit" cannot exclude '
-                . 'development dependencies.',
+                Message::ASSET_DENO_AUDIT_NO_DEV_UNSUPPORTED->getMessage(),
                 $exception->getMessage(),
                 'The exception message should explain why the dependency scope cannot be guaranteed',
             );
@@ -527,8 +522,7 @@ final class DenoAssetManagerTest extends AuditableAssetManager
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            'The installed deno version "upgraded deno 2.9.7" doesn\'t match with the supported version constraint '
-            . '"^2.9.7"',
+            Message::ASSET_VERSION_UNSUPPORTED->getMessage('deno', 'upgraded deno 2.9.7', '^2.9.7'),
         );
 
         $this->manager->validate();
@@ -598,7 +592,6 @@ final class DenoAssetManagerTest extends AuditableAssetManager
         file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'deno.lock', '{}');
 
         $this->sfs->mkdir($this->cwd . DIRECTORY_SEPARATOR . 'node_modules');
-
         $this->executor->addExpectedValues(0, '2.9.7');
         $this->executor->addExpectedValues(0, 'ASSET MANAGER OUTPUT');
 

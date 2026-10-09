@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Foxy\Config;
 
-use Foxy\Exception\RuntimeException;
+use Foxy\Exception\{Message, RuntimeException};
 
 use function array_key_exists;
 use function getenv;
@@ -13,7 +13,6 @@ use function is_array;
 use function json_decode;
 use function json_last_error;
 use function preg_match;
-use function sprintf;
 use function str_replace;
 use function str_starts_with;
 use function strtolower;
@@ -45,6 +44,7 @@ class Config
         }
 
         $envKey = $this->convertEnvKey($key);
+
         $envValue = getenv($envKey);
 
         if (false !== $envValue) {
@@ -154,7 +154,7 @@ class Config
 
         if (json_last_error() !== JSON_ERROR_NONE) {
             throw new RuntimeException(
-                sprintf('The "%s" environment variable isn\'t a valid JSON', $environmentVariable),
+                Message::CONFIG_ENV_JSON_INVALID->getMessage($environmentVariable),
             );
         }
 

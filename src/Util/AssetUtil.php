@@ -5,11 +5,9 @@ declare(strict_types=1);
 namespace Foxy\Util;
 
 use Composer\Installer\InstallationManager;
-use Composer\Package\Link;
-use Composer\Package\PackageInterface;
-use Foxy\Asset\AssetManagerInterface;
-use Foxy\Asset\AssetPackage;
-use Foxy\Exception\RuntimeException;
+use Composer\Package\{Link, PackageInterface};
+use Foxy\Asset\{AssetManagerInterface, AssetPackage};
+use Foxy\Exception\{Message, RuntimeException};
 use JsonException;
 
 use function array_flip;
@@ -24,7 +22,6 @@ use function is_string;
 use function json_decode;
 use function preg_match;
 use function realpath;
-use function sprintf;
 use function str_replace;
 use function str_starts_with;
 use function strtr;
@@ -128,7 +125,7 @@ final class AssetUtil
 
             if (false === $content) {
                 throw new RuntimeException(
-                    sprintf('Unable to read Composer package file "%s".', $composerJsonPath),
+                    Message::UTIL_COMPOSER_PACKAGE_FILE_UNREADABLE->getMessage($composerJsonPath),
                 );
             }
 
@@ -188,12 +185,14 @@ final class AssetUtil
     {
         $projectConfig = self::getProjectActivation($package, $configPackages);
 
-        $enabled = false !== $projectConfig;
+        if (false === $projectConfig) {
+            return false;
+        }
 
-        return $enabled && (self::hasExtraActivation($package)
+        return self::hasExtraActivation($package)
             || self::hasPluginDependency($package->getRequires())
             || self::hasPluginDependency($package->getDevRequires())
-            || true === $projectConfig);
+            || true === $projectConfig;
     }
 
     /**
@@ -269,7 +268,7 @@ final class AssetUtil
 
         if ($normalizedPath !== $normalizedRoot && !str_starts_with($normalizedPath, $normalizedRootPrefix)) {
             throw new RuntimeException(
-                sprintf('The asset package path "%s" escapes its Composer install directory.', $normalizedPath),
+                Message::UTIL_ASSET_PACKAGE_PATH_ESCAPES->getMessage($normalizedPath),
             );
         }
 

@@ -6,7 +6,6 @@ namespace Foxy\Audit;
 
 use Throwable;
 
-use function preg_match;
 use function sprintf;
 
 final readonly class CveEnricher
@@ -55,10 +54,6 @@ final readonly class CveEnricher
 
     private function getGhsaId(string $advisoryId): string|null
     {
-        if (1 !== preg_match('/^GHSA-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/i', $advisoryId)) {
-            return null;
-        }
-
-        return $advisoryId;
+        return null === AuditNormalizer::normalizeGhsaId($advisoryId) ? null : $advisoryId;
     }
 }

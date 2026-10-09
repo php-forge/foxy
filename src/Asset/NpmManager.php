@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Foxy\Asset;
 
+use Composer\Json\JsonFile;
 use Composer\Util\ProcessExecutor;
-use Foxy\Exception\RuntimeException;
-use Foxy\Json\JsonFile;
+use Foxy\Exception\{Message, RuntimeException};
 
+use function array_is_list;
+use function array_keys;
 use function is_array;
 use function is_string;
 use function str_contains;
@@ -60,11 +62,7 @@ final class NpmManager extends AbstractAuditableAssetManager
             ];
         }
 
-        if ($noDev) {
-            $command = [...$command, '--omit=dev', '--include=optional', '--include=peer'];
-        } else {
-            $command = [...$command, '--include=dev', '--include=optional', '--include=peer'];
-        }
+        $command = [...$command, $noDev ? '--omit=dev' : '--include=dev', '--include=optional', '--include=peer'];
 
         return $this->buildUnconfiguredCommand('npm', $command);
     }
@@ -107,17 +105,13 @@ final class NpmManager extends AbstractAuditableAssetManager
             }
         }
 
-        $validatedPatterns = [];
-
         foreach ($patterns as $pattern) {
             if (!is_string($pattern) || '' === trim($pattern)) {
                 throw $this->workspaceEnumerationFailure();
             }
-
-            $validatedPatterns[] = $pattern;
         }
 
-        return $validatedPatterns;
+        return $patterns;
     }
 
     /**
@@ -150,7 +144,7 @@ final class NpmManager extends AbstractAuditableAssetManager
 
         $selectors = [];
 
-        foreach ($packages as $path => $package) {
+        foreach (array_keys($packages) as $path) {
             $path = (string) $path;
 
             if ('' === $path || $this->isNodeModulesPath($path)) {
@@ -177,8 +171,7 @@ final class NpmManager extends AbstractAuditableAssetManager
     private function workspaceEnumerationFailure(): RuntimeException
     {
         return new RuntimeException(
-            'The npm workspace graph could not be enumerated from package-lock.json. '
-            . 'Regenerate the lock file with a supported npm version.',
+            Message::ASSET_NPM_WORKSPACE_GRAPH_UNENUMERABLE->getMessage(),
         );
     }
 }

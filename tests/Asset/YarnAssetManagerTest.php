@@ -16,7 +16,7 @@ use const DIRECTORY_SEPARATOR;
 
 final class YarnAssetManagerTest extends AuditableAssetManager
 {
-    private const AUDIT_ENVIRONMENT_VARIABLES = [
+    private const array AUDIT_ENVIRONMENT_VARIABLES = [
         'YARN_NPM_AUDIT_EXCLUDE_PACKAGES',
         'YARN_NPM_AUDIT_IGNORE_ADVISORIES',
     ];
@@ -29,18 +29,23 @@ final class YarnAssetManagerTest extends AuditableAssetManager
             $excludeVariable = self::AUDIT_ENVIRONMENT_VARIABLES[0];
             $ignoreVariable = self::AUDIT_ENVIRONMENT_VARIABLES[1];
 
-            putenv($excludeVariable . '=process-original');
+            putenv("{$excludeVariable}=process-original");
+
             $_ENV[$excludeVariable] = 'env-original';
+
             unset($_SERVER[$excludeVariable]);
 
             putenv($ignoreVariable);
             unset($_ENV[$ignoreVariable]);
+
             $_SERVER[$ignoreVariable] = 'server-original';
 
             file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'yarn.lock', '{}');
 
             $position = 0;
+
             $executor = $this->createMock(ProcessExecutor::class);
+
             $executor
                 ->expects(self::exactly(2))
                 ->method('execute')
@@ -53,9 +58,21 @@ final class YarnAssetManagerTest extends AuditableAssetManager
                         }
 
                         foreach (self::AUDIT_ENVIRONMENT_VARIABLES as $variable) {
-                            self::assertSame('__FOXY_AUDIT_NO_MATCH__', getenv($variable));
-                            self::assertSame('__FOXY_AUDIT_NO_MATCH__', $_ENV[$variable]);
-                            self::assertSame('__FOXY_AUDIT_NO_MATCH__', $_SERVER[$variable]);
+                            self::assertSame(
+                                '__FOXY_AUDIT_NO_MATCH__',
+                                getenv($variable),
+                                'Process variable must hide audit filters.',
+                            );
+                            self::assertSame(
+                                '__FOXY_AUDIT_NO_MATCH__',
+                                $_ENV[$variable],
+                                '`$_ENV` must hide audit filters.',
+                            );
+                            self::assertSame(
+                                '__FOXY_AUDIT_NO_MATCH__',
+                                $_SERVER[$variable],
+                                '`$_SERVER` must hide audit filters.',
+                            );
                         }
 
                         $output = '{}';
@@ -63,17 +80,44 @@ final class YarnAssetManagerTest extends AuditableAssetManager
                         return 0;
                     },
                 );
-            $executor->expects(self::once())->method('getErrorOutput')->willReturn('');
+            $executor
+                ->expects(self::once())
+                ->method('getErrorOutput')
+                ->willReturn('');
 
             $manager = new YarnManager($this->io, $this->config, $executor, $this->fs, $this->fallback);
+
             $manager->audit(false);
 
-            self::assertSame('process-original', getenv($excludeVariable));
-            self::assertSame('env-original', $_ENV[$excludeVariable]);
-            self::assertArrayNotHasKey($excludeVariable, $_SERVER);
-            self::assertFalse(getenv($ignoreVariable));
-            self::assertArrayNotHasKey($ignoreVariable, $_ENV);
-            self::assertSame('server-original', $_SERVER[$ignoreVariable]);
+            self::assertSame(
+                'process-original',
+                getenv($excludeVariable),
+                'Original process environment value must be restored.',
+            );
+            self::assertSame(
+                'env-original',
+                $_ENV[$excludeVariable],
+                'Original `$_ENV` value must be restored.',
+            );
+            self::assertArrayNotHasKey(
+                $excludeVariable,
+                $_SERVER,
+                'Absent `$_SERVER` value must remain absent.',
+            );
+            self::assertFalse(
+                getenv($ignoreVariable),
+                'Unset process variable must remain unset (`false`).',
+            );
+            self::assertArrayNotHasKey(
+                $ignoreVariable,
+                $_ENV,
+                'Absent `$_ENV` value must remain absent.',
+            );
+            self::assertSame(
+                'server-original',
+                $_SERVER[$ignoreVariable],
+                'Original `$_SERVER` value must be restored.',
+            );
         } finally {
             self::restoreEnvironment($state);
         }
@@ -92,7 +136,9 @@ final class YarnAssetManagerTest extends AuditableAssetManager
             file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'yarn.lock', '{}');
 
             $position = 0;
+
             $executor = $this->createMock(ProcessExecutor::class);
+
             $executor
                 ->expects(self::exactly(2))
                 ->method('execute')
@@ -105,12 +151,26 @@ final class YarnAssetManagerTest extends AuditableAssetManager
                         }
 
                         foreach (self::AUDIT_ENVIRONMENT_VARIABLES as $variable) {
-                            self::assertSame('__FOXY_AUDIT_NO_MATCH__', getenv($variable));
-                            self::assertSame('__FOXY_AUDIT_NO_MATCH__', $_ENV[$variable]);
-                            self::assertSame('__FOXY_AUDIT_NO_MATCH__', $_SERVER[$variable]);
+                            self::assertSame(
+                                '__FOXY_AUDIT_NO_MATCH__',
+                                getenv($variable),
+                                'Process variable must hide audit filters.',
+                            );
+                            self::assertSame(
+                                '__FOXY_AUDIT_NO_MATCH__',
+                                $_ENV[$variable],
+                                '`$_ENV` must hide audit filters.',
+                            );
+                            self::assertSame(
+                                '__FOXY_AUDIT_NO_MATCH__',
+                                $_SERVER[$variable],
+                                '`$_SERVER` must hide audit filters.',
+                            );
                         }
 
-                        throw new \RuntimeException('Audit execution failed.');
+                        throw new \RuntimeException(
+                            'Audit execution failed.',
+                        );
                     },
                 );
 
@@ -118,15 +178,33 @@ final class YarnAssetManagerTest extends AuditableAssetManager
 
             try {
                 $manager->audit(false);
-                self::fail('Expected the audit process to fail.');
+
+                self::fail(
+                    'Expected the audit process to fail.',
+                );
             } catch (\RuntimeException $exception) {
-                self::assertSame('Audit execution failed.', $exception->getMessage());
+                self::assertSame(
+                    'Audit execution failed.',
+                    $exception->getMessage(),
+                    'Exception message must match the audit failure.',
+                );
             }
 
             foreach (self::AUDIT_ENVIRONMENT_VARIABLES as $variable) {
-                self::assertFalse(getenv($variable));
-                self::assertArrayNotHasKey($variable, $_ENV);
-                self::assertArrayNotHasKey($variable, $_SERVER);
+                self::assertFalse(
+                    getenv($variable),
+                    'Process variable must be unset after failure.',
+                );
+                self::assertArrayNotHasKey(
+                    $variable,
+                    $_ENV,
+                    '`$_ENV` entry must be absent after failure.',
+                );
+                self::assertArrayNotHasKey(
+                    $variable,
+                    $_SERVER,
+                    '`$_SERVER` entry must be absent after failure.',
+                );
             }
         } finally {
             self::restoreEnvironment($state);
@@ -138,7 +216,10 @@ final class YarnAssetManagerTest extends AuditableAssetManager
         file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'package.json', '{}');
         file_put_contents($this->cwd . DIRECTORY_SEPARATOR . '.pnp.cjs', '');
 
-        self::assertFalse($this->manager->isInstalled());
+        self::assertFalse(
+            $this->manager->isInstalled(),
+            'Missing lockfile must not count as installed.',
+        );
     }
 
     public function testIsInstalledRequiresPackageFileWithPlugAndPlayState(): void
@@ -146,7 +227,10 @@ final class YarnAssetManagerTest extends AuditableAssetManager
         file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'yarn.lock', '');
         file_put_contents($this->cwd . DIRECTORY_SEPARATOR . '.pnp.cjs', '');
 
-        self::assertFalse($this->manager->isInstalled());
+        self::assertFalse(
+            $this->manager->isInstalled(),
+            'Missing package metadata must not count as installed.',
+        );
     }
 
     public function testIsInstalledWithPlugAndPlayState(): void
@@ -155,7 +239,10 @@ final class YarnAssetManagerTest extends AuditableAssetManager
         file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'yarn.lock', '');
         file_put_contents($this->cwd . DIRECTORY_SEPARATOR . '.pnp.cjs', '');
 
-        self::assertTrue($this->manager->isInstalled());
+        self::assertTrue(
+            $this->manager->isInstalled(),
+            'Plug-and-Play install state must be recognized.',
+        );
     }
 
     protected function getManager(): YarnManager

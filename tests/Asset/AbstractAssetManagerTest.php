@@ -12,7 +12,8 @@ use Foxy\Converter\VersionConverterInterface;
 use Foxy\Fallback\FallbackInterface;
 use Foxy\Tests\Fixtures\Asset\InspectableAssetManager;
 use Foxy\Tests\Fixtures\Util\ProcessExecutorMock;
-use PHPUnit\Framework\Attributes\{DataProvider, PreserveGlobalState, RunInSeparateProcess};
+use Foxy\Tests\Provider\AbstractAssetManagerProvider;
+use PHPUnit\Framework\Attributes\{DataProviderExternal, PreserveGlobalState, RunInSeparateProcess};
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Seld\JsonLint\ParsingException;
@@ -30,6 +31,11 @@ use function str_replace;
 
 use const DIRECTORY_SEPARATOR;
 
+/**
+ * Unit tests for {@see \Foxy\Asset\AbstractAssetManager} through the {@see InspectableAssetManager} fixture.
+ *
+ * {@see AbstractAssetManagerProvider} for test case data providers.
+ */
 final class AbstractAssetManagerTest extends TestCase
 {
     private Config|null $config = null;
@@ -42,43 +48,44 @@ final class AbstractAssetManagerTest extends TestCase
     private RootPackageInterface|MockObject|null $rootPackage = null;
     private SymfonyFilesystem|null $sfs = null;
 
-    public static function relativeRootPackageDirectories(): array
-    {
-        return [
-            ['prefixC:', 'prefixC:'],
-            ['C:directory', 'C:directory'],
-            ['relative/C:/directory', 'relative/C:/directory'],
-        ];
-    }
-
     public function testActionHookIsSkippedWhenManagerExecutionIsDisabled(): void
     {
         $this->config = new Config([], ['run-asset-manager' => false]);
 
         $manager = $this->createManager();
+
         $manager->addDependencies(
             $this->rootPackage,
             ['@composer-asset/foo--bar' => 'path/foo/bar/package.json'],
         );
 
-        self::assertNull($manager->getHandledDependencies());
+        self::assertNull(
+            $manager->getHandledDependencies(),
+            'Disabled execution must leave handled dependencies unset.',
+        );
     }
 
     public function testActionHookRemainsExtensible(): void
     {
         $this->config = new Config([], ['run-asset-manager' => true]);
+
         $this->io
             ->expects(self::once())
             ->method('write')
             ->with('<info>Merging Composer dependencies in the asset package</info>');
 
         $manager = $this->createManager();
+
         $manager->addDependencies(
             $this->rootPackage,
             ['@composer-asset/foo--bar' => 'path/foo/bar/package.json'],
         );
 
-        self::assertSame([], $manager->getHandledDependencies());
+        self::assertSame(
+            [],
+            $manager->getHandledDependencies(),
+            'The default hook must not handle dependencies.',
+        );
     }
 
     public function testAddDependenciesPropagatesFailureWithoutFallback(): void
@@ -101,7 +108,10 @@ final class AbstractAssetManagerTest extends TestCase
     {
         file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'package.json', 'invalid json');
 
-        $this->fallback->expects(self::once())->method('restore');
+        $this->fallback
+            ->expects(self::once())
+            ->method('restore');
+
         $this->expectException(ParsingException::class);
 
         $this->createManager()->addDependencies($this->rootPackage, []);
@@ -112,22 +122,32 @@ final class AbstractAssetManagerTest extends TestCase
         file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'inspectable.lock', '{}');
 
         $position = 0;
+
         $executor = $this->createMock(ProcessExecutor::class);
+
         $executor
             ->expects(self::exactly(2))
             ->method('execute')
             ->willReturnCallback(
                 static function (mixed $command, mixed &$output = null, mixed $cwd = null) use (&$position): int {
-                    self::assertNull($cwd);
+                    self::assertNull($cwd, 'Audit commands must not set a working directory.');
 
                     if (0 === $position++) {
-                        self::assertSame('inspectable --version', $command);
+                        self::assertSame(
+                            'inspectable --version',
+                            $command,
+                            'Version lookup must use the configured binary.',
+                        );
                         $output = '42.0.0';
 
                         return 0;
                     }
 
-                    self::assertSame('inspectable audit --prod', $command);
+                    self::assertSame(
+                        'inspectable audit --prod',
+                        $command,
+                        'Audit command must include the production flag.',
+                    );
                     $output = 'standard output';
 
                     return 1;
@@ -138,20 +158,38 @@ final class AbstractAssetManagerTest extends TestCase
             ->method('getErrorOutput')
             ->willReturn('error output');
 
-        $this->io->expects(self::never())->method('writeRaw');
-        $this->io->expects(self::never())->method('writeErrorRaw');
+        $this->io
+            ->expects(self::never())
+            ->method('writeRaw');
+        $this->io
+            ->expects(self::never())
+            ->method('writeErrorRaw');
 
         $manager = new InspectableAssetManager($this->io, $this->config, $executor, $this->fs, $this->fallback);
+
         $result = $manager->audit(true);
 
-        self::assertSame(1, $result->exitCode);
-        self::assertSame('standard output', $result->output);
-        self::assertSame('error output', $result->errorOutput);
+        self::assertSame(
+            1,
+            $result->exitCode,
+            'The audit exit code must be preserved.',
+        );
+        self::assertSame(
+            'standard output',
+            $result->output,
+            'Standard output must be captured.',
+        );
+        self::assertSame(
+            'error output',
+            $result->errorOutput,
+            'Error output must be captured.',
+        );
     }
 
     public function testAuditInvokesManagerConfigurationValidation(): void
     {
         file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'inspectable.lock', '{}');
+
         $this->executor->addExpectedValues(0, '42.0.0');
         $this->executor->addExpectedValues(0, '{}');
 
@@ -159,23 +197,31 @@ final class AbstractAssetManagerTest extends TestCase
 
         $manager->audit(true);
 
-        self::assertTrue($manager->getAuditValidationForTest());
+        self::assertTrue(
+            $manager->getAuditValidationForTest(),
+            'Manager configuration must be validated before auditing.',
+        );
     }
 
     public function testAuditOverridesAndRestoresManagerEnvironment(): void
     {
         $name = 'FOXY_ABSTRACT_ASSET_MANAGER_AUDIT';
+
         $processValue = getenv($name);
+
         $environment = $_ENV;
         $server = $_SERVER;
 
         file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'inspectable.lock', '{}');
         putenv("{$name}=process-before-audit");
+
         $_ENV[$name] = 'env-before-audit';
         $_SERVER[$name] = 'server-before-audit';
 
         $position = 0;
+
         $executor = $this->createMock(ProcessExecutor::class);
+
         $executor
             ->expects(self::exactly(2))
             ->method('execute')
@@ -187,9 +233,13 @@ final class AbstractAssetManagerTest extends TestCase
                         return 0;
                     }
 
-                    self::assertSame('audit-value', getenv($name));
-                    self::assertSame('audit-value', $_ENV[$name]);
-                    self::assertSame('audit-value', $_SERVER[$name]);
+                    self::assertSame(
+                        'audit-value',
+                        getenv($name),
+                        'Process environment must include the audit override.',
+                    );
+                    self::assertSame('audit-value', $_ENV[$name], '$_ENV must include the audit override.');
+                    self::assertSame('audit-value', $_SERVER[$name], '$_SERVER must include the audit override.');
                     $output = '{}';
 
                     return 0;
@@ -204,15 +254,28 @@ final class AbstractAssetManagerTest extends TestCase
                 $this->fs,
                 $this->fallback,
             );
-            $manager->setAuditEnvironmentForTest([$name => 'audit-value']);
 
+            $manager->setAuditEnvironmentForTest([$name => 'audit-value']);
             $manager->audit(false);
 
-            self::assertSame('process-before-audit', getenv($name));
-            self::assertSame('env-before-audit', $_ENV[$name]);
-            self::assertSame('server-before-audit', $_SERVER[$name]);
+            self::assertSame(
+                'process-before-audit',
+                getenv($name),
+                'Process environment must be restored.',
+            );
+            self::assertSame(
+                'env-before-audit',
+                $_ENV[$name],
+                '$_ENV must be restored.',
+            );
+            self::assertSame(
+                'server-before-audit',
+                $_SERVER[$name],
+                '$_SERVER must be restored.',
+            );
         } finally {
             putenv(false === $processValue ? $name : "{$name}={$processValue}");
+
             $_ENV = $environment;
             $_SERVER = $server;
         }
@@ -221,19 +284,24 @@ final class AbstractAssetManagerTest extends TestCase
     public function testAuditRestoresTimeoutWhenExecutorThrows(): void
     {
         $originalTimeout = ProcessExecutor::getTimeout();
+
         $expectedTimeout = 42;
         $managerTimeout = 900;
         $observedTimeout = null;
 
         file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'inspectable.lock', '{}');
+
         $this->config = new Config(
             [
                 'manager-timeout' => $managerTimeout,
                 'run-asset-manager' => false,
             ],
         );
+
         $position = 0;
+
         $executor = $this->createMock(ProcessExecutor::class);
+
         $executor
             ->expects(self::exactly(2))
             ->method('execute')
@@ -268,13 +336,28 @@ final class AbstractAssetManagerTest extends TestCase
 
             try {
                 $manager->audit(false);
-                self::fail('Expected the audit process to fail.');
+
+                self::fail(
+                    'Expected the audit process to fail.',
+                );
             } catch (\RuntimeException $exception) {
-                self::assertSame('Audit execution failed.', $exception->getMessage());
+                self::assertSame(
+                    'Audit execution failed.',
+                    $exception->getMessage(),
+                    'The original execution error must be propagated.',
+                );
             }
 
-            self::assertSame($managerTimeout, $observedTimeout);
-            self::assertSame($expectedTimeout, ProcessExecutor::getTimeout());
+            self::assertSame(
+                $managerTimeout,
+                $observedTimeout,
+                'The configured timeout must apply during execution.',
+            );
+            self::assertSame(
+                $expectedTimeout,
+                ProcessExecutor::getTimeout(),
+                'The previous timeout must be restored.',
+            );
         } finally {
             ProcessExecutor::setTimeout($originalTimeout);
         }
@@ -293,6 +376,7 @@ final class AbstractAssetManagerTest extends TestCase
         self::assertSame(
             'C:\\tools\\inspectable.exe install',
             $this->createManager()->buildCommandForTest('inspectable.exe', 'install', 'install'),
+            'Windows path separators must be normalized.',
         );
     }
 
@@ -309,27 +393,35 @@ final class AbstractAssetManagerTest extends TestCase
         self::assertSame(
             str_replace('/', DIRECTORY_SEPARATOR, 'custom/bin') . ' install --global --local',
             $this->createManager()->buildCommandForTest('inspectable', 'install', 'install'),
+            'Options must be trimmed and ordered.',
         );
     }
 
     public function testInjectedVersionConverterReceivesTrimmedVersion(): void
     {
         $converter = $this->createMock(VersionConverterInterface::class);
+
         $converter
             ->expects(self::once())
             ->method('convertVersion')
             ->with('custom-version')
             ->willReturn('42.0.0');
+
         $this->executor->addExpectedValues(0, "  custom-version\n");
 
-        self::assertTrue($this->createManager($converter)->isAvailable());
+        self::assertTrue(
+            $this->createManager($converter)->isAvailable(),
+            'A successfully converted version must be available.',
+        );
     }
 
     public function testIsAvailableRejectsEmptyNormalizedVersionOutput(): void
     {
         $converter = $this->createMock(VersionConverterInterface::class);
 
-        $converter->expects(self::never())->method('convertVersion');
+        $converter
+            ->expects(self::never())
+            ->method('convertVersion');
 
         $this->executor->addExpectedValues(0, 'unrecognized output');
 
@@ -339,32 +431,50 @@ final class AbstractAssetManagerTest extends TestCase
 
         self::assertFalse(
             $manager->isAvailable(),
-            'The manager should not be available for empty normalized version output',
+            'Empty normalized output must be unavailable.',
         );
         self::assertSame(
             'unrecognized output',
             $manager->getVersionOutputForTest(),
-            'The version output should match the expected unrecognized output',
+            'Unrecognized version output must be preserved.',
         );
     }
 
     public function testIsAvailableRejectsWhitespaceOnlyVersion(): void
     {
         $converter = $this->createMock(VersionConverterInterface::class);
-        $converter->expects(self::never())->method('convertVersion');
+
+        $converter
+            ->expects(self::never())
+            ->method('convertVersion');
+
         $this->executor->addExpectedValues(0, " \n\t");
 
-        self::assertFalse($this->createManager($converter)->isAvailable());
+        self::assertFalse(
+            $this->createManager($converter)->isAvailable(),
+            'Whitespace-only version output must be unavailable.',
+        );
     }
 
     public function testIsAvailableResolvesManagerSpecificConfiguration(): void
     {
         $this->config = new Config([], ['manager-version' => ['inspectable' => '>=42.0.0']]);
+
         $this->executor->addExpectedValues(0, '42.0.0');
 
-        self::assertNull($this->config->get('manager-version'));
-        self::assertTrue($this->createManager()->isAvailable());
-        self::assertSame('>=42.0.0', $this->config->get('manager-version'));
+        self::assertNull(
+            $this->config->get('manager-version'),
+            'Manager-specific configuration must not alter the global version.',
+        );
+        self::assertTrue(
+            $this->createManager()->isAvailable(),
+            'The manager must accept its configured version constraint.',
+        );
+        self::assertSame(
+            '>=42.0.0',
+            $this->config->get('manager-version'),
+            'The manager-specific version must be resolved.',
+        );
     }
 
     public function testMergeHookReceivesMergedPackageAndPreviousDependencies(): void
@@ -393,7 +503,7 @@ final class AbstractAssetManagerTest extends TestCase
                 '@composer-asset/old--dependency' => 'file:./path/old/dependency',
             ],
             $manager->getPreviousDependenciesForTest(),
-            'The previous dependencies should match the expected array',
+            'Previous asset dependencies must be retained.',
         );
         self::assertSame(
             [
@@ -404,7 +514,7 @@ final class AbstractAssetManagerTest extends TestCase
                 ],
             ],
             $manager->getMergedPackageForTest(),
-            'The merged package should match the expected array',
+            'The merged package must retain asset and unrelated dependencies.',
         );
     }
 
@@ -421,21 +531,32 @@ final class AbstractAssetManagerTest extends TestCase
 
         self::assertNull(
             $manager->getHandledDependencies(),
-            'The handled dependencies should be null when manager execution is disabled',
+            'Disabled execution must leave handled dependencies unset.',
         );
         self::assertSame(
             [],
             $manager->getPreviousDependenciesForTest(),
-            'The previous dependencies should be an empty array when manager execution is disabled',
+            'No previous dependencies should be recorded.',
         );
         self::assertSame(
             ['dependencies' => ['@composer-asset/foo--bar' => 'file:./path/foo/bar']],
             $manager->getMergedPackageForTest(),
-            'The merged package should match the expected array when manager execution is disabled',
+            'The merged package must include the supplied asset dependency.',
         );
     }
 
-    #[DataProvider('relativeRootPackageDirectories')]
+    public function testRootPackageDirectoryFallsBackToCurrentDirectoryWhenConfiguredValueIsEmpty(): void
+    {
+        $this->config = new Config([], ['root-package-json-dir' => '']);
+
+        self::assertSame(
+            $this->cwd,
+            $this->createManager()->getRootPackageDirForTest(),
+            'Empty configuration must resolve to the current directory.',
+        );
+    }
+
+    #[DataProviderExternal(AbstractAssetManagerProvider::class, 'relativeRootPackageDirectories')]
     public function testRootPackageDirectoryOnlyRecognizesAnchoredAbsolutePaths(
         string $configuredDirectory,
         string $relativeDirectory,
@@ -445,62 +566,96 @@ final class AbstractAssetManagerTest extends TestCase
         self::assertSame(
             $this->cwd . DIRECTORY_SEPARATOR . $relativeDirectory,
             $this->createManager()->getRootPackageDirForTest(),
+            'Relative paths must be anchored to the current directory.',
         );
     }
 
     public function testRootPackageDirectoryRecognizesLeadingBackslashAsAbsolute(): void
     {
         $rootPackageDir = '\\server\\share';
+
         $this->config = new Config([], ['root-package-json-dir' => $rootPackageDir]);
 
-        self::assertSame($rootPackageDir, $this->createManager()->getRootPackageDirForTest());
+        self::assertSame(
+            $rootPackageDir,
+            $this->createManager()->getRootPackageDirForTest(),
+            'A leading backslash must remain an absolute path.',
+        );
     }
 
     public function testRootPackageDirectoryRemovesTrailingSeparators(): void
     {
         $this->config = new Config([], ['root-package-json-dir' => $this->cwd . '///']);
 
-        self::assertSame($this->cwd, $this->createManager()->getRootPackageDirForTest());
+        self::assertSame(
+            $this->cwd,
+            $this->createManager()->getRootPackageDirForTest(),
+            'Trailing separators must be removed.',
+        );
     }
 
     public function testRootPackageDirectoryRestoresDriveRootSeparator(): void
     {
         $this->config = new Config([], ['root-package-json-dir' => 'C:']);
 
-        self::assertSame('C:' . DIRECTORY_SEPARATOR, $this->createManager()->getRootPackageDirForTest());
+        self::assertSame(
+            'C:' . DIRECTORY_SEPARATOR,
+            $this->createManager()->getRootPackageDirForTest(),
+            'Drive roots must retain a trailing separator.',
+        );
     }
 
     public function testRootPackageDirectoryTrimsCurrentDirectorySeparator(): void
     {
         $this->config = new Config([], ['root-package-json-dir' => 'assets']);
 
-        MockerState::addCondition('Foxy\\Asset', 'getcwd', [], DIRECTORY_SEPARATOR);
+        MockerState::addCondition(
+            'Foxy\\Asset',
+            'getcwd',
+            [],
+            DIRECTORY_SEPARATOR,
+        );
 
         self::assertSame(
             DIRECTORY_SEPARATOR . 'assets',
             $this->createManager()->getRootPackageDirForTest(),
+            'The root path must contain one separator.',
         );
     }
 
     public function testRootPathsDoNotDuplicateDirectorySeparator(): void
     {
         $this->config = new Config([], ['root-package-json-dir' => DIRECTORY_SEPARATOR]);
+
         $manager = $this->createManager();
 
-        self::assertSame(DIRECTORY_SEPARATOR . 'inspectable.lock', $manager->getLockFilePathForTest());
-        self::assertSame(DIRECTORY_SEPARATOR . 'node_modules', $manager->getNodeModulesPathForTest());
+        self::assertSame(
+            DIRECTORY_SEPARATOR . 'inspectable.lock',
+            $manager->getLockFilePathForTest(),
+            'The lock path must have one leading separator.',
+        );
+        self::assertSame(
+            DIRECTORY_SEPARATOR . 'node_modules',
+            $manager->getNodeModulesPathForTest(),
+            'The modules path must have one leading separator.',
+        );
     }
 
     public function testRunStreamsOutputFromConfiguredRootDirectory(): void
     {
         $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'web';
+
         $this->sfs->mkdir($rootPackageDir);
+
         $this->config = new Config(
             [],
             ['root-package-json-dir' => $rootPackageDir, 'run-asset-manager' => true],
         );
+
         $position = 0;
+
         $executor = $this->createMock(ProcessExecutor::class);
+
         $executor
             ->expects(self::exactly(2))
             ->method('execute')
@@ -509,17 +664,29 @@ final class AbstractAssetManagerTest extends TestCase
                     &$position,
                     $rootPackageDir,
                 ): int {
-                    self::assertSame($rootPackageDir, $cwd);
+                    self::assertSame(
+                        $rootPackageDir,
+                        $cwd,
+                        'Commands must run from the configured root directory.',
+                    );
 
                     if (0 === $position++) {
-                        self::assertSame('inspectable --version', $command);
+                        self::assertSame(
+                            'inspectable --version',
+                            $command,
+                            'Version lookup must use the configured binary.',
+                        );
                         $output = '42.0.0';
 
                         return 0;
                     }
 
-                    self::assertSame('inspectable install', $command);
-                    self::assertIsCallable($output);
+                    self::assertSame(
+                        'inspectable install',
+                        $command,
+                        'The install command must follow version lookup.',
+                    );
+                    self::assertIsCallable($output, 'Streaming output must be delivered through a callback.');
 
                     $output('out', 'standard output');
                     $output('err', 'error output');
@@ -528,21 +695,36 @@ final class AbstractAssetManagerTest extends TestCase
                 },
             );
 
-        $this->io->expects(self::once())->method('writeRaw')->with('standard output', false);
-        $this->io->expects(self::once())->method('writeErrorRaw')->with('error output', false);
+        $this->io
+            ->expects(self::once())
+            ->method('writeRaw')
+            ->with('standard output', false);
+        $this->io
+            ->expects(self::once())
+            ->method('writeErrorRaw')
+            ->with('error output', false);
 
         $manager = new InspectableAssetManager($this->io, $this->config, $executor, $this->fs, $this->fallback);
 
-        self::assertSame(0, $manager->run());
+        self::assertSame(
+            0,
+            $manager->run(),
+            'Successful execution must return a zero exit code.',
+        );
     }
 
     public function testVersionCommandUsesConfiguredRootDirectory(): void
     {
         $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'web';
+
         $this->sfs->mkdir($rootPackageDir);
+
         $this->config = new Config([], ['root-package-json-dir' => $rootPackageDir]);
+
         $observedDirectory = null;
+
         $executor = $this->createMock(ProcessExecutor::class);
+
         $executor
             ->expects(self::once())
             ->method('execute')
@@ -558,18 +740,31 @@ final class AbstractAssetManagerTest extends TestCase
             );
 
         $manager = new InspectableAssetManager($this->io, $this->config, $executor, $this->fs, $this->fallback);
+
         $manager->validate();
 
-        self::assertSame($rootPackageDir, $observedDirectory);
+        self::assertSame(
+            $rootPackageDir,
+            $observedDirectory,
+            'Version lookup must run from the configured root directory.',
+        );
     }
 
     public function testVersionLookupRemainsExtensibleWhenConverterIsDisabled(): void
     {
         $manager = $this->createManager();
+
         $manager->disableVersionConverterForTest();
 
-        self::assertSame('', $manager->getVersionForTest());
-        self::assertNull($this->executor->getLastCommand());
+        self::assertSame(
+            '',
+            $manager->getVersionForTest(),
+            'A disabled converter must preserve the empty version.',
+        );
+        self::assertNull(
+            $this->executor->getLastCommand(),
+            'A disabled converter must skip process execution.',
+        );
     }
 
     public function testVersionOutputHookResultIsConverted(): void
@@ -591,12 +786,12 @@ final class AbstractAssetManagerTest extends TestCase
         self::assertSame(
             '42.0.0',
             $manager->getVersionForTest(),
-            'The version for test should match the expected converted version',
+            'The converted version must be returned.',
         );
         self::assertSame(
             'inspectable 42.0.0',
             $manager->getVersionOutputForTest(),
-            'The version output should match the expected converted output',
+            'Normalized command output must be retained.',
         );
     }
 
@@ -624,6 +819,7 @@ final class AbstractAssetManagerTest extends TestCase
         parent::tearDown();
 
         chdir($this->oldCwd);
+
         $this->sfs->remove($this->cwd);
         $this->config = null;
         $this->cwd = null;

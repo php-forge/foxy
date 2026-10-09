@@ -8,7 +8,7 @@ use Composer\Command\BaseCommand;
 use Composer\Composer;
 use Composer\IO\IOInterface;
 use Composer\Plugin\Capability\CommandProvider;
-use Foxy\Exception\RuntimeException;
+use Foxy\Exception\{Message, RuntimeException};
 use Foxy\Foxy;
 
 final readonly class FoxyCommandProvider implements CommandProvider
@@ -27,7 +27,9 @@ final readonly class FoxyCommandProvider implements CommandProvider
         $plugin = $arguments['plugin'] ?? null;
 
         if (!$composer instanceof Composer || !$io instanceof IOInterface || !$plugin instanceof Foxy) {
-            throw new RuntimeException('Composer provided invalid Foxy command capability arguments.');
+            throw new RuntimeException(
+                Message::COMMAND_CAPABILITY_ARGUMENTS_INVALID->getMessage(),
+            );
         }
 
         $this->composer = $composer;

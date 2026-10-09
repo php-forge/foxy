@@ -11,13 +11,12 @@ use Composer\IO\IOInterface;
 use Composer\Util\Filesystem;
 use Exception;
 use Foxy\Config\Config;
-use Foxy\Exception\RuntimeException;
+use Foxy\Exception\{Message, RuntimeException};
 use Foxy\Util\{ConsoleUtil, LockerUtil, PackageUtil};
 use Symfony\Component\Console\Input\InputInterface;
 use Throwable;
 
 use function is_link;
-use function sprintf;
 
 final class ComposerFallback implements FallbackInterface
 {
@@ -122,9 +121,7 @@ final class ComposerFallback implements FallbackInterface
 
     private function isEnabled(): bool
     {
-        $fallbackComposer = $this->config->get('fallback-composer');
-
-        return $fallbackComposer === true || $fallbackComposer === 1 || $fallbackComposer === '1';
+        return $this->config->isEnabled('fallback-composer');
     }
 
     private function pathExists(string $path): bool
@@ -138,7 +135,7 @@ final class ComposerFallback implements FallbackInterface
             $removed = $this->fs->remove($path);
         } catch (Throwable $exception) {
             throw new RuntimeException(
-                sprintf('Unable to remove Composer fallback path "%s".', $path),
+                Message::FALLBACK_COMPOSER_REMOVE_FAILED->getMessage($path),
                 0,
                 $exception,
             );
@@ -146,7 +143,7 @@ final class ComposerFallback implements FallbackInterface
 
         if (!$removed && $this->pathExists($path)) {
             throw new RuntimeException(
-                sprintf('Unable to remove Composer fallback path "%s".', $path),
+                Message::FALLBACK_COMPOSER_REMOVE_FAILED->getMessage($path),
             );
         }
     }
@@ -249,7 +246,7 @@ final class ComposerFallback implements FallbackInterface
 
         if (0 !== $result) {
             throw new RuntimeException(
-                sprintf('Unable to restore Composer dependencies, installer exited with code %d.', $result),
+                Message::FALLBACK_COMPOSER_RESTORE_FAILED->getMessage($result),
             );
         }
     }

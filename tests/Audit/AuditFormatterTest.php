@@ -4,15 +4,9 @@ declare(strict_types=1);
 
 namespace Foxy\Tests\Audit;
 
-use Foxy\Audit\{
-    AuditFinding,
-    AuditFormat,
-    AuditFormatter,
-    AuditReport,
-    CveStatus,
-    Severity,
-};
-use PHPUnit\Framework\Attributes\DataProvider;
+use Foxy\Audit\{AuditFinding, AuditFormat, AuditFormatter, AuditReport, CveStatus, Severity};
+use Foxy\Tests\Provider\AuditFormatterProvider;
+use PHPUnit\Framework\Attributes\DataProviderExternal;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Output\BufferedOutput;
 
@@ -21,23 +15,13 @@ use function str_replace;
 
 use const JSON_THROW_ON_ERROR;
 
+/**
+ * Unit tests for {@see AuditFormatter} rendering of audit reports in every supported output format.
+ *
+ * {@see AuditFormatterProvider} for test case data providers.
+ */
 final class AuditFormatterTest extends TestCase
 {
-    /**
-     * Provides CVE resolution states for plain formatter tests.
-     *
-     * @return array<string, array{CveStatus, list<string>, string}>
-     */
-    public static function getCveStatusData(): array
-    {
-        return [
-            'resolved' => [CveStatus::RESOLVED, ['CVE-2021-23337'], 'CVE-2021-23337'],
-            'none assigned' => [CveStatus::NONE_ASSIGNED, [], 'None assigned'],
-            'unavailable' => [CveStatus::UNAVAILABLE, [], 'Unavailable'],
-            'not requested' => [CveStatus::NOT_REQUESTED, [], 'Not requested'],
-        ];
-    }
-
     public function testJsonFormatProvidesStableMachineReadableDocument(): void
     {
         $report = new AuditReport(
@@ -57,14 +41,19 @@ final class AuditFormatterTest extends TestCase
         $output = new BufferedOutput();
 
         (new AuditFormatter())->write($report, Severity::CRITICAL, AuditFormat::JSON, $output);
+
         $formatted = self::normalizeLineEndings($output->fetch());
 
-        self::assertStringContainsString("{\n    \"schema_version\": 1,", $formatted);
+        self::assertStringContainsString(
+            "{\n    \"schema_version\": 1,",
+            $formatted,
+            'JSON must include the schema version.',
+        );
         self::assertStringContainsString(
             '"url": "https://github.com/advisories/GHSA-35jh-r3h4-6jhm"',
             $formatted,
+            'Advisory URL must be serialized.',
         );
-
         self::assertSame(
             [
                 'schema_version' => 1,
@@ -112,10 +101,11 @@ final class AuditFormatterTest extends TestCase
                 ],
             ],
             json_decode($formatted, true, 512, JSON_THROW_ON_ERROR),
+            'JSON fields and summary must match the report.',
         );
     }
 
-    #[DataProvider('getCveStatusData')]
+    #[DataProviderExternal(AuditFormatterProvider::class, 'cveStatuses')]
     public function testPlainFormatExplainsCveResolutionStatus(
         CveStatus $status,
         array $cves,
@@ -129,7 +119,11 @@ final class AuditFormatterTest extends TestCase
 
         (new AuditFormatter())->write($report, Severity::LOW, AuditFormat::PLAIN, $output);
 
-        self::assertStringContainsString(' | ' . $expected . ' | ', $output->fetch());
+        self::assertStringContainsString(
+            " | {$expected} | ",
+            $output->fetch(),
+            'CVE status label must be included.',
+        );
     }
 
     public function testPlainFormatIncludesAdvisoryDetailsAndSummary(): void
@@ -155,6 +149,7 @@ final class AuditFormatterTest extends TestCase
             "high | lodash | GHSA-35jh-r3h4-6jhm | CVE-2021-23337 | <1.0.0 | Advisory title | https://github.com/advisories/GHSA-35jh-r3h4-6jhm\n"
             . "1 advisory affecting 1 package (high: 1).\n",
             self::normalizeLineEndings($output->fetch()),
+            'Plain output must include advisory details and summary.',
         );
     }
 
@@ -172,6 +167,7 @@ final class AuditFormatterTest extends TestCase
         self::assertSame(
             "No known frontend vulnerabilities found.\n",
             self::normalizeLineEndings($output->fetch()),
+            'Clean audit message must appear once.',
         );
     }
 
@@ -192,6 +188,7 @@ final class AuditFormatterTest extends TestCase
         self::assertSame(
             "3 advisories affecting 2 packages (critical: 1, high: 1, info: 1).\n",
             self::normalizeLineEndings($output->fetch()),
+            'Summary must report advisory, package, and severity counts.',
         );
     }
 
@@ -209,6 +206,7 @@ final class AuditFormatterTest extends TestCase
         self::assertSame(
             "No known frontend vulnerabilities found.\n",
             self::normalizeLineEndings($output->fetch()),
+            'Clean audit summary must be reported.',
         );
     }
 
@@ -230,10 +228,19 @@ final class AuditFormatterTest extends TestCase
         $output = new BufferedOutput();
 
         (new AuditFormatter())->write($report, Severity::LOW, AuditFormat::TABLE, $output);
+
         $formatted = $output->fetch();
 
-        self::assertStringContainsString('<error>package</error>', $formatted);
-        self::assertStringContainsString('<info>Advisory title</info>', $formatted);
+        self::assertStringContainsString(
+            '<error>package</error>',
+            $formatted,
+            'Package markup must be escaped in the table.',
+        );
+        self::assertStringContainsString(
+            '<info>Advisory title</info>',
+            $formatted,
+            'Title markup must be escaped in the table.',
+        );
     }
 
     public function testTableFormatIncludesCveAndSummary(): void
@@ -254,21 +261,44 @@ final class AuditFormatterTest extends TestCase
         $output = new BufferedOutput();
 
         (new AuditFormatter())->write($report, Severity::LOW, AuditFormat::TABLE, $output);
+
         $formatted = $output->fetch();
 
-        self::assertStringContainsString('Severity', $formatted);
+        self::assertStringContainsString(
+            'Severity',
+            $formatted,
+            'Table must include its severity column.',
+        );
         self::assertStringContainsString(
             '| high     | lodash  | GHSA-35jh-r3h4-6jhm',
             $formatted,
+            'Advisory row must include severity, package, and identifier.',
         );
-        self::assertStringContainsString('lodash', $formatted);
-        self::assertStringContainsString('GHSA-35jh-r3h4-6jhm', $formatted);
+        self::assertStringContainsString(
+            'lodash',
+            $formatted,
+            'Package name must appear in the table.',
+        );
+        self::assertStringContainsString(
+            'GHSA-35jh-r3h4-6jhm',
+            $formatted,
+            'Advisory identifier must appear in the table.',
+        );
         self::assertStringContainsString(
             'https://github.com/advisories/GHSA-35jh-r3h4-6jhm',
             $formatted,
+            'Advisory URL must appear in the table.',
         );
-        self::assertStringContainsString('CVE-2021-23337', $formatted);
-        self::assertStringContainsString('1 advisory affecting 1 package (high: 1).', $formatted);
+        self::assertStringContainsString(
+            'CVE-2021-23337',
+            $formatted,
+            'Resolved CVE must appear in the table.',
+        );
+        self::assertStringContainsString(
+            '1 advisory affecting 1 package (high: 1).',
+            $formatted,
+            'Table summary must report advisory and package counts.',
+        );
     }
 
     /**

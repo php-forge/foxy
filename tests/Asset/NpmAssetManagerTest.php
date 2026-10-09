@@ -8,8 +8,9 @@ use Composer\Package\RootPackageInterface;
 use Composer\Util\ProcessExecutor;
 use Foxy\Asset\NpmManager;
 use Foxy\Config\Config;
-use Foxy\Exception\RuntimeException;
-use PHPUnit\Framework\Attributes\DataProvider;
+use Foxy\Exception\{Message, RuntimeException};
+use Foxy\Tests\Provider\NpmAssetManagerProvider;
+use PHPUnit\Framework\Attributes\DataProviderExternal;
 
 use function array_map;
 use function file_put_contents;
@@ -17,9 +18,14 @@ use function implode;
 
 use const DIRECTORY_SEPARATOR;
 
+/**
+ * Unit tests for {@see NpmManager} commands, version detection, timeouts, and workspace-aware audits.
+ *
+ * {@see NpmAssetManagerProvider} for test case data providers.
+ */
 final class NpmAssetManagerTest extends AuditableAssetManager
 {
-    #[DataProvider('workspaceLocksThatCannotBeEnumerated')]
+    #[DataProviderExternal(NpmAssetManagerProvider::class, 'workspaceLocksThatCannotBeEnumerated')]
     public function testAuditFailsClosedWhenWorkspaceGraphCannotBeEnumerated(string|null $manifest, string $lock): void
     {
         if (null !== $manifest) {
@@ -27,22 +33,23 @@ final class NpmAssetManagerTest extends AuditableAssetManager
         }
 
         file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'package-lock.json', $lock);
+
         $this->executor->addExpectedValues(0, $this->getValidVersion());
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            'The npm workspace graph could not be enumerated from package-lock.json. '
-            . 'Regenerate the lock file with a supported npm version.',
+            Message::ASSET_NPM_WORKSPACE_GRAPH_UNENUMERABLE->getMessage(),
         );
 
         $this->getManager()->audit(false);
     }
 
-    #[DataProvider('workspaceManifests')]
+    #[DataProviderExternal(NpmAssetManagerProvider::class, 'workspaceManifests')]
     public function testAuditForcesTheCompleteWorkspaceGraph(string $manifest, string $lock, array $workspacePaths): void
     {
         file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'package.json', $manifest);
         file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'package-lock.json', $lock);
+
         $this->executor->addExpectedValues(0, $this->getValidVersion());
         $this->executor->addExpectedValues(0, '{}');
 
@@ -61,6 +68,7 @@ final class NpmAssetManagerTest extends AuditableAssetManager
             . $workspaceSelectors
             . ' --include-workspace-root=true --include=dev --include=optional --include=peer',
             $this->executor->getExecutedCommand(1),
+            'The audit command must include every workspace selector.',
         );
     }
 
@@ -68,22 +76,30 @@ final class NpmAssetManagerTest extends AuditableAssetManager
     {
         file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'package.json', '{}');
         file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'package-lock.json', '{"packages":{"":{}}}');
+
         $this->executor->addExpectedValues(0, $this->getValidVersion());
         $this->executor->addExpectedValues(0, '{}');
 
         $this->getManager()->audit(false);
 
-        self::assertSame($this->getValidAuditCommand(false), $this->executor->getExecutedCommand(1));
+        self::assertSame(
+            $this->getValidAuditCommand(false),
+            $this->executor->getExecutedCommand(1),
+            'The audit command must use the root package only.',
+        );
     }
 
     public function testExistingDependencyCleanupIsSkippedWhenManagerExecutionIsDisabled(): void
     {
         $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'web';
+
         $this->sfs->mkdir($rootPackageDir);
+
         $this->config = new Config(
             [],
             ['root-package-json-dir' => $rootPackageDir, 'run-asset-manager' => false],
         );
+
         $this->manager = $this->getManager();
 
         file_put_contents(
@@ -91,10 +107,15 @@ final class NpmAssetManagerTest extends AuditableAssetManager
             '{"dependencies":{"@composer-asset/foo--bar":"file:../asset/foo/bar"}}',
         );
 
-        $this->fs->expects(self::never())->method('remove');
+        $this->fs
+            ->expects(self::never())
+            ->method('remove');
 
         $rootPackage = $this->createMock(RootPackageInterface::class);
-        $rootPackage->method('getLicense')->willReturn([]);
+
+        $rootPackage
+            ->method('getLicense')
+            ->willReturn([]);
 
         $assetPackage = $this->manager->addDependencies(
             $rootPackage,
@@ -104,17 +125,24 @@ final class NpmAssetManagerTest extends AuditableAssetManager
             ],
         );
 
-        self::assertArrayHasKey('@composer-asset/new--dependency', $assetPackage->getPackage()['dependencies']);
+        self::assertArrayHasKey(
+            '@composer-asset/new--dependency',
+            $assetPackage->getPackage()['dependencies'],
+            'The new asset dependency must remain in the package.',
+        );
     }
 
     public function testExistingDependencyCleanupUsesConfiguredRootDirectory(): void
     {
         $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'web';
+
         $this->sfs->mkdir($rootPackageDir);
+
         $this->config = new Config(
             [],
             ['root-package-json-dir' => $rootPackageDir, 'run-asset-manager' => true],
         );
+
         $this->manager = $this->getManager();
 
         file_put_contents(
@@ -128,7 +156,10 @@ final class NpmAssetManagerTest extends AuditableAssetManager
             ->with($rootPackageDir . DIRECTORY_SEPARATOR . 'node_modules/@composer-asset/foo--bar');
 
         $rootPackage = $this->createMock(RootPackageInterface::class);
-        $rootPackage->method('getLicense')->willReturn([]);
+
+        $rootPackage
+            ->method('getLicense')
+            ->willReturn([]);
 
         $this->manager->addDependencies(
             $rootPackage,
@@ -139,9 +170,12 @@ final class NpmAssetManagerTest extends AuditableAssetManager
     public function testRunAppliesConfiguredTimeoutDuringExecution(): void
     {
         $originalTimeout = ProcessExecutor::getTimeout();
+
         $configuredTimeout = 900;
         $observedTimeout = null;
+
         $executor = $this->createMock(ProcessExecutor::class);
+
         $executor
             ->expects(self::exactly(2))
             ->method('execute')
@@ -158,6 +192,7 @@ final class NpmAssetManagerTest extends AuditableAssetManager
                     return 0;
                 },
             );
+
         $this->config = new Config(['run-asset-manager' => true, 'manager-timeout' => $configuredTimeout]);
 
         try {
@@ -165,89 +200,24 @@ final class NpmAssetManagerTest extends AuditableAssetManager
 
             $manager = new NpmManager($this->io, $this->config, $executor, $this->fs, $this->fallback);
 
-            self::assertSame(0, $manager->run());
-            self::assertSame($configuredTimeout, $observedTimeout);
-            self::assertSame(42, ProcessExecutor::getTimeout());
+            self::assertSame(
+                0,
+                $manager->run(),
+                'Successful execution must return a zero exit code.',
+            );
+            self::assertSame(
+                $configuredTimeout,
+                $observedTimeout,
+                'The configured timeout must apply during execution.',
+            );
+            self::assertSame(
+                42,
+                ProcessExecutor::getTimeout(),
+                'The previous timeout must be restored.',
+            );
         } finally {
             ProcessExecutor::setTimeout($originalTimeout);
         }
-    }
-
-    public static function workspaceLocksThatCannotBeEnumerated(): array
-    {
-        return [
-            'legacy lock without package map' => [
-                '{"workspaces":["packages/*"]}',
-                '{"lockfileVersion":1}',
-            ],
-            'lock without workspace entries' => [
-                '{"workspaces":["packages/*"]}',
-                '{"packages":{"":{"workspaces":["packages/*"]}}}',
-            ],
-            'stale workspace declaration' => [
-                '{"workspaces":["packages/*"]}',
-                '{"packages":{"":{"workspaces":["other/*"]},"packages/a":{}}}',
-            ],
-            'stale secondary workspace declaration' => [
-                '{"workspaces":["packages/*","apps/*"]}',
-                '{"packages":{"":{"workspaces":["packages/*","services/*"]},"packages/a":{}}}',
-            ],
-            'manifest without locked workspaces' => [
-                '{}',
-                '{"packages":{"":{"workspaces":["packages/*"]},"packages/a":{}}}',
-            ],
-            'missing manifest with locked workspaces' => [
-                null,
-                '{"packages":{"":{"workspaces":["packages/*"]},"packages/a":{}}}',
-            ],
-            'malformed manifest workspace declaration' => [
-                '{"workspaces":"packages/*"}',
-                '{"packages":{"":{}}}',
-            ],
-            'manifest workspace declaration with a non-string pattern' => [
-                '{"workspaces":[null]}',
-                '{"packages":{"":{}}}',
-            ],
-            'manifest workspace declaration with a blank pattern' => [
-                '{"workspaces":[" "]}',
-                '{"packages":{"":{"workspaces":[" "]},"packages/a":{}}}',
-            ],
-            'malformed locked workspace declaration' => [
-                '{}',
-                '{"packages":{"":{"workspaces":{"packages":"packages/*"}}}}',
-            ],
-        ];
-    }
-
-    public static function workspaceManifests(): array
-    {
-        return [
-            'workspace list' => [
-                '{"workspaces":["packages/*"]}',
-                '{"packages":{"":{"workspaces":["packages/*"]},"node_modules/a":{"link":true,"resolved":"packages/a"},"packages/a":{}}}',
-                ['packages/a'],
-            ],
-            'workspace packages object' => [
-                '{"workspaces":{"packages":["packages/*"]}}',
-                '{"packages":{"":{"workspaces":{"packages":["packages/*"]}},"node_modules/a":{"link":true,"resolved":"packages/a"},"packages/a":{}}}',
-                ['packages/a'],
-            ],
-            'dot-leading workspace path' => [
-                '{"workspaces":["visible",".hidden"]}',
-                '{"packages":{"":{"workspaces":["visible",".hidden"]},".hidden":{},"node_modules/hidden":{"link":true,"resolved":".hidden"},"node_modules/visible":{"link":true,"resolved":"visible"},"visible":{}}}',
-                ['.hidden', 'visible'],
-            ],
-            'numeric workspace path' => [
-                '{"workspaces":["0"]}',
-                '{"packages":{"":{"workspaces":["0"]},"0":{},"node_modules/zero":{"link":true,"resolved":"0"}}}',
-                ['0'],
-            ],
-            'node_modules path separators and boundary' => [
-                '{"workspaces":["packages/*"]}',
-                '{"packages":{"":{"workspaces":["packages/*"]},"node_modules":{},"packages/a":{},"packages\\\\a\\\\node_modules\\\\hidden":{}}}',
-                ['packages/a'],
-            ],
-        ];
     }
 
     protected function getManager(): NpmManager

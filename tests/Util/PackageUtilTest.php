@@ -49,9 +49,21 @@ final class PackageUtilTest extends TestCase
 
         $convertedAliases = PackageUtil::convertLockAlias($lockData);
 
-        self::assertArrayHasKey('aliases', $convertedAliases);
-        self::assertSame('HASH_VALUE', $convertedAliases['content-hash']);
-        self::assertEquals($expectedAliases, $convertedAliases['aliases']);
+        self::assertArrayHasKey(
+            'aliases',
+            $convertedAliases,
+            'The converted aliases array does not contain the expected key.',
+        );
+        self::assertSame(
+            'HASH_VALUE',
+            $convertedAliases['content-hash'],
+            'The content hash does not match the expected value.',
+        );
+        self::assertEquals(
+            $expectedAliases,
+            $convertedAliases['aliases'],
+            'The converted aliases do not match the expected ones.',
+        );
     }
 
     public function testLoadLockPackageLoadsOnlyRequestedSection(): void
@@ -67,8 +79,15 @@ final class PackageUtilTest extends TestCase
 
         $loaded = PackageUtil::loadLockPackage(new ArrayLoader(), $lockData, true);
 
-        self::assertIsArray($loaded['packages'][0]);
-        self::assertInstanceOf(CompletePackage::class, $loaded['packages-dev'][0]);
+        self::assertIsArray(
+            $loaded['packages'][0],
+            'The loaded package is not an array as expected.',
+        );
+        self::assertInstanceOf(
+            CompletePackage::class,
+            $loaded['packages-dev'][0],
+            'The loaded dev package is not an instance of CompletePackage as expected.',
+        );
     }
 
     public function testLoadLockPackages(): void
@@ -83,9 +102,11 @@ final class PackageUtilTest extends TestCase
         ];
 
         $package = new CompletePackage('foo/bar', '1.0.0.0', '1.0.0.0');
+
         $package->setType('library');
 
         $packageDev = new CompletePackage('bar/foo', '1.0.0.0', '1.0.0.0');
+
         $packageDev->setType('library');
 
         $expectedPackages = [$package];
@@ -93,10 +114,26 @@ final class PackageUtilTest extends TestCase
 
         $lockDataLoaded = PackageUtil::loadLockPackages($lockData);
 
-        self::assertArrayHasKey('packages', $lockDataLoaded);
-        self::assertArrayHasKey('packages-dev', $lockDataLoaded);
-        self::assertEquals($expectedPackages, $lockDataLoaded['packages']);
-        self::assertEquals($expectedDevPackages, $lockDataLoaded['packages-dev']);
+        self::assertArrayHasKey(
+            'packages',
+            $lockDataLoaded,
+            'The loaded lock data does not contain the expected "packages" key.',
+        );
+        self::assertArrayHasKey(
+            'packages-dev',
+            $lockDataLoaded,
+            'The loaded lock data does not contain the expected "packages-dev" key.',
+        );
+        self::assertEquals(
+            $expectedPackages,
+            $lockDataLoaded['packages'],
+            'The loaded packages do not match the expected ones.',
+        );
+        self::assertEquals(
+            $expectedDevPackages,
+            $lockDataLoaded['packages-dev'],
+            'The loaded dev packages do not match the expected ones.',
+        );
     }
 
     public function testLoadLockPackagesCanPreserveRawAliases(): void
@@ -118,8 +155,16 @@ final class PackageUtilTest extends TestCase
 
         $lockDataLoaded = PackageUtil::loadLockPackages($lockData, false);
 
-        self::assertInstanceOf(CompletePackage::class, $lockDataLoaded['packages'][0]);
-        self::assertSame($aliases, $lockDataLoaded['aliases']);
+        self::assertInstanceOf(
+            CompletePackage::class,
+            $lockDataLoaded['packages'][0],
+            'The loaded package is not an instance of CompletePackage as expected.',
+        );
+        self::assertSame(
+            $aliases,
+            $lockDataLoaded['aliases'],
+            'The loaded aliases do not match the expected ones.',
+        );
     }
 
     public function testLoadLockPackagesConvertsAliasesByDefault(): void
@@ -148,11 +193,16 @@ final class PackageUtilTest extends TestCase
                 ],
             ],
             $loaded['aliases']['foo/bar'],
+            'The loaded aliases for the package "foo/bar" do not match the expected ones.',
         );
     }
 
     public function testLoadLockPackagesWithoutPackages(): void
     {
-        self::assertSame([], PackageUtil::loadLockPackages([]));
+        self::assertSame(
+            [],
+            PackageUtil::loadLockPackages([]),
+            'The loaded lock data for an empty input does not match the expected empty array.',
+        );
     }
 }

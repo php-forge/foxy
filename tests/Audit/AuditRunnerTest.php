@@ -5,15 +5,8 @@ declare(strict_types=1);
 namespace Foxy\Tests\Audit;
 
 use Foxy\Asset\AssetManagerInterface;
-use Foxy\Audit\{
-    AuditProcessResult,
-    AuditRequest,
-    AuditRunner,
-    AuditableAssetManagerInterface,
-    CveStatus,
-    Severity,
-};
-use Foxy\Exception\RuntimeException;
+use Foxy\Audit\{AuditProcessResult, AuditRequest, AuditRunner, AuditableAssetManagerInterface, CveStatus, Severity};
+use Foxy\Exception\{Message, RuntimeException};
 use Foxy\Tests\Provider\AuditRunnerProvider;
 use PHPUnit\Framework\Attributes\DataProviderExternal;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -250,7 +243,10 @@ final class AuditRunnerTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            'The npm audit output is malformed: invalid JSON. Manager error: registry unavailable',
+            Message::AUDIT_MANAGER_ERROR_APPENDED->getMessage(
+                Message::AUDIT_OUTPUT_MALFORMED->getMessage('npm', Message::AUDIT_REPORT_JSON_INVALID->getMessage()),
+                'registry unavailable',
+            ),
         );
 
         (new AuditRunner($manager))->audit(new AuditRequest());
@@ -263,8 +259,19 @@ final class AuditRunnerTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionCode(2);
         $this->expectExceptionMessage(
-            'The pnpm audit command failed with status code 2. request failed',
+            Message::AUDIT_COMMAND_FAILED_WITH_DIAGNOSTICS->getMessage('pnpm', 2, 'request failed'),
         );
+
+        (new AuditRunner($manager))->audit(new AuditRequest());
+    }
+
+    public function testThrowRuntimeExceptionWhenAuditCommandFailsWithoutDiagnostics(): void
+    {
+        $manager = $this->manager('npm', new AuditProcessResult(2, '', ''));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionCode(2);
+        $this->expectExceptionMessage(Message::AUDIT_COMMAND_FAILED->getMessage('npm', 2));
 
         (new AuditRunner($manager))->audit(new AuditRequest());
     }
@@ -283,8 +290,9 @@ final class AuditRunnerTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            'The bun audit command produced diagnostics and may have returned a partial report. '
-            . 'warn: https://registry.example/ did not answer the audit request (404); skipped @scope/private',
+            Message::AUDIT_BUN_PARTIAL_REPORT->getMessage(
+                'warn: https://registry.example/ did not answer the audit request (404); skipped @scope/private',
+            ),
         );
 
         (new AuditRunner($manager))->audit(new AuditRequest());
@@ -300,7 +308,7 @@ final class AuditRunnerTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionCode(1);
         $this->expectExceptionMessage(
-            'The npm audit command failed with status code 1. network error',
+            Message::AUDIT_COMMAND_FAILED_WITH_DIAGNOSTICS->getMessage('npm', 1, 'network error'),
         );
 
         (new AuditRunner($manager))->audit(new AuditRequest());
@@ -315,8 +323,10 @@ final class AuditRunnerTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            'The deno audit output is malformed: the report is empty. '
-            . 'Manager error: error: failed to fetch the audit report',
+            Message::AUDIT_MANAGER_ERROR_APPENDED->getMessage(
+                Message::AUDIT_OUTPUT_MALFORMED->getMessage('deno', Message::AUDIT_DENO_REPORT_EMPTY->getMessage()),
+                'error: failed to fetch the audit report',
+            ),
         );
 
         (new AuditRunner($manager))->audit(new AuditRequest());
@@ -331,7 +341,7 @@ final class AuditRunnerTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            'The bun audit report contains vulnerabilities but the manager returned a successful status.',
+            Message::AUDIT_SUCCESS_STATUS_WITH_FINDINGS->getMessage('bun'),
         );
 
         (new AuditRunner($manager))->audit(new AuditRequest());

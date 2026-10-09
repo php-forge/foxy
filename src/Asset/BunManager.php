@@ -6,7 +6,8 @@ namespace Foxy\Asset;
 
 use Composer\Pcre\Preg;
 use Composer\Util\Platform;
-use Foxy\Exception\RuntimeException;
+use Foxy\Exception\{Message, RuntimeException};
+use Generator;
 use Stringable;
 
 use function array_diff_ukey;
@@ -23,7 +24,6 @@ use function is_scalar;
 use function ltrim;
 use function preg_match;
 use function rtrim;
-use function sprintf;
 use function str_contains;
 use function str_ends_with;
 use function str_starts_with;
@@ -66,30 +66,22 @@ final class BunManager extends AbstractAuditableAssetManager
             $command[] = '--prod';
         }
 
-        $binary = Platform::isWindows() ? 'bun.exe' : 'bun';
-
-        return $this->buildUnconfiguredCommand($binary, $command);
+        return $this->buildUnconfiguredCommand($this->getBinary(), $command);
     }
 
     protected function getInstallCommand(): string
     {
-        $command = Platform::isWindows() ? 'bun.exe' : 'bun';
-
-        return $this->buildCommand($command, 'install', 'install');
+        return $this->buildCommand($this->getBinary(), 'install', 'install');
     }
 
     protected function getUpdateCommand(): string
     {
-        $command = Platform::isWindows() ? 'bun.exe' : 'bun';
-
-        return $this->buildCommand($command, 'update', 'update');
+        return $this->buildCommand($this->getBinary(), 'update', 'update');
     }
 
     protected function getVersionCommand(): string
     {
-        $command = Platform::isWindows() ? 'bun.exe' : 'bun';
-
-        return $this->buildUnconfiguredCommand($command, '--version');
+        return $this->buildUnconfiguredCommand($this->getBinary(), '--version');
     }
 
     protected function validateAuditConfiguration(bool $noDev): void
@@ -146,19 +138,24 @@ final class BunManager extends AbstractAuditableAssetManager
     }
 
     /**
+     * Returns the platform-specific Bun binary name.
+     */
+    private function getBinary(): string
+    {
+        return Platform::isWindows() ? 'bun.exe' : 'bun';
+    }
+
+    /**
      * @return list<string>
      */
     private function getBunfigPaths(): array
     {
-        $xdgConfigHome = $this->getAuditEnvironmentValue('XDG_CONFIG_HOME');
-        $home = $this->getHomeDirectory();
+        $configHome = $this->getAuditEnvironmentValue('XDG_CONFIG_HOME') ?? $this->getHomeDirectory();
 
         $paths = [];
 
-        if (null !== $xdgConfigHome) {
-            $paths[] = $this->getConfigurationPath($xdgConfigHome, '.bunfig.toml');
-        } elseif (null !== $home) {
-            $paths[] = $this->getConfigurationPath($home, '.bunfig.toml');
+        if (null !== $configHome) {
+            $paths[] = $this->getConfigurationPath($configHome, '.bunfig.toml');
         }
 
         $paths[] = $this->getRootPackagePath('bunfig.toml');
@@ -215,6 +212,82 @@ final class BunManager extends AbstractAuditableAssetManager
     private function isSingleLineTomlContainer(string $value): bool
     {
         $closingCharacters = [];
+
+        $characters = $this->scanUnquotedTomlCharacters($value);
+
+        foreach ($characters as $character) {
+            if ('[' === $character) {
+                $closingCharacters[] = ']';
+
+                continue;
+            }
+
+            if ('{' === $character) {
+                $closingCharacters[] = '}';
+
+                continue;
+            }
+
+            if (']' === $character || '}' === $character) {
+                if ([] === $closingCharacters || $character !== array_pop($closingCharacters)) {
+                    return false;
+                }
+            }
+        }
+
+        return [] === $closingCharacters && $characters->getReturn();
+    }
+
+    private function normalizeAuditEnvironmentValue(mixed $value): string|null
+    {
+        if (!is_scalar($value) && !$value instanceof Stringable) {
+            return null;
+        }
+
+        $value = (string) $value;
+
+        return '' === $value ? null : $value;
+    }
+
+    private function readAuditConfiguration(string $path): string|null
+    {
+        if (!file_exists($path)) {
+            return null;
+        }
+
+        $contents = is_file($path) && is_readable($path) ? file_get_contents($path) : false;
+
+        if (false === $contents) {
+            throw new RuntimeException(
+                Message::ASSET_BUN_AUDIT_CONFIG_UNREADABLE->getMessage($path),
+            );
+        }
+
+        return $contents;
+    }
+
+    private function rejectRestrictedAuditScope(string $path, string $setting): never
+    {
+        throw new RuntimeException(
+            Message::ASSET_BUN_AUDIT_SCOPE_RESTRICTED->getMessage($path, $setting),
+        );
+    }
+
+    private function rejectUnverifiableAuditConfiguration(string $path, string $reason): never
+    {
+        throw new RuntimeException(
+            Message::ASSET_BUN_AUDIT_SCOPE_UNVERIFIABLE->getMessage($path, $reason),
+        );
+    }
+
+    /**
+     * Yields the characters outside TOML basic and literal strings, keyed by position, and returns whether every string
+     * is closed.
+     *
+     * @return Generator<int, string, mixed, bool>
+     */
+    private function scanUnquotedTomlCharacters(string $value): Generator
+    {
         $quote = null;
 
         for ($position = 0, $length = strlen($value); $position < $length; ++$position) {
@@ -242,78 +315,10 @@ final class BunManager extends AbstractAuditableAssetManager
                 continue;
             }
 
-            if ('[' === $character) {
-                $closingCharacters[] = ']';
-
-                continue;
-            }
-
-            if ('{' === $character) {
-                $closingCharacters[] = '}';
-
-                continue;
-            }
-
-            if (']' === $character || '}' === $character) {
-                if ([] === $closingCharacters || $character !== array_pop($closingCharacters)) {
-                    return false;
-                }
-            }
+            yield $position => $character;
         }
 
-        return [] === $closingCharacters && null === $quote;
-    }
-
-    private function normalizeAuditEnvironmentValue(mixed $value): string|null
-    {
-        if (!is_scalar($value) && !$value instanceof Stringable) {
-            return null;
-        }
-
-        $value = (string) $value;
-
-        return '' === $value ? null : $value;
-    }
-
-    private function readAuditConfiguration(string $path): string|null
-    {
-        if (!file_exists($path)) {
-            return null;
-        }
-
-        if (!is_file($path) || !is_readable($path)) {
-            throw new RuntimeException(
-                sprintf('The Bun audit configuration "%s" cannot be read.', $path),
-            );
-        }
-
-        $contents = file_get_contents($path);
-
-        if (false === $contents) {
-            throw new RuntimeException(
-                sprintf('The Bun audit configuration "%s" cannot be read.', $path),
-            );
-        }
-
-        return $contents;
-    }
-
-    private function rejectRestrictedAuditScope(string $path, string $setting): never
-    {
-        throw new RuntimeException(
-            sprintf(
-                'The Bun audit cannot guarantee the requested dependency scope because "%s" declares "%s".',
-                $path,
-                $setting,
-            ),
-        );
-    }
-
-    private function rejectUnverifiableAuditConfiguration(string $path, string $reason): never
-    {
-        throw new RuntimeException(
-            sprintf('The Bun audit cannot verify dependency scope in "%s": %s.', $path, $reason),
-        );
+        return null === $quote;
     }
 
     private function stripLeadingUtf8Bom(string $contents): string
@@ -323,33 +328,7 @@ final class BunManager extends AbstractAuditableAssetManager
 
     private function stripTomlComment(string $line): string
     {
-        $quote = null;
-
-        for ($position = 0, $length = strlen($line); $position < $length; ++$position) {
-            $character = $line[$position];
-
-            if ('\\' === $quote) {
-                $quote = '"';
-
-                continue;
-            }
-
-            if (null !== $quote) {
-                if ('"' === $quote && '\\' === $character) {
-                    $quote = '\\';
-                } elseif ($quote === $character) {
-                    $quote = null;
-                }
-
-                continue;
-            }
-
-            if ('"' === $character || '\'' === $character) {
-                $quote = $character;
-
-                continue;
-            }
-
+        foreach ($this->scanUnquotedTomlCharacters($line) as $position => $character) {
             if ('#' === $character) {
                 return substr($line, 0, $position);
             }
@@ -361,7 +340,10 @@ final class BunManager extends AbstractAuditableAssetManager
     private function validateBunfigAuditScope(string $contents, string $path, bool $noDev): void
     {
         if (1 !== preg_match('//u', $contents)) {
-            $this->rejectUnverifiableAuditConfiguration($path, 'the configuration must be UTF-8');
+            $this->rejectUnverifiableAuditConfiguration(
+                $path,
+                Message::ASSET_BUN_AUDIT_REASON_UTF8_REQUIRED->getMessage(),
+            );
         }
 
         $contents = $this->stripLeadingUtf8Bom($contents);
@@ -383,7 +365,7 @@ final class BunManager extends AbstractAuditableAssetManager
             if (str_contains($keyExpression, '\\')) {
                 $this->rejectUnverifiableAuditConfiguration(
                     $path,
-                    'escape sequences in TOML keys are not supported; use canonical keys',
+                    Message::ASSET_BUN_AUDIT_REASON_TOML_KEY_ESCAPES->getMessage(),
                 );
             }
 
@@ -393,7 +375,7 @@ final class BunManager extends AbstractAuditableAssetManager
                 if (str_contains($value, '"""') || str_contains($value, "'''")) {
                     $this->rejectUnverifiableAuditConfiguration(
                         $path,
-                        'multiline strings in [install] are not supported',
+                        Message::ASSET_BUN_AUDIT_REASON_TOML_MULTILINE_STRING->getMessage(),
                     );
                 }
 
@@ -404,7 +386,7 @@ final class BunManager extends AbstractAuditableAssetManager
                 ) {
                     $this->rejectUnverifiableAuditConfiguration(
                         $path,
-                        'multiline container values in [install] are not supported',
+                        Message::ASSET_BUN_AUDIT_REASON_TOML_MULTILINE_CONTAINER->getMessage(),
                     );
                 }
             }
@@ -419,7 +401,7 @@ final class BunManager extends AbstractAuditableAssetManager
                 if ($arrayTable && $inInstallSection) {
                     $this->rejectUnverifiableAuditConfiguration(
                         $path,
-                        'array install tables are not supported; use an [install] table',
+                        Message::ASSET_BUN_AUDIT_REASON_TOML_ARRAY_INSTALL_TABLE->getMessage(),
                     );
                 }
 
@@ -456,7 +438,7 @@ final class BunManager extends AbstractAuditableAssetManager
             ) {
                 $this->rejectUnverifiableAuditConfiguration(
                     $path,
-                    'inline install tables are not supported; use an [install] table',
+                    Message::ASSET_BUN_AUDIT_REASON_TOML_INLINE_INSTALL_TABLE->getMessage(),
                 );
             }
         }
@@ -475,7 +457,10 @@ final class BunManager extends AbstractAuditableAssetManager
     private function validateNpmrcAuditScope(string $contents, string $path, bool $noDev): void
     {
         if (1 !== preg_match('//u', $contents)) {
-            $this->rejectUnverifiableAuditConfiguration($path, 'the configuration must be UTF-8');
+            $this->rejectUnverifiableAuditConfiguration(
+                $path,
+                Message::ASSET_BUN_AUDIT_REASON_UTF8_REQUIRED->getMessage(),
+            );
         }
 
         $contents = $this->stripLeadingUtf8Bom($contents);
@@ -495,7 +480,7 @@ final class BunManager extends AbstractAuditableAssetManager
             ) {
                 $this->rejectUnverifiableAuditConfiguration(
                     $path,
-                    'escape sequences in npmrc keys are not supported; use canonical keys',
+                    Message::ASSET_BUN_AUDIT_REASON_NPMRC_KEY_ESCAPES->getMessage(),
                 );
             }
 
@@ -518,7 +503,7 @@ final class BunManager extends AbstractAuditableAssetManager
             if (str_contains($value, '\\')) {
                 $this->rejectUnverifiableAuditConfiguration(
                     $path,
-                    'escape sequences in npmrc omit values are not supported; use canonical values',
+                    Message::ASSET_BUN_AUDIT_REASON_NPMRC_OMIT_ESCAPES->getMessage(),
                 );
             }
 

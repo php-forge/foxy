@@ -30,6 +30,7 @@ final class JsonFormatterTest extends TestCase
         self::assertSame(
             LineEndingNormalizer::normalize(self::fixtureWithoutFinalNewline('formatter-output-two-space.json')),
             LineEndingNormalizer::normalize(JsonFormatter::format($content, ['contributors'], 2)),
+            'The formatted JSON content should match the expected output.',
         );
     }
 
@@ -40,6 +41,7 @@ final class JsonFormatterTest extends TestCase
     {
         self::assertEmpty(
             JsonFormatter::format('', [], 2),
+            'Formatting empty content should result in an empty string.',
         );
     }
 
@@ -51,6 +53,7 @@ final class JsonFormatterTest extends TestCase
         self::assertSame(
             $expected,
             JsonFormatter::getArrayKeys($content),
+            'The array keys extracted from the JSON content should match the expected keys.',
         );
     }
 
@@ -62,6 +65,7 @@ final class JsonFormatterTest extends TestCase
         self::assertSame(
             $expected,
             JsonFormatter::getArrayKeys($content),
+            'The array keys extracted from the JSON content should match the expected keys.',
         );
     }
 
@@ -72,6 +76,7 @@ final class JsonFormatterTest extends TestCase
         self::assertSame(
             2,
             JsonFormatter::getIndent($content),
+            'The indent extracted from the JSON content should match the expected indent.',
         );
     }
 
@@ -79,7 +84,11 @@ final class JsonFormatterTest extends TestCase
     {
         $content = "\n  " . self::fixture('name-two-space.json');
 
-        self::assertSame(2, JsonFormatter::getIndent($content));
+        self::assertSame(
+            2,
+            JsonFormatter::getIndent($content),
+            'The indent extracted from the JSON content should match the expected indent.',
+        );
     }
 
     public function testGetMapKeys(): void
@@ -87,6 +96,7 @@ final class JsonFormatterTest extends TestCase
         self::assertSame(
             ['dependencies', 'metadata'],
             JsonFormatter::getMapKeys('{"dependencies":{},"metadata": { }}'),
+            'The map keys extracted from the JSON content should match the expected keys.',
         );
     }
 
@@ -100,10 +110,9 @@ final class JsonFormatterTest extends TestCase
         $content = json_encode($data, JSON_THROW_ON_ERROR);
 
         self::assertSame(
-            LineEndingNormalizer::normalize(
-                self::fixtureWithoutFinalNewline('literal-slashes-four-space.json'),
-            ),
+            LineEndingNormalizer::normalize(self::fixtureWithoutFinalNewline('literal-slashes-four-space.json')),
             LineEndingNormalizer::normalize(JsonFormatter::format($content, [], 4)),
+            'The formatted JSON content should preserve literal escaped slashes.',
         );
     }
 
@@ -117,10 +126,9 @@ final class JsonFormatterTest extends TestCase
         $content = json_encode($data, JSON_THROW_ON_ERROR);
 
         self::assertSame(
-            LineEndingNormalizer::normalize(
-                self::fixtureWithoutFinalNewline('literal-unicode-two-space.json'),
-            ),
+            LineEndingNormalizer::normalize(self::fixtureWithoutFinalNewline('literal-unicode-two-space.json')),
             LineEndingNormalizer::normalize(JsonFormatter::format($content, [], 2)),
+            'The formatted JSON content should preserve literal Unicode escape sequences.',
         );
     }
 
@@ -129,10 +137,15 @@ final class JsonFormatterTest extends TestCase
      */
     public function testPreservesRootObjectAndSpacesInsideStrings(): void
     {
-        self::assertSame('{}', JsonFormatter::format('{}', [], 2));
+        self::assertSame(
+            '{}',
+            JsonFormatter::format('{}', [], 2),
+            'The formatted JSON content should preserve the root object and spaces inside strings.',
+        );
         self::assertStringContainsString(
             '"value": "left    right"',
             JsonFormatter::format('{"value":"left    right"}', [], 2),
+            'The formatted JSON content should preserve spaces inside strings.',
         );
     }
 }

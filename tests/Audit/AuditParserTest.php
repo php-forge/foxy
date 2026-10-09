@@ -8,7 +8,7 @@ use Closure;
 use Foxy\Audit\{AuditParserFactory, AuditParserInterface, CveStatus};
 use Foxy\Audit\Parser\{BunAuditParser, DenoAuditParser, NpmAuditParser, PnpmAuditParser, YarnAuditParser};
 use Foxy\Audit\Severity;
-use Foxy\Exception\RuntimeException;
+use Foxy\Exception\{Message, RuntimeException};
 use Foxy\Tests\Provider\AuditParserProvider;
 use PHPUnit\Framework\Attributes\DataProviderExternal;
 use PHPUnit\Framework\TestCase;
@@ -243,16 +243,6 @@ final class AuditParserTest extends TestCase
             $findings[1]->title,
             'The missing title should fall back to the default title',
         );
-    }
-
-    public function testParserAcceptsReportAtSafetyLimit(): void
-    {
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage(
-            'auditReportVersion must be 2',
-        );
-
-        (new NpmAuditParser())->parse('{' . str_repeat(' ', 16 * 1024 * 1024 - 2) . '}');
     }
 
     public function testParserFactoryCreatesEverySupportedParser(): void
@@ -493,7 +483,7 @@ final class AuditParserTest extends TestCase
     {
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            'The asset manager "legacy" does not provide a supported audit report.',
+            Message::AUDIT_PARSER_UNSUPPORTED_MANAGER->getMessage('legacy'),
         );
 
         AuditParserFactory::create('legacy');
@@ -508,7 +498,10 @@ final class AuditParserTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            'metadata vulnerability counts must equal the vulnerability entries',
+            Message::AUDIT_OUTPUT_MALFORMED->getMessage(
+                'npm',
+                Message::AUDIT_NPM_METADATA_COUNT_MISMATCH->getMessage(),
+            ),
         );
 
         (new NpmAuditParser())->parse(json_encode($data, JSON_THROW_ON_ERROR));
@@ -522,7 +515,10 @@ final class AuditParserTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            'metadata.vulnerabilities.total must equal the severity counts',
+            Message::AUDIT_OUTPUT_MALFORMED->getMessage(
+                'npm',
+                Message::AUDIT_SEVERITY_TOTAL_MISMATCH->getMessage('metadata'),
+            ),
         );
 
         (new NpmAuditParser())->parse(json_encode($data, JSON_THROW_ON_ERROR));
@@ -536,16 +532,34 @@ final class AuditParserTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            'metadata vulnerability counts must equal the advisory entries',
+            Message::AUDIT_OUTPUT_MALFORMED->getMessage(
+                'pnpm',
+                Message::AUDIT_PNPM_METADATA_COUNT_MISMATCH->getMessage(),
+            ),
         );
 
         (new PnpmAuditParser())->parse(json_encode($data, JSON_THROW_ON_ERROR));
     }
 
+    public function testThrowRuntimeExceptionWhenReportAtSafetyLimitHasUnsupportedVersion(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            Message::AUDIT_OUTPUT_MALFORMED->getMessage(
+                'npm',
+                Message::AUDIT_NPM_REPORT_VERSION_UNSUPPORTED->getMessage(),
+            ),
+        );
+
+        (new NpmAuditParser())->parse('{' . str_repeat(' ', 16 * 1024 * 1024 - 2) . '}');
+    }
+
     public function testThrowRuntimeExceptionWhenReportExceedsSafetyLimit(): void
     {
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('the report exceeds the 16 MiB safety limit');
+        $this->expectExceptionMessage(
+            Message::AUDIT_OUTPUT_MALFORMED->getMessage('npm', Message::AUDIT_REPORT_SIZE_LIMIT_EXCEEDED->getMessage()),
+        );
 
         (new NpmAuditParser())->parse('{' . str_repeat(' ', 16 * 1024 * 1024) . '}');
     }
@@ -554,7 +568,10 @@ final class AuditParserTest extends TestCase
     {
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            'the report exceeds the 16 MiB safety limit',
+            Message::AUDIT_OUTPUT_MALFORMED->getMessage(
+                'yarn',
+                Message::AUDIT_REPORT_SIZE_LIMIT_EXCEEDED->getMessage(),
+            ),
         );
 
         (new YarnAuditParser())->parse(str_repeat(' ', 16 * 1024 * 1024 + 1));

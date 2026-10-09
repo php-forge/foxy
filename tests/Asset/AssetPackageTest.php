@@ -9,9 +9,10 @@ use Composer\Package\RootPackageInterface;
 use Composer\Util\Filesystem as ComposerFilesystem;
 use Exception;
 use Foxy\Asset\AssetPackage;
-use Foxy\Exception\RuntimeException;
+use Foxy\Exception\{Message, RuntimeException};
+use Foxy\Tests\Provider\AssetPackageProvider;
 use JsonException;
-use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\DataProviderExternal;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Seld\JsonLint\ParsingException;
@@ -25,6 +26,11 @@ use function getcwd;
 
 use const DIRECTORY_SEPARATOR;
 
+/**
+ * Unit tests for {@see AssetPackage} manifest loading, required key injection, and dependency synchronization.
+ *
+ * {@see AssetPackageProvider} for test case data providers.
+ */
 final class AssetPackageTest extends TestCase
 {
     protected string|null $cwd = '';
@@ -32,43 +38,6 @@ final class AssetPackageTest extends TestCase
     protected string|null $oldCwd = '';
     protected MockObject|RootPackageInterface|null $rootPackage = null;
     protected Filesystem|null $sfs = null;
-
-    public static function getDataRequiredKeys(): array
-    {
-        return [
-            [
-                [
-                    'name' => '@foo/bar',
-                    'license' => 'MIT',
-                ],
-                [
-                    'name' => '@foo/bar',
-                    'license' => 'MIT',
-                ],
-                'proprietary',
-            ],
-            [
-                [
-                    'name' => '@foo/bar',
-                    'license' => 'MIT',
-                ],
-                [
-                    'name' => '@foo/bar',
-                ],
-                'MIT',
-            ],
-            [
-                [
-                    'name' => '@foo/bar',
-                    'private' => true,
-                ],
-                [
-                    'name' => '@foo/bar',
-                ],
-                'proprietary',
-            ],
-        ];
-    }
 
     /**
      * @throws JsonException|ParsingException
@@ -111,15 +80,18 @@ final class AssetPackageTest extends TestCase
         $this->addPackageFile($package);
 
         $assetPackage = new AssetPackage($this->rootPackage, $this->jsonFile);
+
         $existing = $assetPackage->addNewDependencies($dependencies);
 
         self::assertSame(
             $expected,
             $assetPackage->getPackage(),
+            'The package must include all merged dependencies.',
         );
         self::assertSame(
             $expectedExisting,
             $existing,
+            'Existing managed dependencies must be reported.',
         );
     }
 
@@ -128,9 +100,13 @@ final class AssetPackageTest extends TestCase
      */
     public function testAddNewDependenciesPreservesFileUriFromEventListener(): void
     {
-        $this->jsonFile->expects(self::once())->method('exists')->willReturn(false);
+        $this->jsonFile
+            ->expects(self::once())
+            ->method('exists')
+            ->willReturn(false);
 
         $assetPackage = new AssetPackage($this->rootPackage, $this->jsonFile);
+
         $assetPackage->addNewDependencies(
             ['@composer-asset/foo--bar' => 'file:../custom/foo/bar'],
         );
@@ -138,17 +114,28 @@ final class AssetPackageTest extends TestCase
         self::assertSame(
             'file:../custom/foo/bar',
             $assetPackage->getPackage()['dependencies']['@composer-asset/foo--bar'],
+            'The listener-provided file URI must be preserved.',
         );
     }
 
     public function testAddNewDependenciesRejectsUnavailableWorkingDirectory(): void
     {
-        $this->jsonFile->expects(self::once())->method('exists')->willReturn(false);
+        $this->jsonFile
+            ->expects(self::once())
+            ->method('exists')
+            ->willReturn(false);
 
-        MockerState::addCondition('Foxy\\Asset', 'getcwd', [], false);
+        MockerState::addCondition(
+            'Foxy\\Asset',
+            'getcwd',
+            [],
+            false,
+        );
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Unable to get the current working directory.');
+        $this->expectExceptionMessage(
+            Message::CURRENT_WORKING_DIRECTORY_UNAVAILABLE->getMessage(),
+        );
 
         (new AssetPackage($this->rootPackage, $this->jsonFile))->addNewDependencies(
             ['@composer-asset/foo--bar' => 'asset/foo/package.json'],
@@ -165,14 +152,20 @@ final class AssetPackageTest extends TestCase
         );
 
         $assetPackage = new AssetPackage($this->rootPackage, $this->jsonFile);
+
         $existing = $assetPackage->addNewDependencies(
             ['@composer-asset/foo--bar' => $this->cwd . '/fresh/path/package.json'],
         );
 
-        self::assertSame(['@composer-asset/foo--bar'], $existing);
+        self::assertSame(
+            ['@composer-asset/foo--bar'],
+            $existing,
+            'The updated dependency must remain marked as existing.',
+        );
         self::assertSame(
             'file:./fresh/path',
             $assetPackage->getPackage()['dependencies']['@composer-asset/foo--bar'],
+            'The dependency must use the refreshed relative path.',
         );
     }
 
@@ -184,10 +177,17 @@ final class AssetPackageTest extends TestCase
         $currentDirectory = DIRECTORY_SEPARATOR . 'project';
         $manifestPath = $currentDirectory . DIRECTORY_SEPARATOR . 'asset/foo/package.json';
         $absoluteConsumerPath = $currentDirectory . DIRECTORY_SEPARATOR . $consumerPath;
+
         $fs = $this->createMock(ComposerFilesystem::class);
 
-        $this->jsonFile->expects(self::once())->method('exists')->willReturn(false);
-        $this->jsonFile->expects(self::once())->method('getPath')->willReturn($consumerPath);
+        $this->jsonFile
+            ->expects(self::once())
+            ->method('exists')
+            ->willReturn(false);
+        $this->jsonFile
+            ->expects(self::once())
+            ->method('getPath')
+            ->willReturn($consumerPath);
         $fs
             ->expects(self::exactly(3))
             ->method('isAbsolutePath')
@@ -204,14 +204,21 @@ final class AssetPackageTest extends TestCase
             ->with(dirname($absoluteConsumerPath), dirname($manifestPath), true, true)
             ->willReturn($relativePath);
 
-        MockerState::addCondition('Foxy\\Asset', 'getcwd', [], $currentDirectory);
+        MockerState::addCondition(
+            'Foxy\\Asset',
+            'getcwd',
+            [],
+            $currentDirectory,
+        );
 
         $assetPackage = new AssetPackage($this->rootPackage, $this->jsonFile, $fs);
+
         $assetPackage->addNewDependencies(['@composer-asset/foo--bar' => $path]);
 
         self::assertSame(
             'file:./asset/foo',
             $assetPackage->getPackage()['dependencies']['@composer-asset/foo--bar'],
+            'The relative path must be resolved from the consumer manifest.',
         );
     }
 
@@ -220,10 +227,17 @@ final class AssetPackageTest extends TestCase
         $path = 'asset/foo/package.json';
         $consumerPath = '/consumer/package.json';
         $relativePath = '..\\asset\\foo';
+
         $fs = $this->createMock(ComposerFilesystem::class);
 
-        $this->jsonFile->expects(self::once())->method('exists')->willReturn(false);
-        $this->jsonFile->expects(self::once())->method('getPath')->willReturn($consumerPath);
+        $this->jsonFile
+            ->expects(self::once())
+            ->method('exists')
+            ->willReturn(false);
+        $this->jsonFile
+            ->expects(self::once())
+            ->method('getPath')
+            ->willReturn($consumerPath);
         $fs
             ->expects(self::exactly(3))
             ->method('isAbsolutePath')
@@ -240,14 +254,21 @@ final class AssetPackageTest extends TestCase
             ->with('/consumer', DIRECTORY_SEPARATOR . 'asset/foo', true, true)
             ->willReturn($relativePath);
 
-        MockerState::addCondition('Foxy\\Asset', 'getcwd', [], DIRECTORY_SEPARATOR);
+        MockerState::addCondition(
+            'Foxy\\Asset',
+            'getcwd',
+            [],
+            DIRECTORY_SEPARATOR,
+        );
 
         $assetPackage = new AssetPackage($this->rootPackage, $this->jsonFile, $fs);
+
         $assetPackage->addNewDependencies(['@composer-asset/foo--bar' => $path]);
 
         self::assertSame(
             'file:../asset/foo',
             $assetPackage->getPackage()['dependencies']['@composer-asset/foo--bar'],
+            'Path separators must be normalized in the portable URI.',
         );
     }
 
@@ -276,6 +297,7 @@ final class AssetPackageTest extends TestCase
         self::assertSame(
             $expected,
             $assetPackage->getInstalledDependencies(),
+            'Only installed Composer asset dependencies must be returned.',
         );
     }
 
@@ -296,26 +318,31 @@ final class AssetPackageTest extends TestCase
         self::assertSame(
             $package,
             $assetPackage->getPackage(),
+            'The existing package contents must be loaded.',
         );
     }
 
     /**
      * @throws JsonException|ParsingException
      */
-    #[DataProvider('getDataRequiredKeys')]
+    #[DataProviderExternal(AssetPackageProvider::class, 'requiredKeys')]
     public function testInjectionOfRequiredKeys(array $expected, array $package, string $license): void
     {
         $this->addPackageFile($package);
 
         $this->rootPackage = $this->createMock(RootPackageInterface::class);
 
-        $this->rootPackage->expects(self::any())->method('getLicense')->willReturn([$license]);
+        $this->rootPackage
+            ->expects(self::any())
+            ->method('getLicense')
+            ->willReturn([$license]);
 
         $assetPackage = new AssetPackage($this->rootPackage, $this->jsonFile);
 
         self::assertSame(
             $expected,
             $assetPackage->getPackage(),
+            'Required package keys must be injected without losing values.',
         );
     }
 
@@ -350,6 +377,7 @@ final class AssetPackageTest extends TestCase
         self::assertSame(
             $expected,
             $assetPackage->getPackage(),
+            'Unused managed dependencies must be removed.',
         );
     }
 
@@ -360,8 +388,14 @@ final class AssetPackageTest extends TestCase
     {
         $package = ['name' => '@foo/bar'];
 
-        $this->jsonFile->expects(self::once())->method('exists')->willReturn(false);
-        $this->jsonFile->expects(self::once())->method('write')->with($package);
+        $this->jsonFile
+            ->expects(self::once())
+            ->method('exists')
+            ->willReturn(false);
+        $this->jsonFile
+            ->expects(self::once())
+            ->method('write')
+            ->with($package);
 
         $assetPackage = new AssetPackage($this->rootPackage, $this->jsonFile);
 
@@ -382,9 +416,18 @@ final class AssetPackageTest extends TestCase
         $filename = $this->cwd . '/package.json';
         $contentString ??= json_encode($package, JSON_THROW_ON_ERROR);
 
-        $this->jsonFile->expects(self::any())->method('exists')->willReturn(true);
-        $this->jsonFile->expects(self::any())->method('getPath')->willReturn($filename);
-        $this->jsonFile->expects(self::any())->method('read')->willReturn($package);
+        $this->jsonFile
+            ->expects(self::any())
+            ->method('exists')
+            ->willReturn(true);
+        $this->jsonFile
+            ->expects(self::any())
+            ->method('getPath')
+            ->willReturn($filename);
+        $this->jsonFile
+            ->expects(self::any())
+            ->method('read')
+            ->willReturn($package);
 
         file_put_contents($filename, $contentString);
     }
@@ -399,15 +442,19 @@ final class AssetPackageTest extends TestCase
         $this->sfs = new Filesystem();
 
         $this->rootPackage = $this->createMock(RootPackageInterface::class);
+
         $this->jsonFile = $this
             ->getMockBuilder(JsonFile::class)
             ->disableOriginalConstructor()
             ->onlyMethods(['exists', 'getPath', 'read', 'write'])
             ->getMock()
         ;
-        $this->rootPackage->expects(self::any())->method('getLicense')->willReturn([]);
-
+        $this->rootPackage
+            ->expects(self::any())
+            ->method('getLicense')
+            ->willReturn([]);
         $this->sfs->mkdir($this->cwd);
+
         chdir($this->cwd);
     }
 
@@ -416,6 +463,7 @@ final class AssetPackageTest extends TestCase
         parent::tearDown();
 
         chdir($this->oldCwd);
+
         $this->sfs->remove($this->cwd);
         $this->jsonFile = null;
         $this->rootPackage = null;

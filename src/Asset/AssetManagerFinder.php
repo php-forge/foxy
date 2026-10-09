@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace Foxy\Asset;
 
-use Foxy\Exception\RuntimeException;
+use Foxy\Exception\{Message, RuntimeException};
 
 use function count;
-use function sprintf;
 
 final class AssetManagerFinder
 {
@@ -47,7 +46,9 @@ final class AssetManagerFinder
                 return $this->managers[$manager];
             }
 
-            throw new RuntimeException(sprintf('The asset manager "%s" doesn\'t exist', $manager));
+            throw new RuntimeException(
+                Message::ASSET_MANAGER_UNKNOWN->getMessage($manager),
+            );
         }
 
         return $this->findAvailableManager($checkAvailability);
@@ -70,7 +71,9 @@ final class AssetManagerFinder
         }
 
         if (count($lockedManagers) > 1) {
-            throw new RuntimeException('Multiple asset manager lock files were found; configure "manager" explicitly');
+            throw new RuntimeException(
+                Message::ASSET_MANAGER_LOCK_FILES_AMBIGUOUS->getMessage(),
+            );
         }
 
         if (isset($lockedManagers[0])) {
@@ -79,10 +82,7 @@ final class AssetManagerFinder
             }
 
             throw new RuntimeException(
-                sprintf(
-                    'The asset manager "%s" selected by its lock file is not available',
-                    $lockedManagers[0]->getName(),
-                ),
+                Message::ASSET_MANAGER_LOCKED_UNAVAILABLE->getMessage($lockedManagers[0]->getName()),
             );
         }
 
@@ -93,6 +93,8 @@ final class AssetManagerFinder
             }
         }
 
-        throw new RuntimeException('No asset manager is found');
+        throw new RuntimeException(
+            Message::ASSET_MANAGER_NONE_FOUND->getMessage(),
+        );
     }
 }

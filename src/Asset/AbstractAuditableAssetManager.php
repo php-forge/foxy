@@ -4,14 +4,12 @@ declare(strict_types=1);
 
 namespace Foxy\Asset;
 
-use Composer\Util\ProcessExecutor;
 use Foxy\Audit\{AuditProcessResult, AuditableAssetManagerInterface};
-use Foxy\Exception\RuntimeException;
+use Foxy\Exception\{Message, RuntimeException};
 
 use function array_key_exists;
 use function getenv;
 use function putenv;
-use function sprintf;
 
 abstract class AbstractAuditableAssetManager extends AbstractAssetManager implements AuditableAssetManagerInterface
 {
@@ -24,35 +22,31 @@ abstract class AbstractAuditableAssetManager extends AbstractAssetManager implem
     {
         if (!$this->hasLockFile()) {
             throw new RuntimeException(
-                sprintf('The %s lock file "%s" was not found.', $this->getName(), $this->getLockFilePath()),
+                Message::ASSET_MANAGER_LOCK_FILE_MISSING->getMessage($this->getName(), $this->getLockFilePath()),
             );
         }
 
         $this->validateAuditConfiguration($noDev);
         $this->validate();
 
-        $timeout = ProcessExecutor::getTimeout();
+        return $this->withManagerTimeout(
+            function () use ($noDev): AuditProcessResult {
+                $environment = $this->overrideEnvironment($this->getAuditEnvironment());
 
-        /** @var int $managerTimeout */
-        $managerTimeout = $this->config->get('manager-timeout', PHP_INT_MAX);
+                try {
+                    $output = '';
+                    $result = $this->executor->execute(
+                        $this->getAuditCommand($noDev),
+                        $output,
+                        $this->getManagerWorkingDirectory(),
+                    );
 
-        ProcessExecutor::setTimeout($managerTimeout);
-
-        $environment = $this->overrideEnvironment($this->getAuditEnvironment());
-
-        try {
-            $output = '';
-            $result = $this->executor->execute(
-                $this->getAuditCommand($noDev),
-                $output,
-                $this->getManagerWorkingDirectory(),
-            );
-
-            return new AuditProcessResult($result, (string) $output, $this->executor->getErrorOutput());
-        } finally {
-            $this->restoreEnvironment($environment);
-            ProcessExecutor::setTimeout($timeout);
-        }
+                    return new AuditProcessResult($result, (string) $output, $this->executor->getErrorOutput());
+                } finally {
+                    $this->restoreEnvironment($environment);
+                }
+            },
+        );
     }
 
     /**
