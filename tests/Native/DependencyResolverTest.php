@@ -61,6 +61,32 @@ final class DependencyResolverTest extends TestCase
         );
     }
 
+    public function testResolveDropsOnlyTheSubtreesBlockingMandatoryRequirement(): void
+    {
+        $registry = (new InMemoryRegistry())
+            ->add(self::metadata('q', ['1.0.0' => ['dependencies' => ['x' => '*']]]))
+            ->add(self::metadata('r', ['1.0.0' => ['dependencies' => ['x' => '<1.5']]]))
+            ->add(self::metadata('m', ['1.0.0' => ['dependencies' => ['x' => '>=1.5']]]))
+            ->add(self::metadata('x', ['1.0.0' => [], '1.5.0' => [], '2.0.0' => []]));
+
+        $conflict = Message::NATIVE_VERSION_CONFLICT->getMessage(
+            'x',
+            '"*" from q@1.0.0, "<1.5" from r@1.0.0, ">=1.5" from m@1.0.0',
+        );
+
+        self::assertEquals(
+            [
+                'm' => self::package('m', '1.0.0'),
+                'q' => self::package('q', '1.0.0'),
+                'x' => self::package('x', '2.0.0'),
+            ],
+            $this->resolver($registry, $this->optionalWarning('r', '*', $conflict))->resolve(
+                [new Requirement('q', '*', '', true), new Requirement('r', '*', '', true), new Requirement('m', '*', '')],
+            ),
+            'Only the subtree whose constraint blocks `>=1.5` may be dropped.',
+        );
+    }
+
     public function testResolveDropsOptionalConstraintBlockingMandatoryRequirement(): void
     {
         $registry = (new InMemoryRegistry())
@@ -151,6 +177,57 @@ final class DependencyResolverTest extends TestCase
                 [new Requirement('foo', '*', '', true), new Requirement('bar', '^1.0', '')],
             ),
             'The optional package must go and bar 1.0.0 must stay.',
+        );
+    }
+
+    public function testResolveDropsOptionalSubtreeRequiringItsOwnRoot(): void
+    {
+        $registry = (new InMemoryRegistry())
+            ->add(self::metadata('foo', ['1.0.0' => ['dependencies' => ['bar' => '*']]]))
+            ->add(self::metadata('bar', ['1.0.0' => ['dependencies' => ['foo' => '*', 'baz' => '^1.0']]]))
+            ->add(self::metadata('left', ['1.0.0' => []]));
+
+        self::assertEquals(
+            ['left' => self::package('left', '1.0.0')],
+            $this->resolver(
+                $registry,
+                $this->optionalWarning('foo', '*', Message::NATIVE_PACKAGE_NOT_FOUND->getMessage('baz', 'memory')),
+            )->resolve([new Requirement('foo', '*', '', true), new Requirement('left', '*', '')]),
+            'A requirement from inside the subtree must not keep its root.',
+        );
+    }
+
+    public function testResolveDropsOptionalSubtreesRequiringDroppedPackage(): void
+    {
+        $registry = $this->subtreeChainRegistry();
+        $warnings = [];
+        $io = $this->createMock(IOInterface::class);
+
+        $io
+            ->method('writeError')
+            ->willReturnCallback(
+                static function (string $message) use (&$warnings): void {
+                    $warnings[] = $message;
+                },
+            );
+
+        self::assertEquals(
+            ['left' => self::package('left', '1.0.0')],
+            (new DependencyResolver($registry, $io))->resolve(
+                [new Requirement('aa', '*', '', true), new Requirement('z', '*', '', true), new Requirement('left', '*', '')],
+            ),
+            'Both optional subtrees must be dropped.',
+        );
+
+        $reason = Message::NATIVE_PACKAGE_NOT_FOUND->getMessage('y', 'memory');
+
+        self::assertSame(
+            [
+                sprintf('<warning>The optional dependency "z" (*) was skipped: %s</warning>', $reason),
+                sprintf('<warning>The optional dependency "aa" (*) was skipped: %s</warning>', $reason),
+            ],
+            $warnings,
+            'Each dropped optional root must be reported once.',
         );
     }
 
@@ -911,6 +988,18 @@ final class DependencyResolverTest extends TestCase
         );
     }
 
+    public function testThrowRuntimeExceptionWhenOptionalSubtreeFailsUnderGloballyMandatoryPackage(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            Message::NATIVE_PACKAGE_NOT_FOUND->getMessage('y', 'memory'),
+        );
+
+        $this->resolver($this->subtreeChainRegistry())->resolve(
+            [new Requirement('aa', '*', '', true), new Requirement('z', '*', '', true), new Requirement('z', '*', '')],
+        );
+    }
+
     public function testThrowRuntimeExceptionWhenOptionalSubtreeFailsUnderMandatoryRoot(): void
     {
         $registry = (new InMemoryRegistry())
@@ -939,6 +1028,24 @@ final class DependencyResolverTest extends TestCase
         );
 
         $this->resolver($registry)->resolve([new Requirement('foo', '*', '', true), new Requirement('m', '*', '')]);
+    }
+
+    public function testThrowRuntimeExceptionWhenOptionalSubtreeFailsUnderSubtreeOfMandatoryPackage(): void
+    {
+        $registry = (new InMemoryRegistry())
+            ->add(self::metadata('aa', ['1.0.0' => ['dependencies' => ['z' => '*']]]))
+            ->add(self::metadata('z', ['1.0.0' => ['dependencies' => ['x' => '*']]]))
+            ->add(self::metadata('x', ['1.0.0' => ['dependencies' => ['y' => '^1.0']]]))
+            ->add(self::metadata('m', ['1.0.0' => ['dependencies' => ['aa' => '*']]]));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            Message::NATIVE_PACKAGE_NOT_FOUND->getMessage('y', 'memory'),
+        );
+
+        $this->resolver($registry)->resolve(
+            [new Requirement('aa', '*', '', true), new Requirement('z', '*', '', true), new Requirement('m', '*', '')],
+        );
     }
 
     public function testThrowRuntimeExceptionWhenOrphanedSubtreeConstraintBlocksMandatoryRequirement(): void
@@ -1107,5 +1214,16 @@ final class DependencyResolverTest extends TestCase
         }
 
         return new DependencyResolver($registry, $io);
+    }
+
+    /**
+     * Returns a registry where aa@1.0.0 requires `z`, and z@1.0.0 requires `y`, which the registry lacks.
+     */
+    private function subtreeChainRegistry(): InMemoryRegistry
+    {
+        return (new InMemoryRegistry())
+            ->add(self::metadata('aa', ['1.0.0' => ['dependencies' => ['z' => '*']]]))
+            ->add(self::metadata('z', ['1.0.0' => ['dependencies' => ['y' => '^1.0']]]))
+            ->add(self::metadata('left', ['1.0.0' => []]));
     }
 }

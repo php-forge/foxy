@@ -8,6 +8,7 @@ use Composer\IO\IOInterface;
 use Composer\Semver\Semver;
 use Foxy\Exception\{Message, RuntimeException};
 
+use function array_keys;
 use function array_map;
 use function array_pop;
 use function array_shift;
@@ -88,8 +89,18 @@ final readonly class DependencyResolver
                 continue;
             }
 
+            $blockers = [];
+
             try {
-                $version = $this->select($requirement, $metadata, $constraints, $selected, $abandoned, $locals);
+                $version = $this->select(
+                    $requirement,
+                    $metadata,
+                    $constraints,
+                    $selected,
+                    $abandoned,
+                    $locals,
+                    $blockers,
+                );
             } catch (RuntimeException $exception) {
                 if ($requirement->optional) {
                     $this->skip($requirement, $exception);
@@ -100,36 +111,28 @@ final readonly class DependencyResolver
                 $root = $requirement->optionalRoot;
 
                 if (null !== $root) {
-                    if (
-                        !self::dropSubtree($optionalRoots[$root], $root, $constraints, $selected, $dropped)
-                        || !isset($dropped[$requirement->source])
-                    ) {
+                    $keys = self::dropSubtrees($root, $optionalRoots, $constraints, $selected, $dropped);
+
+                    if ([] === $keys || !isset($dropped[$requirement->source])) {
                         throw $exception;
                     }
 
-                    $this->skip($optionalRoots[$root], $exception);
+                    foreach ($keys as $key) {
+                        $this->skip($optionalRoots[$key], $exception);
+                    }
 
                     continue;
                 }
 
                 $released = false;
 
-                $roots = self::subtreeRoots($constraints[$requirement->name] ?? []);
+                foreach ($blockers as $blocker) {
+                    if (isset($optionalRoots[$blocker])) {
+                        foreach (self::dropSubtrees($blocker, $optionalRoots, $constraints, $selected, $dropped) as $key) {
+                            $this->skip($optionalRoots[$key], $exception);
 
-                $current = $selected[$requirement->name] ?? null;
-
-                if ($current instanceof LocalPackage) {
-                    $roots[$current->name] = $current->name;
-                }
-
-                foreach ($roots as $key) {
-                    if (
-                        isset($optionalRoots[$key])
-                        && self::dropSubtree($optionalRoots[$key], $key, $constraints, $selected, $dropped)
-                    ) {
-                        $this->skip($optionalRoots[$key], $exception);
-
-                        $released = true;
+                            $released = true;
+                        }
                     }
                 }
 
@@ -218,45 +221,74 @@ final readonly class DependencyResolver
     }
 
     /**
-     * Unselects an optional package and the packages only its subtree requires, and returns whether it did so.
+     * Unselects an optional package with the packages only its subtree requires, and returns the subtrees dropped.
      *
-     * Nothing changes, and `false` is returned, when the package is no longer selected at the subtree's version or a
-     * mandatory constraint requires it.
+     * Every other optional subtree whose mandatory requirement selected the package is dropped with it, recursively.
+     * Nothing changes, and an empty list is returned, when one of those packages is no longer selected at its
+     * subtree's version or a globally mandatory constraint (neither optional nor inside an optional subtree) requires
+     * it.
      *
-     * @param Requirement $root Optional requirement that selected the package.
      * @param string $key Selection at the top of the subtree, as {@see key()} returns it.
+     * @param array<string, Requirement> $optionalRoots Optional requirements that started each subtree, keyed by the
+     * selection at its top.
      * @param array<string, list<Constraint>> $constraints Constraints keyed by package name.
      * @param array<string, LocalPackage|PackageVersion> $selected Current selections.
      * @param array<string, LocalPackage|PackageVersion> $dropped Selections no longer required, keyed as {@see key()}
      * returns them.
+     *
+     * @return list<string> Keys of the dropped subtrees, the given one first.
      */
-    private static function dropSubtree(
-        Requirement $root,
+    private static function dropSubtrees(
         string $key,
+        array $optionalRoots,
         array &$constraints,
         array &$selected,
         array &$dropped,
-    ): bool {
-        $current = $selected[$root->name] ?? null;
+    ): array {
+        $pending = [$key];
+        $subtrees = [];
 
-        if (null === $current || self::key($current) !== $key) {
-            return false;
-        }
+        while ([] !== $pending) {
+            $current = array_shift($pending);
 
-        foreach ($constraints[$root->name] ?? [] as $constraint) {
-            if (!$constraint['optional']) {
-                return false;
+            if (isset($subtrees[$current])) {
+                continue;
             }
+
+            $name = $optionalRoots[$current]->name;
+            $selection = $selected[$name] ?? null;
+
+            if (null === $selection || self::key($selection) !== $current) {
+                return [];
+            }
+
+            foreach ($constraints[$name] ?? [] as $constraint) {
+                if ($constraint['optional']) {
+                    continue;
+                }
+
+                if (null === $constraint['root']) {
+                    return [];
+                }
+
+                $pending[] = $constraint['root'];
+            }
+
+            $subtrees[$current] = $name;
         }
 
-        $dropped[$key] = $current;
-        $constraints[$root->name] = [];
+        foreach ($subtrees as $subtree => $name) {
+            $dropped[$subtree] = $selected[$name];
+            $constraints[$name] = [];
 
-        unset($selected[$root->name]);
+            unset($selected[$name]);
+        }
 
-        self::retract($key, $constraints, $selected, $dropped);
+        foreach (array_keys($subtrees) as $subtree) {
+            self::retract($subtree, $constraints, $selected, $dropped);
+        }
 
-        return true;
+        return array_keys($subtrees);
     }
 
     /**
@@ -441,6 +473,8 @@ final readonly class DependencyResolver
      * @param array<string, bool> $abandoned Selections replaced by a re-pick, keyed by `name@version`, with `true`
      * when the abandonment is final because the version was already selected again once.
      * @param array<string, LocalPackage> $locals Local packages keyed by name.
+     * @param list<string> $blockers Receives, before a conflict is thrown, the optional subtrees whose dropping would
+     * let a globally mandatory requirement through.
      *
      * @throws RuntimeException if the specification is unsupported or invalid, the registry fails, an optional
      * requirement rejects the current selection, no version satisfies the constraints, the version found was
@@ -453,6 +487,7 @@ final readonly class DependencyResolver
         array $selected,
         array $abandoned,
         array $locals,
+        array &$blockers,
     ): LocalPackage|PackageVersion|null {
         $name = $requirement->name;
         $spec = $requirement->spec;
@@ -492,6 +527,8 @@ final readonly class DependencyResolver
                 return null;
             }
 
+            $blockers[] = $current->name;
+
             throw new RuntimeException(
                 Message::NATIVE_LOCAL_VERSION_CONFLICT->getMessage($name, $current->version, self::describe([$constraint])),
             );
@@ -529,18 +566,31 @@ final readonly class DependencyResolver
         if (null === $version && !$requirement->optional) {
             $required = [];
 
-            foreach ($candidates as $candidate) {
-                if (!$candidate['optional']) {
+            foreach ($constraints[$name] ?? [] as $candidate) {
+                if (!$candidate['optional'] && null === $candidate['root']) {
                     $required[] = $candidate;
                 }
             }
 
+            $required[] = $constraint;
             $version = self::highest($package, $required);
         }
 
         if (null === $version || ($abandoned["{$name}@{$version->version}"] ?? false)) {
             throw new RuntimeException(
                 Message::NATIVE_VERSION_CONFLICT->getMessage($name, self::describe($required)),
+            );
+        }
+
+        foreach ($candidates as $candidate) {
+            if (!$candidate['optional'] && !$candidate['range']->satisfies($version->version)) {
+                $blockers[] = (string) $candidate['root'];
+            }
+        }
+
+        if ([] !== $blockers) {
+            throw new RuntimeException(
+                Message::NATIVE_VERSION_CONFLICT->getMessage($name, self::describe($candidates)),
             );
         }
 
@@ -576,25 +626,5 @@ final readonly class DependencyResolver
         $this->io->writeError(
             sprintf(self::OPTIONAL_SKIPPED, $requirement->name, $requirement->spec, $failure->getMessage()),
         );
-    }
-
-    /**
-     * Returns the optional subtrees (`name@version` of their top package) that declared any of the constraints.
-     *
-     * @param list<Constraint> $constraints
-     *
-     * @return array<string, string>
-     */
-    private static function subtreeRoots(array $constraints): array
-    {
-        $roots = [];
-
-        foreach ($constraints as $constraint) {
-            if (null !== $constraint['root']) {
-                $roots[$constraint['root']] = $constraint['root'];
-            }
-        }
-
-        return $roots;
     }
 }
