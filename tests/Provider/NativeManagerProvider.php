@@ -21,6 +21,7 @@ final class NativeManagerProvider
         yield 'relative path' => ['vendor/npm-asset', null, '{cwd}/vendor/npm-asset'];
         yield 'relative path under root package dir' => ['vendor/npm-asset', 'web', '{cwd}/web/vendor/npm-asset'];
         yield 'trailing slash' => ['vendor/npm-asset/', null, '{cwd}/vendor/npm-asset'];
+        yield 'unc share subdirectory' => ['//server/share/node_modules', null, '//server/share/node_modules'];
         yield 'unset value' => [null, null, '{cwd}/node_modules'];
     }
 
@@ -36,6 +37,9 @@ final class NativeManagerProvider
         yield 'filesystem root' => ['/', '/'];
         yield 'parent directory' => ['..', '{parent}'];
         yield 'root package directory' => ['{cwd}', '{cwd}'];
+        yield 'unc share root' => ['//server/share', '//server/share'];
+        yield 'unc share root with backslashes' => ['\\\\server\\share', '//server/share'];
+        yield 'unc share root with trailing slash' => ['//server/share/', '//server/share'];
     }
 
     /**

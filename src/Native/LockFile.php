@@ -20,11 +20,13 @@ use function preg_match;
  * Reads and writes `foxy.lock`: the requirements fingerprint and the packages installed by the native manager.
  *
  * The fingerprint maps each source (`''` for the root manifest, the local package name otherwise) to its mandatory
- * `dependencies` and its `optionalDependencies`, so moving a requirement between the two kinds makes the lock stale.
+ * `dependencies` and its `optionalDependencies`, plus the `version` of a local package, so moving a requirement
+ * between the two kinds or changing a local version makes the lock stale.
  *
  * @phpstan-type Fingerprint array<array-key, array{
  *     dependencies: array<array-key, string>,
  *     optionalDependencies: array<array-key, string>,
+ *     version?: string,
  * }>
  */
 final readonly class LockFile
@@ -71,14 +73,25 @@ final readonly class LockFile
         $fingerprint = [];
 
         foreach ($requirements as $source => $maps) {
-            if (!is_array($maps) || 2 !== count($maps)) {
-                throw $this->invalid();
-            }
-
-            $fingerprint[$source] = [
+            $entry = [
                 'dependencies' => $this->specs($maps['dependencies'] ?? null),
                 'optionalDependencies' => $this->specs($maps['optionalDependencies'] ?? null),
             ];
+            $version = $maps['version'] ?? null;
+
+            if (null !== $version) {
+                if (!is_string($version)) {
+                    throw $this->invalid();
+                }
+
+                $entry['version'] = $version;
+            }
+
+            if (count($entry) !== count($maps)) {
+                throw $this->invalid();
+            }
+
+            $fingerprint[$source] = $entry;
         }
 
         $entries = $data['packages'] ?? null;
@@ -100,7 +113,7 @@ final readonly class LockFile
      * Writes the lock file with its maps sorted by key as strings.
      *
      * @param Fingerprint $requirements Specifications keyed by source (`''` for the root manifest, the local package
-     * name otherwise), then by kind, then by package name.
+     * name otherwise), then by kind, then by package name; a local source also carries its `version`, written first.
      * @param array<array-key, ResolvedPackage> $packages Packages keyed by name.
      */
     public function write(array $requirements, array $packages): void
@@ -111,7 +124,7 @@ final readonly class LockFile
         $requirementMaps = [];
 
         foreach ($requirements as $source => $maps) {
-            $requirementMaps[$source] = [
+            $requirementMaps[$source] = (isset($maps['version']) ? ['version' => $maps['version']] : []) + [
                 'dependencies' => self::sorted($maps['dependencies']),
                 'optionalDependencies' => self::sorted($maps['optionalDependencies']),
             ];

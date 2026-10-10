@@ -87,6 +87,7 @@ final class LockFileTest extends TestCase
                 self::LOCAL_NAME => [
                     'dependencies' => ['@popperjs/core' => '^2.11.8', 'bootstrap' => '^5.3.0'],
                     'optionalDependencies' => ['fsevents' => '^2.3'],
+                    'version' => '1.0.0',
                 ],
             ],
             $data['requirements'],
@@ -218,6 +219,7 @@ final class LockFileTest extends TestCase
                         "optionalDependencies": {}
                     },
                     "@composer-asset/acme--theme": {
+                        "version": "1.0.0",
                         "dependencies": {
                             "@popperjs/core": "^2.11.8",
                             "bootstrap": "^5.3.0"
@@ -289,7 +291,11 @@ final class LockFileTest extends TestCase
     }
 
     /**
-     * @return array<string, array{dependencies: array<string, string>, optionalDependencies: array<string, string>}>
+     * @return array<string, array{
+     *     dependencies: array<string, string>,
+     *     optionalDependencies: array<string, string>,
+     *     version?: string,
+     * }>
      */
     private function requirements(): array
     {
@@ -297,6 +303,7 @@ final class LockFileTest extends TestCase
             self::LOCAL_NAME => [
                 'dependencies' => ['bootstrap' => '^5.3.0', '@popperjs/core' => '^2.11.8'],
                 'optionalDependencies' => ['fsevents' => '^2.3'],
+                'version' => '1.0.0',
             ],
             '' => [
                 'dependencies' => ['bootstrap' => '^5.3', self::LOCAL_NAME => 'file:' . self::LOCAL_PATH],

@@ -150,7 +150,7 @@ final class NativeInstallerTest extends TestCase
         self::assertSame(
             [
                 '' => self::kinds([self::LOCAL_NAME => 'file:' . self::LOCAL_PATH]),
-                self::LOCAL_NAME => self::kinds(['bootstrap' => '^5.3'], ['missing-pkg' => '^1.0']),
+                self::LOCAL_NAME => self::localKinds('1.0.0', ['bootstrap' => '^5.3'], ['missing-pkg' => '^1.0']),
             ],
             $this->lock()['requirements'],
             'Requirements must list the root and the local source.',
@@ -259,7 +259,7 @@ final class NativeInstallerTest extends TestCase
         self::assertSame(
             [
                 '' => self::kinds(['left-pad' => '*'], [self::LOCAL_NAME => 'file:' . self::LOCAL_PATH]),
-                self::LOCAL_NAME => self::kinds(['missing-pkg' => '^1.0']),
+                self::LOCAL_NAME => self::localKinds('1.0.0', ['missing-pkg' => '^1.0']),
             ],
             $this->lock()['requirements'],
             'The fingerprint must keep the manifest content.',
@@ -384,7 +384,7 @@ final class NativeInstallerTest extends TestCase
         self::assertSame(
             [
                 '' => self::kinds([self::LOCAL_NAME => 'file:' . self::LOCAL_PATH]),
-                self::LOCAL_NAME => self::kinds([], ['bootstrap' => '^5.3', 'missing-pkg' => '^2.0']),
+                self::LOCAL_NAME => self::localKinds('1.0.0', [], ['bootstrap' => '^5.3', 'missing-pkg' => '^2.0']),
             ],
             $this->lock()['requirements'],
             'The local requirements must record the optional specifications.',
@@ -605,6 +605,36 @@ final class NativeInstallerTest extends TestCase
         );
     }
 
+    public function testInstallResolvesAgainWhenDroppedOptionalLocalVersionChanges(): void
+    {
+        $registry = $this->registry();
+
+        $this->publish($registry, 'widgets', ['1.0.0' => ['dependencies' => [self::LOCAL_NAME => '^2.0']]]);
+        $this->publish($registry, self::LOCAL_NAME, ['2.1.0' => []]);
+        $this->writeJson(
+            'package.json',
+            [
+                'dependencies' => ['widgets' => '^1.0'],
+                'optionalDependencies' => [self::LOCAL_NAME => 'file:' . self::LOCAL_PATH],
+            ],
+        );
+        $this->writeLocal(['version' => '1.0.0']);
+        $this->install($registry);
+        $this->writeLocal(['version' => '2.0.0']);
+        $this->install($registry);
+
+        self::assertSame(
+            ['version' => '2.0.0', 'file' => self::LOCAL_PATH],
+            $this->lock()['packages'][self::LOCAL_NAME],
+            'The accepted local version must replace the registry package.',
+        );
+        self::assertJsonStringEqualsJsonFile(
+            "{$this->root}/node_modules/" . self::LOCAL_NAME . '/package.json',
+            '{"version": "2.0.0"}',
+            'The local package must be copied.',
+        );
+    }
+
     public function testInstallResolvesAgainWhenLocalVersionChanges(): void
     {
         $registry = $this->registry();
@@ -627,7 +657,7 @@ final class NativeInstallerTest extends TestCase
         );
     }
 
-    public function testInstallResolvesAgainWhenLockLacksLocalPackage(): void
+    public function testInstallResolvesAgainWhenLockLacksLocalVersion(): void
     {
         $registry = $this->registry();
 
@@ -637,7 +667,7 @@ final class NativeInstallerTest extends TestCase
 
         $lock = $this->lock();
 
-        unset($lock['packages'][self::LOCAL_NAME]);
+        unset($lock['requirements'][self::LOCAL_NAME]['version']);
 
         $this->writeJson('foxy.lock', $lock);
         $this->install($registry);
@@ -645,7 +675,7 @@ final class NativeInstallerTest extends TestCase
         self::assertSame(
             ['left-pad', 'left-pad'],
             $registry->requested,
-            'A lock without the local entry is stale.',
+            'A local source without its version must make the lock stale.',
         );
     }
 
@@ -1424,6 +1454,22 @@ final class NativeInstallerTest extends TestCase
     private function localDirectory(): string
     {
         return (new Filesystem())->normalizePath("{$this->root}/" . self::LOCAL_PATH);
+    }
+
+    /**
+     * Returns the fingerprint of one local source as the lock file decodes it, its version first.
+     *
+     * @param array<string, string> $dependencies Mandatory specifications.
+     * @param array<string, string> $optionalDependencies Optional specifications.
+     *
+     * @return array{version: string, dependencies: array<string, string>, optionalDependencies: array<string, string>}
+     */
+    private static function localKinds(
+        string $version,
+        array $dependencies,
+        array $optionalDependencies = [],
+    ): array {
+        return ['version' => $version] + self::kinds($dependencies, $optionalDependencies);
     }
 
     /**

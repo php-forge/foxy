@@ -78,6 +78,24 @@ final class LockFileProvider
         yield 'requirement kind is replaced by another key' => [
             self::encode(['requirements' => ['' => ['dependencies' => [], 'peers' => []]], 'packages' => []]),
         ];
+        yield 'requirement source has an extra key beside its version' => [
+            self::encode(
+                [
+                    'requirements' => [
+                        'theme' => ['version' => '1.0.0', 'dependencies' => [], 'optionalDependencies' => [], 'x' => 1],
+                    ],
+                    'packages' => [],
+                ],
+            ),
+        ];
+        yield 'requirement source version is not a string' => [
+            self::encode(
+                [
+                    'requirements' => ['theme' => ['version' => 1, 'dependencies' => [], 'optionalDependencies' => []]],
+                    'packages' => [],
+                ],
+            ),
+        ];
         yield 'requirement spec is not a string' => [
             self::encode(['requirements' => self::requirements(['bootstrap' => 5]), 'packages' => []]),
         ];

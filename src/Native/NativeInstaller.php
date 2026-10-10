@@ -139,7 +139,7 @@ final readonly class NativeInstaller implements NativeInstallerInterface
 
                 $local = $this->readLocal($name, $directory);
 
-                $fingerprint[$name] = $local['specs'];
+                $fingerprint[$name] = $local['specs'] + ['version' => $local['version']];
 
                 $locals[$name] = new LocalPackage($name, $local['version'], $path, $local['requirements']);
                 $requirements[] = new Requirement($name, $spec, '', $optional);
@@ -152,7 +152,7 @@ final readonly class NativeInstaller implements NativeInstallerInterface
 
         $lock = new LockFile($lockPath);
 
-        $packages = $update ? null : $this->lockedPackages($lock, $fingerprint, $locals);
+        $packages = $update ? null : $this->lockedPackages($lock, $fingerprint);
 
         if (null === $packages) {
             $packages = $this->resolver->resolve($requirements, $locals);
@@ -297,17 +297,16 @@ final readonly class NativeInstaller implements NativeInstallerInterface
     /**
      * Returns the locked packages when the lock file is fresh, or `null` when it is missing or stale.
      *
-     * A local package must be locked at its current version, except that an optional one may be absent or locked as a
-     * registry package: the resolver dropped it, and adding it to the manifest would have changed the fingerprint.
+     * The lock is fresh when its fingerprint equals the current one, which covers the requirements of every source and
+     * the version of every local package.
      *
      * @param Fingerprint $fingerprint Current requirements fingerprint.
-     * @param array<string, LocalPackage> $locals Current local packages keyed by name.
      *
      * @throws RuntimeException if the lock file is malformed.
      *
      * @return array<array-key, ResolvedPackage>|null
      */
-    private function lockedPackages(LockFile $lock, array $fingerprint, array $locals): array|null
+    private function lockedPackages(LockFile $lock, array $fingerprint): array|null
     {
         if (!$lock->exists()) {
             return null;
@@ -315,23 +314,7 @@ final readonly class NativeInstaller implements NativeInstallerInterface
 
         $locked = $lock->read();
 
-        if ($locked['requirements'] !== $fingerprint) {
-            return null;
-        }
-
-        foreach ($locals as $name => $local) {
-            $entry = $locked['packages'][$name] ?? null;
-
-            if (isset($fingerprint['']['optionalDependencies'][$name]) && (null === $entry || !$entry->isLocal())) {
-                continue;
-            }
-
-            if ($entry?->version !== $local->version) {
-                return null;
-            }
-        }
-
-        return $locked['packages'];
+        return $locked['requirements'] === $fingerprint ? $locked['packages'] : null;
     }
 
     /**

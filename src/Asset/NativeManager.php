@@ -34,7 +34,7 @@ use function trim;
  */
 final class NativeManager extends AbstractManifestAssetManager
 {
-    private const string FILESYSTEM_ROOT = '{^(?:[A-Za-z]:)?/?$}';
+    private const string FILESYSTEM_ROOT = '{^(?:[A-Za-z]:|//[^/]+/[^/]+)?/?$}';
 
     /**
      * @param IOInterface $io Output for the progress line.
@@ -202,8 +202,8 @@ final class NativeManager extends AbstractManifestAssetManager
      * Windows; the returned path keeps its symbolic links.
      *
      * @throws RuntimeException if the directory is the root package directory, one of its parents, or a filesystem
-     * root, since the installer removes every entry of the directory outside the install set, or if a symbolic link in
-     * either directory cannot be resolved.
+     * root (`/`, a drive such as `C:/`, or a UNC share such as `//server/share`), since the installer removes every
+     * entry of the directory outside the install set, or if a symbolic link in either directory cannot be resolved.
      */
     private function getInstallDirectory(): string
     {
