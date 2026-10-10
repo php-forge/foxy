@@ -333,7 +333,8 @@ final class GitHubAdvisoryCveResolverTest extends TestCase
                     $ghsaId = substr($url, strlen('https://api.github.com/advisories/'));
 
                     self::assertArrayHasKey(
-                        $ghsaId, $answers,
+                        $ghsaId,
+                        $answers,
                         'Request must target an expected advisory URL once.',
                     );
 
