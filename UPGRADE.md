@@ -53,7 +53,10 @@ or `composer foxy:audit` to keep that check.
 ### PHP API
 
 The classes that custom managers, audit parsers, and CVE resolvers extend changed in this release. A project that
-configures Foxy through `composer.json` is not affected.
+configures Foxy through `composer.json` is not affected. One change binds silently:
+`AbstractAssetManager::buildCommand()` and `buildUnconfiguredCommand()` lost their first parameter, the default binary,
+so a subclass that still passes it has the binary bound as the action. Drop that argument and return a custom binary
+from `getDefaultBinary()`.
 
 ## Upgrading from 0.2.x to 0.3.x
 
