@@ -6,6 +6,8 @@ namespace Foxy\Asset;
 
 use Composer\Pcre\Preg;
 use Composer\Util\Platform;
+use Foxy\Audit\AuditParserInterface;
+use Foxy\Audit\Parser\BunAuditParser;
 use Foxy\Exception\{Message, RuntimeException};
 use Generator;
 use Stringable;
@@ -36,8 +38,13 @@ use function trim;
 
 use const DIRECTORY_SEPARATOR;
 
-final class BunManager extends AbstractAuditableAssetManager
+final class BunManager extends AbstractAssetManager
 {
+    public function getAuditParser(): AuditParserInterface
+    {
+        return new BunAuditParser();
+    }
+
     public function getLockPackageName(): string
     {
         return 'bun.lock';

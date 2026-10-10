@@ -11,18 +11,15 @@ use function in_array;
 use function intdiv;
 use function json_decode;
 use function json_encode;
-use function preg_match;
 use function preg_match_all;
 use function str_repeat;
 use function str_replace;
 use function strlen;
-use function trim;
 
 final class JsonFormatter
 {
     public const string ARRAY_KEYS_REGEX = '/["\']([\w\-.]+)["\']\s*:\s*\[\s*]/';
     public const int DEFAULT_INDENT = 4;
-    public const string INDENT_REGEX = '/^[{\[][\r\n]( +)["\']/';
     public const string MAP_KEYS_REGEX = '/["\']([\w\-.]+)["\']\s*:\s*\{\s*}/';
 
     /**
@@ -71,20 +68,6 @@ final class JsonFormatter
         preg_match_all(self::ARRAY_KEYS_REGEX, $content, $matches);
 
         return $matches[1];
-    }
-
-    /**
-     * Get the indent of file.
-     *
-     * @param string $content The content
-     */
-    public static function getIndent(string $content): int
-    {
-        if (1 !== preg_match(self::INDENT_REGEX, trim($content), $matches)) {
-            return self::DEFAULT_INDENT;
-        }
-
-        return strlen($matches[1]);
     }
 
     /**

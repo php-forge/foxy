@@ -316,7 +316,11 @@ path is built from it. Scoped packages keep the npm layout (`vendor/npm-asset/@p
 The native manager requires the PHP `zlib` extension and prints `Installing`, `Updating`, and `Removing` lines like
 the other managers. Its registry requests go through Composer's HTTP layer: proxies, `cafile`, `disable-tls`, and the
 credentials stored in `auth.json` for the registry host all apply, so a private registry can be configured with
-`registry-url` plus Composer authentication:
+`registry-url` plus Composer authentication. Credentials are matched against the request's `host:port` exactly as
+written in `registry-url`: `localhost` and `127.0.0.1` are not aliases of each other, and the `auth.json` key must
+include the port when it is not the scheme's default (`npm.example.com:4873`). A plain `http://` registry also needs
+Composer's `config.secure-http` set to `false`. A registry that answers 401 or 403 fails the request with Composer's
+error text, as any other registry failure does:
 
 ```json
 {
@@ -330,8 +334,15 @@ credentials stored in `auth.json` for the registry host all apply, so a private 
 ```
 
 The registry is expected to answer the npm metadata API (`GET /<name>` with
-`Accept: application/vnd.npm.install-v1+json`) and to serve the tarball URLs it publishes. HTTP 429 responses are
-retried up to three times, honoring `Retry-After` up to 60 seconds; other failures are reported immediately.
+`Accept: application/vnd.npm.install-v1+json`) and to serve the tarball URLs it publishes. `composer foxy:audit` also
+needs npm's bulk advisories endpoint (`POST /-/npm/v1/security/advisories/bulk` with a JSON body); the registry must
+implement it, and a registry that does not fails the audit with status `2`. Verdaccio implements it only with its
+`audit` middleware enabled (`middlewares: audit: enabled: true`); its default configuration answers 404. HTTP 429
+responses are retried up to three times, honoring `Retry-After` up to 60 seconds; other failures are reported
+immediately. Tarballs missing from the cache are first downloaded in parallel through Composer's HTTP downloader
+(`COMPOSER_MAX_PARALLEL_HTTP` sets the limit, 12 by default) and then verified and installed one by one; a tarball
+whose parallel download fails is requested again on its own, with the retries above, and its error is reported then.
+With `cache-read-only` or an unwritable cache, tarballs are downloaded one by one only.
 
 The native manager implements the subset that frontend assets need. It does not support:
 
@@ -347,7 +358,6 @@ The native manager implements the subset that frontend assets need. It does not 
   named `alpha`, `beta`, `RC`, `dev`, and `patch` are matched with npm's rule: only a range that names a prerelease
   of the same `major.minor.patch` can select it.
 - Symbolic and hard links inside tarballs (skipped) and `..` or absolute entry paths (rejected).
-- `composer foxy:audit`.
 
 Selection by availability is also disabled for this manager: without `manager: native` or a `foxy.lock` file, a
 project without a JavaScript manager still reports `No asset manager was found.`.

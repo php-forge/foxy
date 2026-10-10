@@ -16,6 +16,8 @@ use Throwable;
 use function base64_decode;
 use function hash_equals;
 use function hash_file;
+use function is_file;
+use function json_encode;
 use function min;
 use function preg_match;
 use function preg_split;
@@ -27,14 +29,19 @@ use function str_replace;
 use function str_starts_with;
 use function strlen;
 use function substr;
+use function sys_get_temp_dir;
+use function uniqid;
 use function unlink;
 
+use const JSON_THROW_ON_ERROR;
+
 /**
- * Provides the npm registry access of the native manager: abbreviated metadata and integrity-verified tarballs.
+ * Provides the npm registry access of the native manager: abbreviated metadata, integrity-verified tarballs, and bulk
+ * security advisories.
  *
  * Requests answered with HTTP 429 are retried up to three times, waiting the `Retry-After` seconds (capped at 60)
  * or 1, 2, and 4 seconds. Tarballs are cached and verified against their Subresource Integrity value on every cache
- * hit and every download.
+ * hit and every download; a prefetch fills the cache with parallel downloads and no retry.
  */
 final readonly class NpmRegistry implements NpmRegistryInterface
 {
@@ -44,14 +51,17 @@ final readonly class NpmRegistry implements NpmRegistryInterface
      * Hash algorithms accepted in an integrity value, strongest first.
      */
     private const array ALGORITHMS = ['sha512', 'sha384', 'sha256', 'sha1'];
+    private const string BULK_ADVISORIES_PATH = '/-/npm/v1/security/advisories/bulk';
     private const string METADATA_ACCEPT = 'Accept: application/vnd.npm.install-v1+json';
+    private const string PREFETCH_FAILED = '<comment>Prefetching the tarball of "%s" (%s) failed: %s</comment>';
     private const int RETRIES = 3;
     private const int RETRY_AFTER_LIMIT = 60;
 
     /**
-     * @param HttpDownloader $httpDownloader Downloader that performs the requests.
+     * @param HttpDownloader $httpDownloader Downloader that performs the requests; {@see prefetchTarballs()} needs the
+     * async-enabled instance returned by `Composer::getLoop()->getHttpDownloader()`.
      * @param Cache $cache Tarball cache.
-     * @param IOInterface $io Output for the retry notices.
+     * @param IOInterface $io Output for the retry and failed prefetch notices.
      * @param string $url Registry base URL; a trailing slash is ignored.
      * @param (Closure(int): void)|null $delay Replacement for `sleep()` during the 429 back-off, or `null` to sleep.
      */
@@ -77,7 +87,7 @@ final readonly class NpmRegistry implements NpmRegistryInterface
     {
         $resolved = $package->resolved ?? '';
         $integrity = $package->integrity ?? '';
-        $key = "tarball/{$package->name}/{$package->version}-" . sha1($resolved) . '.tgz';
+        $key = $this->tarballKey($package);
         $file = "{$directory}/" . str_replace(['@', '/'], ['', '-'], $package->name) . "-{$package->version}.tgz";
 
         if ($this->cache->copyTo($key, $file)) {
@@ -101,6 +111,37 @@ final readonly class NpmRegistry implements NpmRegistryInterface
         $this->cache->copyFrom($key, $file);
 
         return $file;
+    }
+
+    /**
+     * Returns the registry's bulk advisories document for the given versions, as the registry wrote it.
+     *
+     * Sends one `POST` to npm's bulk advisories endpoint with a JSON object body; an empty response body is returned
+     * as an empty string.
+     *
+     * @param array<string, non-empty-list<string>> $versions Locked versions keyed by package name.
+     *
+     * @throws RuntimeException if the request fails, including a registry that does not implement the endpoint.
+     */
+    public function getAdvisories(array $versions): string
+    {
+        $url = $this->registryUrl() . self::BULK_ADVISORIES_PATH;
+
+        $response = $this->send(
+            $url,
+            fn(): Response => $this->httpDownloader->get(
+                $url,
+                [
+                    'http' => [
+                        'method' => 'POST',
+                        'header' => ['Content-Type: application/json', 'Accept: application/json'],
+                        'content' => json_encode((object) $versions, JSON_THROW_ON_ERROR),
+                    ],
+                ],
+            ),
+        );
+
+        return $response->getBody() ?? '';
     }
 
     /**
@@ -132,6 +173,64 @@ final readonly class NpmRegistry implements NpmRegistryInterface
         }
 
         return PackageMetadata::fromDocument($name, $document);
+    }
+
+    /**
+     * Downloads the tarballs missing from the cache in parallel, verifying each before it is cached.
+     *
+     * Nothing is downloaded when the cache is disabled or read-only, since the downloads could not be kept. A package
+     * without a tarball URL is skipped. A download that fails or does not match its integrity value is discarded with
+     * a verbose notice; {@see fetchTarball()} downloads it again and reports the error. Every temporary file is
+     * removed before the method returns.
+     *
+     * @param list<ResolvedPackage> $packages Registry packages whose tarballs are wanted.
+     */
+    public function prefetchTarballs(array $packages): void
+    {
+        if (!$this->cache->isEnabled() || $this->cache->isReadOnly()) {
+            return;
+        }
+
+        $queued = false;
+
+        foreach ($packages as $package) {
+            $resolved = $package->resolved ?? '';
+            $key = $this->tarballKey($package);
+
+            if ('' === $resolved || false !== $this->cache->getAge($key)) {
+                continue;
+            }
+
+            $file = sys_get_temp_dir() . '/' . uniqid('foxy-tarball-', true) . '.tgz';
+
+            $this->httpDownloader->addCopy($resolved, $file)->then(
+                function () use ($package, $key, $file, $resolved): void {
+                    if ($this->matchesIntegrity($file, $package->integrity ?? '')) {
+                        $this->cache->copyFrom($key, $file);
+                    } else {
+                        $this->reportPrefetchFailure(
+                            $package,
+                            Message::NATIVE_INTEGRITY_MISMATCH->getMessage($resolved),
+                        );
+                    }
+
+                    unlink($file);
+                },
+                function (Throwable $exception) use ($package, $file): void {
+                    if (is_file($file)) {
+                        unlink($file);
+                    }
+
+                    $this->reportPrefetchFailure($package, $exception->getMessage());
+                },
+            );
+
+            $queued = true;
+        }
+
+        if ($queued) {
+            $this->httpDownloader->wait();
+        }
     }
 
     /**
@@ -173,6 +272,18 @@ final readonly class NpmRegistry implements NpmRegistryInterface
     private function registryUrl(): string
     {
         return rtrim($this->url, '/');
+    }
+
+    /**
+     * Writes the verbose notice of a failed prefetch, naming the package and the cause.
+     */
+    private function reportPrefetchFailure(ResolvedPackage $package, string $reason): void
+    {
+        $this->io->writeError(
+            sprintf(self::PREFETCH_FAILED, $package->name, $package->version, $reason),
+            true,
+            IOInterface::VERBOSE,
+        );
     }
 
     /**
@@ -234,5 +345,13 @@ final readonly class NpmRegistry implements NpmRegistryInterface
                 $retry++;
             }
         }
+    }
+
+    /**
+     * Returns the cache key of a package's tarball: name, version, and the SHA-1 of the tarball URL.
+     */
+    private function tarballKey(ResolvedPackage $package): string
+    {
+        return "tarball/{$package->name}/{$package->version}-" . sha1($package->resolved ?? '') . '.tgz';
     }
 }

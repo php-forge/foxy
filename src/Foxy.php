@@ -8,7 +8,7 @@ use Composer\{Cache, Composer};
 use Composer\DependencyResolver\Operation\InstallOperation;
 use Composer\EventDispatcher\EventSubscriberInterface;
 use Composer\Factory;
-use Composer\Installer\{PackageEvent, PackageEvents};
+use Composer\Installer\{InstallerEvents, PackageEvent, PackageEvents};
 use Composer\IO\IOInterface;
 use Composer\Plugin\Capability\CommandProvider as ComposerCommandProvider;
 use Composer\Plugin\{Capable, PluginInterface};
@@ -25,7 +25,7 @@ use Foxy\Asset\{
     PnpmManager,
     YarnManager,
 };
-use Foxy\Audit\{AuditReport, AuditRequest, AuditRunner, AuditRunnerInterface, AuditableAssetManagerInterface};
+use Foxy\Audit\{AuditReport, AuditRequest, AuditRunner, AuditRunnerInterface};
 use Foxy\Command\FoxyCommandProvider;
 use Foxy\Config\{Config, ConfigBuilder};
 use Foxy\Exception\{Message, RuntimeException};
@@ -124,12 +124,6 @@ final class Foxy implements PluginInterface, EventSubscriberInterface, Capable, 
             );
         }
 
-        if (!isset($this->assetManager) || !$this->assetManager instanceof AuditableAssetManagerInterface) {
-            throw new RuntimeException(
-                Message::FOXY_AUDIT_UNSUPPORTED_MANAGER->getMessage(),
-            );
-        }
-
         return (new AuditRunner($this->assetManager))->audit($request);
     }
 
@@ -146,7 +140,7 @@ final class Foxy implements PluginInterface, EventSubscriberInterface, Capable, 
     public static function getSubscribedEvents(): array
     {
         return [
-            ComposerUtil::getInitEventName() => [['init', 100]],
+            InstallerEvents::PRE_OPERATIONS_EXEC => [['init', 100]],
             PackageEvents::POST_PACKAGE_INSTALL => [['initOnInstall', 100]],
             ScriptEvents::POST_INSTALL_CMD => [['solveAssets', 100]],
             ScriptEvents::POST_UPDATE_CMD => [['solveAssets', 100]],
@@ -249,6 +243,7 @@ final class Foxy implements PluginInterface, EventSubscriberInterface, Capable, 
             $config,
             $fs,
             new NativeInstaller($io, $fs, $registry, new DependencyResolver($registry, $io), new TarballExtractor($fs)),
+            $registry,
         );
     }
 

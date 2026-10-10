@@ -35,9 +35,9 @@ final class JsonFile extends \Composer\Json\JsonFile
      */
     private static array $encodeArrayKeys = [];
 
-    private int|null $indent = null;
-
     private array $mapKeys = [];
+
+    private bool $parsed = false;
 
     /**
      * Encode package manifest data as JSON.
@@ -65,14 +65,6 @@ final class JsonFile extends \Composer\Json\JsonFile
         $this->ensureParsed();
 
         return $this->arrayKeys;
-    }
-
-    /**
-     * Get the indent for this JSON file.
-     */
-    public function getIndent(): int
-    {
-        return $this->ensureParsed();
     }
 
     public function read(): array
@@ -125,12 +117,14 @@ final class JsonFile extends \Composer\Json\JsonFile
     }
 
     /**
-     * Parses the original JSON document once and returns its detected indent.
+     * Parses the original JSON document once to collect its empty array and empty object keys.
+     *
+     * @throws RuntimeException if the file exists but cannot be read.
      */
-    private function ensureParsed(): int
+    private function ensureParsed(): void
     {
-        if (null !== $this->indent) {
-            return $this->indent;
+        if ($this->parsed) {
+            return;
         }
 
         $content = '';
@@ -148,8 +142,7 @@ final class JsonFile extends \Composer\Json\JsonFile
 
         $this->arrayKeys = JsonFormatter::getArrayKeys($content);
         $this->mapKeys = JsonFormatter::getMapKeys($content);
-
-        return $this->indent = JsonFormatter::getIndent($content);
+        $this->parsed = true;
     }
 
     /**

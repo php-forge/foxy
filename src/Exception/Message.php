@@ -180,6 +180,15 @@ enum Message: string
     case ASSET_MANAGER_UNKNOWN = 'The asset manager "%s" doesn\'t exist.';
 
     /**
+     * Error when a production-only audit is requested for the native manager.
+     *
+     * Format: "The native audit cannot guarantee the requested dependency scope because the native manager installs
+     *         development dependencies together with the others."
+     */
+    case ASSET_NATIVE_AUDIT_NO_DEV_UNSUPPORTED = 'The native audit cannot guarantee the requested dependency scope '
+        . 'because the native manager installs development dependencies together with the others.';
+
+    /**
      * Error when the npm workspace graph cannot be enumerated.
      *
      * Format: "The npm workspace graph could not be enumerated from package-lock.json. Regenerate the lock file with a
@@ -212,11 +221,11 @@ enum Message: string
         . 'constraint "%s".';
 
     /**
-     * Bun parser detail when a package lacks an advisory list.
+     * Bulk advisory parser detail when a package lacks an advisory list.
      *
      * Format: "each package must contain a list of advisories"
      */
-    case AUDIT_BUN_PACKAGE_ADVISORIES_REQUIRED = 'each package must contain a list of advisories';
+    case AUDIT_BULK_PACKAGE_ADVISORIES_REQUIRED = 'each package must contain a list of advisories';
 
     /**
      * Error when Bun reports diagnostics that may indicate a partial report.
@@ -408,13 +417,6 @@ enum Message: string
      * Format: "The %s audit output is malformed: %s."
      */
     case AUDIT_OUTPUT_MALFORMED = 'The %s audit output is malformed: %s.';
-
-    /**
-     * Error when no audit parser exists for the asset manager.
-     *
-     * Format: "The asset manager "%s" does not provide a supported audit report."
-     */
-    case AUDIT_PARSER_UNSUPPORTED_MANAGER = 'The asset manager "%s" does not provide a supported audit report.';
 
     /**
      * pnpm parser detail when an advisory has no findings.
@@ -619,13 +621,6 @@ enum Message: string
      * Format: "Foxy is disabled; frontend dependencies cannot be audited."
      */
     case FOXY_AUDIT_DISABLED = 'Foxy is disabled; frontend dependencies cannot be audited.';
-
-    /**
-     * Error when the asset manager does not support audits.
-     *
-     * Format: "The selected asset manager does not support security audits."
-     */
-    case FOXY_AUDIT_UNSUPPORTED_MANAGER = 'The selected asset manager does not support security audits.';
 
     /**
      * Error when a JSON file cannot be read.

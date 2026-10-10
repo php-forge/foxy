@@ -112,10 +112,11 @@ composer foxy:audit
 composer foxy:audit --format=summary --no-dev --audit-level=high
 ```
 
-Foxy normalizes the current npm, pnpm, Yarn, Bun, and Deno audit reports and identifies the affected package,
+Foxy normalizes the current npm, pnpm, Yarn, Bun, Deno, and native audit reports and identifies the affected package,
 advisory, severity, vulnerable range, and CVE identifiers when GitHub maps the advisory to a CVE. The command returns
 `0` when no advisory meets the configured threshold, `1` when at least one does, and `2` when the audit cannot be
-completed reliably. With Deno, `--no-dev` is rejected because `deno audit` cannot exclude development dependencies.
+completed reliably. With Deno and the `native` manager, `--no-dev` is rejected because neither can exclude
+development dependencies.
 See the [usage guide](docs/usage.md#security-auditing) for formats and CI examples.
 
 ## Quick start

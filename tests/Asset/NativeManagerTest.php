@@ -8,14 +8,17 @@ use Composer\IO\IOInterface;
 use Composer\Package\RootPackageInterface;
 use Composer\Util\{Filesystem, Platform};
 use Foxy\Asset\NativeManager;
+use Foxy\Audit\Parser\NativeAuditParser;
 use Foxy\Config\Config;
 use Foxy\Exception\{Message, RuntimeException};
 use Foxy\Fallback\FallbackInterface;
 use Foxy\Native\NativeInstallerInterface;
+use Foxy\Tests\Fixtures\Native\InMemoryRegistry;
 use Foxy\Tests\Provider\NativeManagerProvider;
 use PHPUnit\Framework\Attributes\{DataProviderExternal, PreserveGlobalState, RunInSeparateProcess};
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use stdClass;
 use Xepozz\InternalMocker\MockerState;
 
 use function basename;
@@ -26,6 +29,7 @@ use function dirname;
 use function file_get_contents;
 use function file_put_contents;
 use function getcwd;
+use function json_encode;
 use function mkdir;
 use function str_replace;
 use function strtr;
@@ -35,15 +39,18 @@ use function uniqid;
 use function unlink;
 
 use const DIRECTORY_SEPARATOR;
+use const JSON_THROW_ON_ERROR;
 
 /**
- * Unit tests for {@see NativeManager} selection, validation, install directory resolution, and installer orchestration.
+ * Unit tests for {@see NativeManager} selection, validation, install directory resolution, installer orchestration, and
+ * the registry audit.
  *
  * {@see NativeManagerProvider} for test case data providers.
  */
 final class NativeManagerTest extends TestCase
 {
     private const string INSTALLING = '<info>Installing frontend dependencies with the native manager</info>';
+    private const string INTEGRITY = 'sha512-aGVsbG8=';
     private const string UPDATING = '<info>Updating frontend dependencies with the native manager</info>';
 
     private string $cwd = '';
@@ -56,6 +63,7 @@ final class NativeManagerTest extends TestCase
      */
     private array $links = [];
     private string $oldCwd = '';
+    private InMemoryRegistry $registry;
 
     public function testAddDependenciesWritesManifest(): void
     {
@@ -77,10 +85,112 @@ final class NativeManagerTest extends TestCase
         );
     }
 
+    public function testAuditRequestsRegistryPackagesSortedByNameWithoutLocalPackages(): void
+    {
+        $this->writeLock(
+            [
+                'zeta' => self::registryEntry('zeta', '2.0.0'),
+                '@composer-asset/foo--bar' => ['version' => '1.0.0', 'file' => './path/foo/bar'],
+                'alpha' => self::registryEntry('alpha', '1.2.3'),
+                '9' => self::registryEntry('9', '0.9.0'),
+                '10' => self::registryEntry('10', '1.0.0'),
+            ],
+        );
+
+        $result = $this->manager()->audit(false);
+
+        self::assertSame(
+            [
+                [
+                    '10' => ['1.0.0'],
+                    '9' => ['0.9.0'],
+                    'alpha' => ['1.2.3'],
+                    'zeta' => ['2.0.0'],
+                ],
+            ],
+            $this->registry->advisoryRequests,
+            'One request must carry the registry versions sorted as strings.',
+        );
+        self::assertSame(
+            0,
+            $result->exitCode,
+            'An empty document must exit with `0`.',
+        );
+        self::assertSame(
+            '{}',
+            $result->output,
+            'The document must be returned as received.',
+        );
+    }
+
+    public function testAuditReturnsDocumentWithFindingsAndExitOne(): void
+    {
+        $document = (string) file_get_contents(dirname(__DIR__) . '/Fixtures/Audit/bun-populated.json');
+
+        $this->registry->addAdvisories($document);
+
+        $this->writeLock(['lodash' => self::registryEntry('lodash', '4.17.15')]);
+
+        $result = $this->manager()->audit(false);
+
+        self::assertSame(
+            1,
+            $result->exitCode,
+            'A document with advisories must exit with `1`.',
+        );
+        self::assertSame(
+            $document,
+            $result->output,
+            'The document must be returned verbatim.',
+        );
+        self::assertSame(
+            '',
+            $result->errorOutput,
+            'The error output must be empty.',
+        );
+    }
+
+    public function testAuditSkipsRequestWhenLockHoldsOnlyLocalPackages(): void
+    {
+        $this->writeLock(['@composer-asset/foo--bar' => ['version' => '1.0.0', 'file' => './path/foo/bar']]);
+
+        $result = $this->manager()->audit(false);
+
+        self::assertSame(
+            [],
+            $this->registry->advisoryRequests,
+            'No request must be sent without registry packages.',
+        );
+        self::assertSame(
+            0,
+            $result->exitCode,
+            'A lock without registry packages must exit with `0`.',
+        );
+        self::assertSame(
+            '{}',
+            $result->output,
+            'The document must be the empty object.',
+        );
+        self::assertSame(
+            '',
+            $result->errorOutput,
+            'The error output must be empty.',
+        );
+    }
+
+    public function testGetAuditParserReturnsNativeParser(): void
+    {
+        self::assertInstanceOf(
+            NativeAuditParser::class,
+            $this->manager()->getAuditParser(),
+            'The native parser must read the bulk advisories document.',
+        );
+    }
+
     public function testIsAvailableRequiresLockFileAndResolvesManager(): void
     {
         $config = new Config(['manager-timeout' => ['native' => 5]]);
-        $manager = new NativeManager($this->io, $config, new Filesystem(), $this->installer);
+        $manager = new NativeManager($this->io, $config, new Filesystem(), $this->installer, $this->registry);
 
         self::assertNull(
             $config->get('manager-timeout'),
@@ -375,6 +485,48 @@ final class NativeManagerTest extends TestCase
         $this->manager(['run-asset-manager' => true, 'native-install-dir' => strtr($value, $placeholders)])->run();
     }
 
+    public function testThrowRuntimeExceptionForMalformedAdvisoriesDocument(): void
+    {
+        $this->registry->addAdvisories('[]');
+
+        $this->writeLock(['lodash' => self::registryEntry('lodash', '4.17.15')]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            Message::AUDIT_OUTPUT_MALFORMED->getMessage(
+                'native',
+                Message::AUDIT_REPORT_JSON_OBJECT_EXPECTED->getMessage(),
+            ),
+        );
+
+        $this->manager()->audit(false);
+    }
+
+    public function testThrowRuntimeExceptionWhenAuditLockFileIsInvalid(): void
+    {
+        file_put_contents("{$this->cwd}/foxy.lock", '{}');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            Message::NATIVE_LOCK_INVALID->getMessage($this->cwd . DIRECTORY_SEPARATOR . 'foxy.lock'),
+        );
+
+        $this->manager()->audit(false);
+    }
+
+    public function testThrowRuntimeExceptionWhenAuditLockFileIsMissing(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            Message::ASSET_MANAGER_LOCK_FILE_MISSING->getMessage(
+                'native',
+                $this->cwd . DIRECTORY_SEPARATOR . 'foxy.lock',
+            ),
+        );
+
+        $this->manager()->audit(false);
+    }
+
     public function testThrowRuntimeExceptionWhenFallbackRestoreFails(): void
     {
         $failure = new RuntimeException('Install failed.');
@@ -469,6 +621,31 @@ final class NativeManagerTest extends TestCase
         )->run();
     }
 
+    public function testThrowRuntimeExceptionWhenProductionOnlyAuditIsRequested(): void
+    {
+        $this->writeLock(['lodash' => self::registryEntry('lodash', '4.17.15')]);
+
+        try {
+            $this->manager()->audit(true);
+
+            self::fail(
+                'Expected the production-only native audit to be rejected.',
+            );
+        } catch (RuntimeException $exception) {
+            self::assertSame(
+                Message::ASSET_NATIVE_AUDIT_NO_DEV_UNSUPPORTED->getMessage(),
+                $exception->getMessage(),
+                'The rejection must explain the dependency scope.',
+            );
+        }
+
+        self::assertSame(
+            [],
+            $this->registry->advisoryRequests,
+            'The registry must not be asked.',
+        );
+    }
+
     public function testThrowRuntimeExceptionWhenRootPackageDirIsMissing(): void
     {
         $this->installer
@@ -531,6 +708,7 @@ final class NativeManagerTest extends TestCase
         $this->fallback = $this->createMock(FallbackInterface::class);
         $this->installer = $this->createMock(NativeInstallerInterface::class);
         $this->io = $this->createMock(IOInterface::class);
+        $this->registry = new InMemoryRegistry();
         $this->oldCwd = (string) getcwd();
 
         $directory = sys_get_temp_dir() . '/' . uniqid('foxy_native_manager_test_', true);
@@ -595,13 +773,34 @@ final class NativeManagerTest extends TestCase
      */
     private function manager(array $config = []): NativeManager
     {
-        return new NativeManager($this->io, new Config($config), new Filesystem(), $this->installer, $this->fallback);
+        return new NativeManager(
+            $this->io,
+            new Config($config),
+            new Filesystem(),
+            $this->installer,
+            $this->registry,
+            $this->fallback,
+        );
     }
 
     private function markInstalled(): void
     {
         file_put_contents("{$this->cwd}/package.json", '{}');
         mkdir("{$this->cwd}/node_modules");
+    }
+
+    /**
+     * Returns a registry lock entry for the version.
+     *
+     * @return array<string, string>
+     */
+    private static function registryEntry(string $name, string $version): array
+    {
+        return [
+            'version' => $version,
+            'resolved' => "https://registry.npmjs.org/{$name}/-/{$name}-{$version}.tgz",
+            'integrity' => self::INTEGRITY,
+        ];
     }
 
     /**
@@ -612,5 +811,18 @@ final class NativeManagerTest extends TestCase
         if ('\\' === DIRECTORY_SEPARATOR) {
             self::markTestSkipped('PHP does not resolve symbolic links with realpath() on Windows.');
         }
+    }
+
+    /**
+     * Writes `foxy.lock` with the given package entries and no requirements.
+     *
+     * @param array<array-key, array<string, string>> $packages Lock entries keyed by package name, in file order.
+     */
+    private function writeLock(array $packages): void
+    {
+        file_put_contents(
+            "{$this->cwd}/foxy.lock",
+            json_encode(['requirements' => new stdClass(), 'packages' => (object) $packages], JSON_THROW_ON_ERROR),
+        );
     }
 }

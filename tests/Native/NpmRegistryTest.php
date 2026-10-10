@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Foxy\Tests\Native;
 
+use Closure;
 use Composer\Cache;
 use Composer\Downloader\TransportException;
-use Composer\IO\{BufferIO, NullIO};
+use Composer\IO\{BufferIO, IOInterface, NullIO};
 use Composer\Util\Filesystem;
 use Composer\Util\Http\Response;
 use Composer\Util\HttpDownloader;
@@ -16,12 +17,17 @@ use Foxy\Tests\Provider\NpmRegistryProvider;
 use PHPUnit\Framework\Attributes\DataProviderExternal;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use React\Promise\PromiseInterface;
+use Symfony\Component\Console\Output\OutputInterface;
 
 use function base64_encode;
 use function file_get_contents;
 use function file_put_contents;
 use function hash;
 use function mkdir;
+use function preg_quote;
+use function React\Promise\reject;
+use function React\Promise\resolve;
 use function sha1;
 use function sys_get_temp_dir;
 use function uniqid;
@@ -29,17 +35,27 @@ use function uniqid;
 use const PHP_EOL;
 
 /**
- * Unit tests for {@see NpmRegistry} metadata requests, 429 back-off, and cached, integrity-verified tarball downloads.
+ * Unit tests for {@see NpmRegistry} metadata and bulk advisories requests, 429 back-off, cached, integrity-verified
+ * tarball downloads, and parallel tarball prefetches.
  *
  * {@see NpmRegistryProvider} for test case data providers.
  */
 final class NpmRegistryTest extends TestCase
 {
     private const array ACCEPT = ['http' => ['header' => ['Accept: application/vnd.npm.install-v1+json']]];
+    private const string ADVISORIES_DOCUMENT = '{"lodash":[{"id":1106913,"severity":"high"}]}';
+    private const string ADVISORIES_URL = 'https://registry.test/-/npm/v1/security/advisories/bulk';
+    private const string LEFT_PAD_TARBALL = "package/index.js\0module.exports = 'left-pad';\n";
+    private const string LEFT_PAD_URL = 'https://registry.test/left-pad/-/left-pad-1.3.0.tgz';
     private const string METADATA_URL = 'https://registry.test/@scope%2Fpkg';
     private const string TARBALL_URL = 'https://registry.test/@scope/pkg/-/pkg-1.0.0.tgz';
 
     private string $cacheDir = '';
+
+    /**
+     * @var list<array{string, string}> URL and target file of each parallel copy, in request order.
+     */
+    private array $copies = [];
 
     /**
      * @var list<int>
@@ -158,6 +174,77 @@ final class NpmRegistryTest extends TestCase
         );
     }
 
+    public function testGetAdvisoriesPostsEmptyObjectAndReturnsEmptyStringForMissingBody(): void
+    {
+        $downloader = $this->createMock(HttpDownloader::class);
+
+        $downloader
+            ->expects(self::once())
+            ->method('get')
+            ->with(self::ADVISORIES_URL, self::advisoriesOptions('{}'))
+            ->willReturn(new Response(['url' => self::ADVISORIES_URL], 200, [], null));
+
+        self::assertSame(
+            '',
+            $this->registry($downloader)->getAdvisories([]),
+            'A missing body must become an empty string.',
+        );
+    }
+
+    public function testGetAdvisoriesPostsVersionsAsJsonObject(): void
+    {
+        $downloader = $this->createMock(HttpDownloader::class);
+
+        $downloader
+            ->expects(self::once())
+            ->method('get')
+            ->with(self::ADVISORIES_URL, self::advisoriesOptions('{"lodash":["4.17.15"],"minimist":["1.2.0"]}'))
+            ->willReturn(new Response(['url' => self::ADVISORIES_URL], 200, [], self::ADVISORIES_DOCUMENT));
+
+        self::assertSame(
+            self::ADVISORIES_DOCUMENT,
+            $this->registry($downloader)->getAdvisories(['lodash' => ['4.17.15'], 'minimist' => ['1.2.0']]),
+            'The document must be returned as the registry wrote it.',
+        );
+    }
+
+    public function testGetAdvisoriesRetriesTooManyRequests(): void
+    {
+        $calls = 0;
+        $downloader = $this->createMock(HttpDownloader::class);
+        $exception = self::transportException(429, [], 'Too Many Requests');
+
+        $downloader
+            ->expects(self::exactly(2))
+            ->method('get')
+            ->with(self::ADVISORIES_URL, self::advisoriesOptions('{"lodash":["4.17.15"]}'))
+            ->willReturnCallback(
+                static function () use (&$calls, $exception): Response {
+                    if (0 === $calls++) {
+                        throw $exception;
+                    }
+
+                    return new Response(['url' => self::ADVISORIES_URL], 200, [], self::ADVISORIES_DOCUMENT);
+                },
+            );
+
+        self::assertSame(
+            self::ADVISORIES_DOCUMENT,
+            $this->registry($downloader)->getAdvisories(['lodash' => ['4.17.15']]),
+            'The document of the retried request must be returned.',
+        );
+        self::assertSame(
+            [1],
+            $this->delays,
+            'Back-off must follow the default schedule.',
+        );
+        self::assertSame(
+            'Retrying "' . self::ADVISORIES_URL . '" after a 429 response (1 s)' . PHP_EOL,
+            $this->io->getOutput(),
+            'The retry must be announced.',
+        );
+    }
+
     public function testGetMetadataRequestsEscapedScopedNameWithAcceptHeader(): void
     {
         $downloader = $this->createMock(HttpDownloader::class);
@@ -219,6 +306,230 @@ final class NpmRegistryTest extends TestCase
         );
     }
 
+    public function testPrefetchTarballsCachesVerifiedDownloadForLaterFetch(): void
+    {
+        $registry = $this->registry($this->prefetchDownloader(1, self::serve(NpmRegistryProvider::TARBALL)));
+
+        $registry->prefetchTarballs([$this->package()]);
+
+        self::assertSame(
+            NpmRegistryProvider::TARBALL,
+            file_get_contents($this->cacheEntry()),
+            'Verified download must be cached.',
+        );
+        self::assertFileDoesNotExist(
+            $this->copies[0][1],
+            'Temporary file must be removed.',
+        );
+        self::assertSame(
+            NpmRegistryProvider::TARBALL,
+            file_get_contents($registry->fetchTarball($this->package(), $this->directory)),
+            'Later fetch must be served from the cache.',
+        );
+    }
+
+    public function testPrefetchTarballsDiscardsDownloadWithMismatchingIntegrity(): void
+    {
+        $io = self::verboseIo();
+
+        $this->registry($this->prefetchDownloader(1, self::serve('corrupted')), io: $io)
+            ->prefetchTarballs([$this->package()]);
+
+        self::assertFileDoesNotExist(
+            $this->cacheEntry(),
+            'Mismatching download must not be cached.',
+        );
+        self::assertFileDoesNotExist(
+            $this->copies[0][1],
+            'Temporary file must be removed.',
+        );
+        self::assertSame(
+            'Prefetching the tarball of "@scope/pkg" (1.0.0) failed: '
+            . Message::NATIVE_INTEGRITY_MISMATCH->getMessage(self::TARBALL_URL) . PHP_EOL,
+            $io->getOutput(),
+            'Verbose notice must name the package and the mismatch.',
+        );
+    }
+
+    public function testPrefetchTarballsDiscardsPartialFileOfRejectedDownload(): void
+    {
+        $io = self::verboseIo();
+
+        $this->registry($this->prefetchDownloader(1, self::fail500(true)), io: $io)
+            ->prefetchTarballs([$this->package()]);
+
+        self::assertFileDoesNotExist(
+            $this->cacheEntry(),
+            'Rejected download must not be cached.',
+        );
+        self::assertFileDoesNotExist(
+            $this->copies[0][1],
+            'Partial temporary file must be removed.',
+        );
+        self::assertSame(
+            'Prefetching the tarball of "@scope/pkg" (1.0.0) failed: Internal Server Error' . PHP_EOL,
+            $io->getOutput(),
+            'Verbose notice must name the package and the cause.',
+        );
+    }
+
+    public function testPrefetchTarballsDownloadsMissingPackagesWithOneWait(): void
+    {
+        $this->registry(
+            $this->prefetchDownloader(
+                2,
+                static fn(string $url, string $to): PromiseInterface => self::serve(
+                    self::TARBALL_URL === $url ? NpmRegistryProvider::TARBALL : self::LEFT_PAD_TARBALL,
+                )($url, $to),
+            ),
+        )->prefetchTarballs([$this->package(), $this->leftPad()]);
+
+        self::assertSame(
+            [self::TARBALL_URL, self::LEFT_PAD_URL],
+            [$this->copies[0][0], $this->copies[1][0]],
+            'Each missing tarball must be requested once, in order.',
+        );
+        self::assertNotSame(
+            $this->copies[0][1],
+            $this->copies[1][1],
+            'Temporary files must have unique names.',
+        );
+        self::assertMatchesRegularExpression(
+            '{^' . preg_quote(sys_get_temp_dir()) . '/foxy-tarball-[0-9a-f]{13}\d\.\d{8}\.tgz$}',
+            $this->copies[0][1],
+            'Temporary file must be a unique `.tgz` in the system temporary directory.',
+        );
+        self::assertSame(
+            NpmRegistryProvider::TARBALL,
+            file_get_contents($this->cacheEntry()),
+            'First tarball must be cached.',
+        );
+        self::assertSame(
+            self::LEFT_PAD_TARBALL,
+            file_get_contents($this->leftPadCacheEntry()),
+            'Second tarball must be cached.',
+        );
+        self::assertFileDoesNotExist(
+            $this->copies[1][1],
+            'Every temporary file must be removed.',
+        );
+    }
+
+    public function testPrefetchTarballsHidesFailureNoticeAtNormalVerbosity(): void
+    {
+        $this->registry($this->prefetchDownloader(1, self::fail500(false)))->prefetchTarballs([$this->package()]);
+
+        self::assertSame(
+            '',
+            $this->io->getOutput(),
+            'Notice must be verbose only.',
+        );
+    }
+
+    public function testPrefetchTarballsIgnoresRejectedDownload(): void
+    {
+        $io = self::verboseIo();
+
+        $this->registry($this->prefetchDownloader(1, self::fail500(false)), io: $io)
+            ->prefetchTarballs([$this->package()]);
+
+        self::assertFileDoesNotExist(
+            $this->cacheEntry(),
+            'Rejected download must not be cached.',
+        );
+        self::assertFileDoesNotExist(
+            $this->copies[0][1],
+            'No temporary file may be left.',
+        );
+        self::assertSame(
+            'Prefetching the tarball of "@scope/pkg" (1.0.0) failed: Internal Server Error' . PHP_EOL,
+            $io->getOutput(),
+            'Verbose notice must name the package and the cause.',
+        );
+    }
+
+    public function testPrefetchTarballsRequestsNothingForCachedPackages(): void
+    {
+        $this->seedCache(NpmRegistryProvider::TARBALL);
+
+        $this->registry($this->idleDownloader())->prefetchTarballs([$this->package()]);
+
+        self::assertSame(
+            [],
+            $this->copies,
+            'Cached tarball must not be requested.',
+        );
+    }
+
+    public function testPrefetchTarballsRequestsNothingForEmptyList(): void
+    {
+        $this->registry($this->idleDownloader())->prefetchTarballs([]);
+
+        self::assertSame(
+            [],
+            $this->copies,
+            'No tarball must be requested.',
+        );
+    }
+
+    public function testPrefetchTarballsRequestsNothingWithDisabledCache(): void
+    {
+        mkdir("{$this->root}/locked", 0o555);
+
+        $cache = new Cache(new NullIO(), "{$this->root}/locked", 'a-z0-9_./');
+
+        $this->registry($this->idleDownloader(), $cache)->prefetchTarballs([$this->package()]);
+
+        self::assertFalse(
+            $cache->isEnabled(),
+            'Cache in a read-only directory must be disabled.',
+        );
+    }
+
+    public function testPrefetchTarballsRequestsNothingWithoutTarballUrl(): void
+    {
+        $this->registry($this->idleDownloader())->prefetchTarballs(
+            [new ResolvedPackage('no-url', '1.0.0'), new ResolvedPackage('empty-url', '1.0.0', '', 'sha512-AAAA')],
+        );
+
+        self::assertSame(
+            [],
+            $this->copies,
+            'Package without a tarball URL must be skipped.',
+        );
+    }
+
+    public function testPrefetchTarballsRequestsNothingWithReadOnlyCache(): void
+    {
+        $cache = new Cache(new NullIO(), $this->cacheDir, 'a-z0-9_./', null, true);
+
+        $this->registry($this->idleDownloader(), $cache)->prefetchTarballs([$this->package()]);
+
+        self::assertFileDoesNotExist(
+            $this->cacheEntry(),
+            'Read-only cache must stay empty.',
+        );
+    }
+
+    public function testPrefetchTarballsSkipsCachedPackageAndRequestsMissingOne(): void
+    {
+        $this->seedCache(NpmRegistryProvider::TARBALL);
+
+        $this->registry($this->prefetchDownloader(1, self::serve(self::LEFT_PAD_TARBALL)))
+            ->prefetchTarballs([$this->package(), $this->leftPad()]);
+
+        self::assertSame(
+            self::LEFT_PAD_URL,
+            $this->copies[0][0],
+            'Only the missing tarball must be requested.',
+        );
+        self::assertSame(
+            self::LEFT_PAD_TARBALL,
+            file_get_contents($this->leftPadCacheEntry()),
+            'Missing tarball must be cached.',
+        );
+    }
+
     public function testThrowRuntimeExceptionForInvalidMetadataJson(): void
     {
         $downloader = $this->createMock(HttpDownloader::class);
@@ -263,6 +574,23 @@ final class NpmRegistryTest extends TestCase
             $this->cacheEntry(),
             'Rejected download must not be cached.',
         );
+    }
+
+    public function testThrowRuntimeExceptionWhenAdvisoriesEndpointIsMissing(): void
+    {
+        $downloader = $this->createMock(HttpDownloader::class);
+
+        $downloader
+            ->expects(self::once())
+            ->method('get')
+            ->willThrowException(self::transportException(404, [], 'Not Found'));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            Message::NATIVE_REGISTRY_REQUEST_FAILED->getMessage(self::ADVISORIES_URL, 'Not Found'),
+        );
+
+        $this->registry($downloader)->getAdvisories(['lodash' => ['4.17.15']]);
     }
 
     public function testThrowRuntimeExceptionWhenDownloadFailsAfterCorruptedCacheHit(): void
@@ -409,6 +737,22 @@ final class NpmRegistryTest extends TestCase
         (new Filesystem())->removeDirectory($this->root);
     }
 
+    /**
+     * Returns the stream options of a bulk advisories request with the JSON body.
+     *
+     * @return array{http: array{method: string, header: list<string>, content: string}}
+     */
+    private static function advisoriesOptions(string $content): array
+    {
+        return [
+            'http' => [
+                'method' => 'POST',
+                'header' => ['Content-Type: application/json', 'Accept: application/json'],
+                'content' => $content,
+            ],
+        ];
+    }
+
     private function cache(): Cache
     {
         return new Cache(new NullIO(), $this->cacheDir, 'a-z0-9_./');
@@ -422,6 +766,54 @@ final class NpmRegistryTest extends TestCase
     private function cacheKey(): string
     {
         return 'tarball/@scope/pkg/1.0.0-' . sha1(self::TARBALL_URL) . '.tgz';
+    }
+
+    /**
+     * Returns a promise factory that rejects a parallel copy with an HTTP 500 error, leaving a partial file if asked.
+     *
+     * @return Closure(string, string): PromiseInterface<Response>
+     */
+    private static function fail500(bool $partial): Closure
+    {
+        return static function (string $url, string $to) use ($partial): PromiseInterface {
+            if ($partial) {
+                file_put_contents($to, 'partial');
+            }
+
+            return reject(self::transportException(500, [], 'Internal Server Error'));
+        };
+    }
+
+    /**
+     * Returns a downloader that must receive neither a parallel copy nor a `wait()` call.
+     */
+    private function idleDownloader(): HttpDownloader&MockObject
+    {
+        $downloader = $this->createMock(HttpDownloader::class);
+
+        $downloader
+            ->expects(self::never())
+            ->method('addCopy');
+        $downloader
+            ->expects(self::never())
+            ->method('wait');
+
+        return $downloader;
+    }
+
+    private function leftPad(): ResolvedPackage
+    {
+        return new ResolvedPackage(
+            'left-pad',
+            '1.3.0',
+            self::LEFT_PAD_URL,
+            'sha512-' . base64_encode(hash('sha512', self::LEFT_PAD_TARBALL, true)),
+        );
+    }
+
+    private function leftPadCacheEntry(): string
+    {
+        return "{$this->cacheDir}/tarball/left-pad/1.3.0-" . sha1(self::LEFT_PAD_URL) . '.tgz';
     }
 
     /**
@@ -471,12 +863,45 @@ final class NpmRegistryTest extends TestCase
         );
     }
 
-    private function registry(HttpDownloader $downloader): NpmRegistry
+    /**
+     * Returns a downloader that records the parallel copies into {@see $copies}, answers them through the factory, and
+     * expects one `wait()` and no sequential copy.
+     *
+     * @param Closure(string, string): PromiseInterface<Response> $answer Promise factory for each copy.
+     */
+    private function prefetchDownloader(int $copies, Closure $answer): HttpDownloader&MockObject
     {
+        $downloader = $this->createMock(HttpDownloader::class);
+
+        $downloader
+            ->expects(self::exactly($copies))
+            ->method('addCopy')
+            ->willReturnCallback(
+                function (string $url, string $to) use ($answer): PromiseInterface {
+                    $this->copies[] = [$url, $to];
+
+                    return $answer($url, $to);
+                },
+            );
+        $downloader
+            ->expects(self::once())
+            ->method('wait');
+        $downloader
+            ->expects(self::never())
+            ->method('copy');
+
+        return $downloader;
+    }
+
+    private function registry(
+        HttpDownloader $downloader,
+        Cache|null $cache = null,
+        IOInterface|null $io = null,
+    ): NpmRegistry {
         return new NpmRegistry(
             $downloader,
-            $this->cache(),
-            $this->io,
+            $cache ?? $this->cache(),
+            $io ?? $this->io,
             'https://registry.test/',
             function (int $seconds): void {
                 $this->delays[] = $seconds;
@@ -494,6 +919,20 @@ final class NpmRegistryTest extends TestCase
         file_put_contents($source, $bytes);
 
         $this->cache()->copyFrom($this->cacheKey(), $source);
+    }
+
+    /**
+     * Returns a promise factory that writes the bytes to the copy target and fulfils the copy.
+     *
+     * @return Closure(string, string): PromiseInterface<Response>
+     */
+    private static function serve(string $bytes): Closure
+    {
+        return static function (string $url, string $to) use ($bytes): PromiseInterface {
+            file_put_contents($to, $bytes);
+
+            return resolve(new Response(['url' => $url], 200, [], null));
+        };
     }
 
     /**
@@ -532,5 +971,10 @@ final class NpmRegistryTest extends TestCase
         $exception->setHeaders($headers);
 
         return $exception;
+    }
+
+    private static function verboseIo(): BufferIO
+    {
+        return new BufferIO('', OutputInterface::VERBOSITY_VERBOSE);
     }
 }

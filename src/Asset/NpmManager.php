@@ -6,6 +6,8 @@ namespace Foxy\Asset;
 
 use Composer\Json\JsonFile;
 use Composer\Util\ProcessExecutor;
+use Foxy\Audit\AuditParserInterface;
+use Foxy\Audit\Parser\NpmAuditParser;
 use Foxy\Exception\{Message, RuntimeException};
 
 use function array_is_list;
@@ -16,8 +18,13 @@ use function str_contains;
 use function str_replace;
 use function trim;
 
-final class NpmManager extends AbstractAuditableAssetManager
+final class NpmManager extends AbstractAssetManager
 {
+    public function getAuditParser(): AuditParserInterface
+    {
+        return new NpmAuditParser();
+    }
+
     public function getLockPackageName(): string
     {
         return 'package-lock.json';

@@ -5,9 +5,16 @@ declare(strict_types=1);
 namespace Foxy\Asset;
 
 use Composer\Util\ProcessExecutor;
+use Foxy\Audit\AuditParserInterface;
+use Foxy\Audit\Parser\PnpmAuditParser;
 
-final class PnpmManager extends AbstractAuditableAssetManager
+final class PnpmManager extends AbstractAssetManager
 {
+    public function getAuditParser(): AuditParserInterface
+    {
+        return new PnpmAuditParser();
+    }
+
     public function getLockPackageName(): string
     {
         return 'pnpm-lock.yaml';

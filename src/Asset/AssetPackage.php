@@ -148,9 +148,7 @@ final class AssetPackage implements AssetPackageInterface
             $license = current($rootPackage->getLicense());
 
             if ('proprietary' === $license) {
-                if (!isset($this->package['private'])) {
-                    $this->package['private'] = true;
-                }
+                $this->package['private'] ??= true;
             } else {
                 $this->package['license'] = $license;
             }

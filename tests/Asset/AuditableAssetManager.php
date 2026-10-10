@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Foxy\Tests\Asset;
 
-use Foxy\Audit\AuditableAssetManagerInterface;
+use Foxy\Asset\AbstractAssetManager;
+use Foxy\Audit\AuditParserInterface;
 use Foxy\Config\Config;
 use Foxy\Exception\{Message, RuntimeException};
 use Foxy\Tests\Provider\AuditableAssetManagerProvider;
@@ -17,13 +18,18 @@ use function getcwd;
 use const DIRECTORY_SEPARATOR;
 
 /**
- * Base unit tests for {@see AuditableAssetManagerInterface} asset managers, shared by the audit-capable manager tests.
+ * Base unit tests for the audit of {@see AbstractAssetManager} subclasses, shared by the process-based manager tests.
  *
  * {@see AuditableAssetManagerProvider} for test case data providers.
  */
 abstract class AuditableAssetManager extends AssetManager
 {
     abstract protected function getValidAuditCommand(bool $noDev): string;
+
+    /**
+     * @return class-string<AuditParserInterface>
+     */
+    abstract protected function getValidAuditParserClass(): string;
 
     #[DataProviderExternal(AuditableAssetManagerProvider::class, 'auditScopes')]
     public function testAuditBuildsExactCommandWithoutInstallOptions(bool $noDev): void
@@ -41,12 +47,6 @@ abstract class AuditableAssetManager extends AssetManager
 
         $this->executor->addExpectedValues(0, $this->getValidVersion());
         $this->executor->addExpectedValues(1, 'AUDIT OUTPUT');
-
-        self::assertInstanceOf(
-            AuditableAssetManagerInterface::class,
-            $this->manager,
-            'The manager should implement the AuditableAssetManagerInterface',
-        );
 
         $result = $this->manager->audit($noDev);
 
@@ -86,12 +86,6 @@ abstract class AuditableAssetManager extends AssetManager
         $this->config = new Config(['run-asset-manager' => false]);
 
         $this->manager = $this->getManager();
-
-        self::assertInstanceOf(
-            AuditableAssetManagerInterface::class,
-            $this->manager,
-            'The manager should implement the AuditableAssetManagerInterface',
-        );
 
         try {
             $this->manager->audit(false);
@@ -136,12 +130,6 @@ abstract class AuditableAssetManager extends AssetManager
         $this->executor->addExpectedValues(0, $this->getValidVersion());
         $this->executor->addExpectedValues(0, '{}');
 
-        self::assertInstanceOf(
-            AuditableAssetManagerInterface::class,
-            $this->manager,
-            'The manager should implement the AuditableAssetManagerInterface',
-        );
-
         $this->manager->audit(false);
 
         [, $auditArguments] = explode(' ', $this->getValidAuditCommand(false), 2);
@@ -181,12 +169,6 @@ abstract class AuditableAssetManager extends AssetManager
         $this->executor->addExpectedValues(0, $this->getValidVersion());
         $this->executor->addExpectedValues(0, '{}');
 
-        self::assertInstanceOf(
-            AuditableAssetManagerInterface::class,
-            $this->manager,
-            'The manager should implement the AuditableAssetManagerInterface',
-        );
-
         $this->manager->audit(false);
 
         self::assertSame(
@@ -203,6 +185,15 @@ abstract class AuditableAssetManager extends AssetManager
             $originalCwd,
             getcwd(),
             'The current working directory should not have changed after the audit',
+        );
+    }
+
+    public function testGetAuditParserReturnsParserOfManagerReport(): void
+    {
+        self::assertInstanceOf(
+            $this->getValidAuditParserClass(),
+            $this->getManager()->getAuditParser(),
+            'The parser should read the report format of this manager',
         );
     }
 }

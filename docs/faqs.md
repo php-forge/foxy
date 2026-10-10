@@ -50,8 +50,8 @@ Explicit selection and a committed lockfile are recommended for CI.
 Yes. Set `config.foxy.manager` to `native`. Foxy reads the merged `package.json`, resolves every dependency against
 the npm registry with one version per package, downloads and verifies the tarballs, extracts them into `node_modules`,
 and records the result in `foxy.lock`. PHP with the `zlib` extension is the only requirement. The native manager does
-not run lifecycle scripts, does not create `bin` links, and does not support `composer foxy:audit`. See
-[Native manager](config.md#native-manager) for the complete scope.
+not run lifecycle scripts and does not create `bin` links. See [Native manager](config.md#native-manager) for the
+complete scope.
 
 ## How can frontend dependencies be checked for known CVEs?
 
@@ -61,9 +61,10 @@ identifiers. Use `--format=summary` for compact counts in CI or `--format=json` 
 document.
 
 The native registry response commonly contains a GHSA but no CVE. Foxy resolves that relationship through GitHub's
-public advisory API unless `--no-cve` or `--format=summary` is supplied. A lookup failure is shown as unavailable
-without hiding the native security finding. See [Security auditing](usage.md#security-auditing) for options and exit
-statuses.
+public advisory API unless `--no-cve` or `--format=summary` is supplied. The lookups run concurrently through
+Composer's HTTP downloader (at most 12 at once; `COMPOSER_MAX_PARALLEL_HTTP` changes the limit), and a `github-oauth`
+token in Composer's `auth.json` applies to them. A lookup failure marks only its own advisory as unavailable without
+hiding the native security finding. See [Security auditing](usage.md#security-auditing) for options and exit statuses.
 
 ## Why is a dependency's package.json not detected?
 

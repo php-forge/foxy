@@ -45,10 +45,16 @@ composer foxy:audit
 
 The command requires the selected manager's native lockfile, validates the manager version, and asks the manager for a
 security report. It reads the lockfile and does not run an install, update, fix, or fallback. Foxy supports npm audit
-report version 2 starting with npm 10.9.8 and the current report schemas emitted by pnpm 11, Yarn 4, and Bun 1.4;
-legacy report formats are rejected instead of being interpreted heuristically.
+report version 2 starting with npm 10.9.8, the current report schemas emitted by pnpm 11, Yarn 4, and Bun 1.4, and the
+npm registry's bulk advisories document read by the `native` manager; legacy report formats are rejected instead of
+being interpreted heuristically.
 
-The `native` manager does not support the audit command yet; `composer foxy:audit` returns status `2` for it.
+With the `native` manager, `composer foxy:audit` reads `foxy.lock` and asks the configured `registry-url` for
+advisories in one request to npm's bulk advisories endpoint (`POST <registry-url>/-/npm/v1/security/advisories/bulk`),
+sending every locked registry package with its version; local `file:` packages are not sent, and a lock without
+registry packages is clean without a request. `--no-dev` is rejected with status `2` because the native manager
+installs development dependencies together with the others. A registry that does not implement the endpoint fails
+the audit with status `2`.
 
 Deno does not provide a machine-readable report. Foxy runs `deno audit --level=low` with `NO_COLOR=1` against
 `deno.lock` and parses its text report strictly. The parser is validated against Deno 2.9.7 and returns status `2`
@@ -99,9 +105,11 @@ standard error so JSON on standard output remains valid.
 
 Native npm registry audit data normally identifies advisories by a numeric ID and GHSA rather than a CVE. Unless
 `--no-cve` or `--format=summary` is used, Foxy resolves each unique public GHSA once through the
-[GitHub global security advisories API](https://docs.github.com/en/rest/security-advisories/global-advisories). A
-failed optional lookup is reported as `unavailable` and does not discard the native finding or change its audit exit
-status.
+[GitHub global security advisories API](https://docs.github.com/en/rest/security-advisories/global-advisories). The
+lookups run concurrently through Composer's HTTP downloader, at most 12 at once by default; the
+`COMPOSER_MAX_PARALLEL_HTTP` environment variable changes that limit. A `github-oauth` token for `github.com` in
+Composer's `auth.json` applies to these requests and raises GitHub's rate limit. A failed optional lookup marks only
+its own advisory as `unavailable` and does not discard the native finding or change its audit exit status.
 
 Bun can skip packages from a registry that does not answer its audit request while still returning a successful native
 status. Foxy therefore treats any diagnostic emitted by `bun audit --json` as an unreliable partial report and returns
@@ -125,7 +133,8 @@ composer foxy:audit --no-dev --audit-level=high --format=summary
 
 The explicit command still runs when `run-asset-manager` is `false`; that setting controls automatic install and
 update execution, not a user-requested audit. Foxy must be enabled, the selected binary must satisfy its supported
-version constraint, and the matching native lockfile must exist.
+version constraint, and the matching native lockfile must exist. The `native` manager has no binary, so only Foxy and
+`foxy.lock` are required for it.
 
 ## Library setup
 

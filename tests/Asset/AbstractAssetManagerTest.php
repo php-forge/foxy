@@ -16,6 +16,7 @@ use Foxy\Tests\Provider\AbstractAssetManagerProvider;
 use PHPUnit\Framework\Attributes\{DataProviderExternal, PreserveGlobalState, RunInSeparateProcess};
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use Seld\JsonLint\ParsingException;
 use Symfony\Component\Filesystem\Filesystem as SymfonyFilesystem;
 use Xepozz\InternalMocker\MockerState;
@@ -318,7 +319,7 @@ final class AbstractAssetManagerTest extends TestCase
 
                     $observedTimeout = ProcessExecutor::getTimeout();
 
-                    throw new \RuntimeException('Audit execution failed.');
+                    throw new RuntimeException('Audit execution failed.');
                 },
             );
         $this->fallback->expects(self::never())->method('restore');
@@ -340,7 +341,7 @@ final class AbstractAssetManagerTest extends TestCase
                 self::fail(
                     'Expected the audit process to fail.',
                 );
-            } catch (\RuntimeException $exception) {
+            } catch (RuntimeException $exception) {
                 self::assertSame(
                     'Audit execution failed.',
                     $exception->getMessage(),

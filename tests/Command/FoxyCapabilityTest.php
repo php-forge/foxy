@@ -7,7 +7,8 @@ namespace Foxy\Tests\Command;
 use Composer\Plugin\Capability\CommandProvider as ComposerCommandProvider;
 use Composer\Plugin\Capable;
 use Foxy\Asset\AssetManagerInterface;
-use Foxy\Audit\{AuditProcessResult, AuditRequest, AuditRunnerInterface, AuditableAssetManagerInterface, Severity};
+use Foxy\Audit\{AuditProcessResult, AuditRequest, AuditRunnerInterface, Severity};
+use Foxy\Audit\Parser\NpmAuditParser;
 use Foxy\Command\FoxyCommandProvider;
 use Foxy\Config\Config;
 use Foxy\Exception\{Message, RuntimeException};
@@ -17,11 +18,9 @@ use ReflectionClass;
 
 final class FoxyCapabilityTest extends TestCase
 {
-    public function testAuditDelegatesToSelectedAuditableManager(): void
+    public function testAuditDelegatesToSelectedManager(): void
     {
-        $manager = $this->createMockForIntersectionOfInterfaces(
-            [AssetManagerInterface::class, AuditableAssetManagerInterface::class],
-        );
+        $manager = $this->createMock(AssetManagerInterface::class);
 
         $manager
             ->expects(self::once())
@@ -38,6 +37,10 @@ final class FoxyCapabilityTest extends TestCase
                     ' manager diagnostic ',
                 ),
             );
+        $manager
+            ->expects(self::once())
+            ->method('getAuditParser')
+            ->willReturn(new NpmAuditParser());
 
         $foxy = new Foxy();
 
@@ -63,59 +66,6 @@ final class FoxyCapabilityTest extends TestCase
         );
     }
 
-    public function testAuditRejectsDisabledPlugin(): void
-    {
-        $foxy = new Foxy();
-
-        self::setProperty($foxy, 'config', new Config([], ['enabled' => false]));
-
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage(
-            Message::FOXY_AUDIT_DISABLED->getMessage(),
-        );
-
-        $foxy->audit(new AuditRequest());
-    }
-
-    public function testAuditRejectsManagerWithoutAuditCapability(): void
-    {
-        $foxy = new Foxy();
-
-        self::setProperty($foxy, 'config', new Config([], ['enabled' => true]));
-        self::setProperty($foxy, 'assetManager', $this->createMock(AssetManagerInterface::class));
-
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage(
-            Message::FOXY_AUDIT_UNSUPPORTED_MANAGER->getMessage(),
-        );
-
-        $foxy->audit(new AuditRequest());
-    }
-
-    public function testAuditRejectsMissingAssetManager(): void
-    {
-        $foxy = new Foxy();
-
-        self::setProperty($foxy, 'config', new Config([], ['enabled' => true]));
-
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage(
-            Message::FOXY_AUDIT_UNSUPPORTED_MANAGER->getMessage(),
-        );
-
-        $foxy->audit(new AuditRequest());
-    }
-
-    public function testAuditRejectsUnactivatedPlugin(): void
-    {
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage(
-            Message::FOXY_AUDIT_DISABLED->getMessage(),
-        );
-
-        (new Foxy())->audit(new AuditRequest());
-    }
-
     public function testDeclaresCommandProviderCapability(): void
     {
         $foxy = new Foxy();
@@ -135,6 +85,30 @@ final class FoxyCapabilityTest extends TestCase
             $foxy->getCapabilities(),
             'Command capability must map to its provider.',
         );
+    }
+
+    public function testThrowRuntimeExceptionWhenPluginIsDisabled(): void
+    {
+        $foxy = new Foxy();
+
+        self::setProperty($foxy, 'config', new Config([], ['enabled' => false]));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            Message::FOXY_AUDIT_DISABLED->getMessage(),
+        );
+
+        $foxy->audit(new AuditRequest());
+    }
+
+    public function testThrowRuntimeExceptionWhenPluginIsNotActivated(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            Message::FOXY_AUDIT_DISABLED->getMessage(),
+        );
+
+        (new Foxy())->audit(new AuditRequest());
     }
 
     private static function setProperty(Foxy $foxy, string $property, object $value): void

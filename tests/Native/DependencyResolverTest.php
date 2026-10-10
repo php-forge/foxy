@@ -231,6 +231,32 @@ final class DependencyResolverTest extends TestCase
         );
     }
 
+    public function testResolveDropsOptionalSubtreesThroughSelfReferencingConstraint(): void
+    {
+        $registry = (new InMemoryRegistry())
+            ->add(self::metadata('z', ['1.0.0' => ['dependencies' => ['bar' => '*', 'x' => '*']]]))
+            ->add(self::metadata('bar', ['1.0.0' => ['dependencies' => ['z' => '*']]]))
+            ->add(self::metadata('x', ['1.0.0' => ['dependencies' => ['x2' => '*']]]))
+            ->add(self::metadata('x2', ['1.0.0' => ['dependencies' => ['y' => '^1.0']]]))
+            ->add(self::metadata('aa', ['1.0.0' => ['dependencies' => ['k' => '*']]]))
+            ->add(self::metadata('k', ['1.0.0' => ['dependencies' => ['z' => '*']]]))
+            ->add(self::metadata('left', ['1.0.0' => []]));
+
+        $io = $this->createMock(IOInterface::class);
+
+        $io
+            ->expects(self::exactly(2))
+            ->method('writeError');
+
+        self::assertEquals(
+            ['left' => self::package('left', '1.0.0')],
+            (new DependencyResolver($registry, $io))->resolve(
+                [new Requirement('z', '*', '', true), new Requirement('aa', '*', '', true), new Requirement('left', '*', '')],
+            ),
+            'The subtree requiring z from outside must go too.',
+        );
+    }
+
     public function testResolveDropsOptionalSubtreeWithUnavailableDependency(): void
     {
         $registry = (new InMemoryRegistry())
@@ -911,6 +937,23 @@ final class DependencyResolverTest extends TestCase
         );
 
         $resolver->resolve([new Requirement('foo', '^1.0', '', true), new Requirement('m', '*', '')]);
+    }
+
+    public function testThrowRuntimeExceptionWhenMandatoryConstraintsConflictBesideOptionalOne(): void
+    {
+        $registry = (new InMemoryRegistry())
+            ->add(self::metadata('o', ['1.0.0' => ['optionalDependencies' => ['x' => '>=1.5']]]))
+            ->add(self::metadata('m', ['1.0.0' => ['dependencies' => ['x' => '^2.0']]]))
+            ->add(self::metadata('x', ['1.0.0' => [], '1.5.0' => [], '2.0.0' => []]));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            Message::NATIVE_VERSION_CONFLICT->getMessage('x', '"^1.0" from root, "^2.0" from m@1.0.0'),
+        );
+
+        $this->resolver($registry)->resolve(
+            [new Requirement('x', '^1.0', ''), new Requirement('o', '*', ''), new Requirement('m', '*', '')],
+        );
     }
 
     public function testThrowRuntimeExceptionWhenMandatoryConstraintsConflictWithoutOptionalOnes(): void

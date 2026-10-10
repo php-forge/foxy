@@ -446,6 +446,47 @@ final class NativeInstallerTest extends TestCase
         );
     }
 
+    public function testInstallPrefetchesRegistryPackagesOnceBeforeFetching(): void
+    {
+        $registry = $this->registry();
+
+        $this->writeJson(
+            'package.json',
+            ['dependencies' => ['left-pad' => '*', self::LOCAL_NAME => 'file:' . self::LOCAL_PATH]],
+        );
+        $this->writeLocal(['version' => '1.0.0', 'dependencies' => ['bootstrap' => '^5.3']]);
+        $this->install($registry);
+
+        self::assertSame(
+            [['names' => ['@popperjs/core', 'bootstrap', 'left-pad'], 'fetchedBefore' => 0]],
+            $registry->prefetched,
+            'One prefetch must list every registry package, without the local one, before any fetch.',
+        );
+        self::assertCount(
+            3,
+            $registry->fetched,
+            'Every prefetched tarball must still be fetched.',
+        );
+    }
+
+    public function testInstallPrefetchesUnchangedPackagesAgainFromFreshLock(): void
+    {
+        $registry = $this->registry();
+
+        $this->writeJson('package.json', ['dependencies' => ['left-pad' => '*']]);
+        $this->install($registry);
+        $this->install($registry);
+
+        self::assertSame(
+            [
+                ['names' => ['left-pad'], 'fetchedBefore' => 0],
+                ['names' => ['left-pad'], 'fetchedBefore' => 1],
+            ],
+            $registry->prefetched,
+            'A reinstall from the lock must prefetch the locked packages again.',
+        );
+    }
+
     public function testInstallPrunesEntriesOutsideTheInstallSet(): void
     {
         $this->writeJson('package.json', ['dependencies' => ['bootstrap' => '^5.3']]);
@@ -995,6 +1036,25 @@ final class NativeInstallerTest extends TestCase
         self::assertFileExists(
             "{$this->root}/node_modules/left-pad/index.js",
             'The remaining requirements must be installed.',
+        );
+    }
+
+    public function testInstallSkipsPrefetchWithoutRegistryPackages(): void
+    {
+        $registry = $this->registry();
+
+        $this->writeJson('package.json', ['dependencies' => [self::LOCAL_NAME => 'file:' . self::LOCAL_PATH]]);
+        $this->writeLocal(['version' => '1.0.0']);
+        $this->install($registry);
+
+        self::assertSame(
+            [],
+            $registry->prefetched,
+            'Local packages alone must not trigger a prefetch.',
+        );
+        self::assertFileExists(
+            "{$this->root}/node_modules/" . self::LOCAL_NAME . '/package.json',
+            'The local package must be copied.',
         );
     }
 

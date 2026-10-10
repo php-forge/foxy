@@ -6,7 +6,7 @@ namespace Foxy\Tests\Provider;
 
 use Closure;
 use Foxy\Audit\AuditParserInterface;
-use Foxy\Audit\Parser\{BunAuditParser, NpmAuditParser, PnpmAuditParser, YarnAuditParser};
+use Foxy\Audit\Parser\{BunAuditParser, NativeAuditParser, NpmAuditParser, PnpmAuditParser, YarnAuditParser};
 use Foxy\Exception\Message;
 
 /**
@@ -165,7 +165,7 @@ final class AuditParserProvider
         yield 'Bun advisories object' => [
             new BunAuditParser(),
             '{"pkg":{}}',
-            self::malformed('bun', Message::AUDIT_BUN_PACKAGE_ADVISORIES_REQUIRED->getMessage()),
+            self::malformed('bun', Message::AUDIT_BULK_PACKAGE_ADVISORIES_REQUIRED->getMessage()),
         ];
         yield 'Bun blank required string' => [
             new BunAuditParser(),
@@ -180,7 +180,7 @@ final class AuditParserProvider
         yield 'Bun empty package key' => [
             new BunAuditParser(),
             '{"":[]}',
-            self::malformed('bun', Message::AUDIT_BUN_PACKAGE_ADVISORIES_REQUIRED->getMessage()),
+            self::malformed('bun', Message::AUDIT_BULK_PACKAGE_ADVISORIES_REQUIRED->getMessage()),
         ];
         yield 'Bun non-scalar advisory ID' => [
             new BunAuditParser(),
@@ -196,6 +196,59 @@ final class AuditParserProvider
             new BunAuditParser(),
             '[]',
             self::malformed('bun', Message::AUDIT_REPORT_JSON_OBJECT_EXPECTED->getMessage()),
+        ];
+        yield 'native advisories object' => [
+            new NativeAuditParser(),
+            '{"pkg":{}}',
+            self::malformed('native', Message::AUDIT_BULK_PACKAGE_ADVISORIES_REQUIRED->getMessage()),
+        ];
+        yield 'native blank required string' => [
+            new NativeAuditParser(),
+            '{"pkg":[{"id":1,"severity":"low","vulnerable_versions":"   "}]}',
+            self::malformed(
+                'native',
+                Message::AUDIT_FIELD_STRING_REQUIRED->getMessage('pkg.0', 'vulnerable_versions'),
+            ),
+        ];
+        yield 'native empty advisory ID' => [
+            new NativeAuditParser(),
+            '{"pkg":[{"id":" "}]}',
+            self::malformed('native', Message::AUDIT_VALUE_EMPTY->getMessage('pkg.0.id')),
+        ];
+        yield 'native empty document' => [
+            new NativeAuditParser(),
+            '',
+            self::malformed('native', Message::AUDIT_REPORT_JSON_OBJECT_EXPECTED->getMessage()),
+        ];
+        yield 'native empty package key' => [
+            new NativeAuditParser(),
+            '{"":[]}',
+            self::malformed('native', Message::AUDIT_BULK_PACKAGE_ADVISORIES_REQUIRED->getMessage()),
+        ];
+        yield 'native error document' => [
+            new NativeAuditParser(),
+            '{"statusCode":400,"error":"Bad Request","message":"Invalid request payload input"}',
+            self::malformed('native', Message::AUDIT_BULK_PACKAGE_ADVISORIES_REQUIRED->getMessage()),
+        ];
+        yield 'native non-scalar advisory ID' => [
+            new NativeAuditParser(),
+            '{"pkg":[{"id":false}]}',
+            self::malformed('native', Message::AUDIT_VALUE_STRING_OR_INTEGER_REQUIRED->getMessage('pkg.0.id')),
+        ];
+        yield 'native non-string optional URL' => [
+            new NativeAuditParser(),
+            '{"pkg":[{"id":1,"url":false}]}',
+            self::malformed('native', Message::AUDIT_FIELD_STRING_REQUIRED->getMessage('pkg.0', 'url')),
+        ];
+        yield 'native root list' => [
+            new NativeAuditParser(),
+            '[]',
+            self::malformed('native', Message::AUDIT_REPORT_JSON_OBJECT_EXPECTED->getMessage()),
+        ];
+        yield 'native unsupported severity' => [
+            new NativeAuditParser(),
+            '{"pkg":[{"id":1,"title":"Issue","severity":"unknown","vulnerable_versions":"<1"}]}',
+            self::malformed('native', Message::AUDIT_VALUE_SEVERITY_UNSUPPORTED->getMessage('pkg.0')),
         ];
         yield 'npm empty via' => [
             new NpmAuditParser(),

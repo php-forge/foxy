@@ -131,6 +131,12 @@ final class MessageProvider
             ['gulp'],
             'The asset manager "gulp" doesn\'t exist.',
         ];
+        yield 'ASSET_NATIVE_AUDIT_NO_DEV_UNSUPPORTED' => [
+            Message::ASSET_NATIVE_AUDIT_NO_DEV_UNSUPPORTED,
+            [],
+            'The native audit cannot guarantee the requested dependency scope because the native manager installs '
+            . 'development dependencies together with the others.',
+        ];
         yield 'ASSET_NPM_WORKSPACE_GRAPH_UNENUMERABLE' => [
             Message::ASSET_NPM_WORKSPACE_GRAPH_UNENUMERABLE,
             [],
@@ -152,8 +158,8 @@ final class MessageProvider
             ['yarn', '1.22.19', '>=2.0.0'],
             'The installed yarn version "1.22.19" doesn\'t match the supported version constraint ">=2.0.0".',
         ];
-        yield 'AUDIT_BUN_PACKAGE_ADVISORIES_REQUIRED' => [
-            Message::AUDIT_BUN_PACKAGE_ADVISORIES_REQUIRED,
+        yield 'AUDIT_BULK_PACKAGE_ADVISORIES_REQUIRED' => [
+            Message::AUDIT_BULK_PACKAGE_ADVISORIES_REQUIRED,
             [],
             'each package must contain a list of advisories',
         ];
@@ -292,11 +298,6 @@ final class MessageProvider
             Message::AUDIT_OUTPUT_MALFORMED,
             ['npm', 'invalid JSON'],
             'The npm audit output is malformed: invalid JSON.',
-        ];
-        yield 'AUDIT_PARSER_UNSUPPORTED_MANAGER' => [
-            Message::AUDIT_PARSER_UNSUPPORTED_MANAGER,
-            ['deno'],
-            'The asset manager "deno" does not provide a supported audit report.',
         ];
         yield 'AUDIT_PNPM_FINDINGS_EMPTY' => [
             Message::AUDIT_PNPM_FINDINGS_EMPTY,
@@ -442,11 +443,6 @@ final class MessageProvider
             Message::FOXY_AUDIT_DISABLED,
             [],
             'Foxy is disabled; frontend dependencies cannot be audited.',
-        ];
-        yield 'FOXY_AUDIT_UNSUPPORTED_MANAGER' => [
-            Message::FOXY_AUDIT_UNSUPPORTED_MANAGER,
-            [],
-            'The selected asset manager does not support security audits.',
         ];
         yield 'JSON_FILE_UNREADABLE' => [
             Message::JSON_FILE_UNREADABLE,

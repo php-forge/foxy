@@ -134,41 +134,6 @@ final class JsonFileTest extends TestCase
         );
     }
 
-    public function testGetIndentWithExistingFile(): void
-    {
-        $content = self::fixture('name-two-space.json');
-
-        $filename = './package.json';
-
-        file_put_contents($filename, $content);
-
-        self::assertFileExists(
-            $filename,
-            'The package JSON file should exist before attempting to read it.',
-        );
-
-        $jsonFile = new JsonFile($filename);
-
-        self::assertSame(
-            2,
-            $jsonFile->getIndent(),
-            'The indent should match the expected value.',
-        );
-    }
-
-    public function testGetIndentWithoutFile(): void
-    {
-        $filename = './package.json';
-
-        $jsonFile = new JsonFile($filename);
-
-        self::assertSame(
-            4,
-            $jsonFile->getIndent(),
-            'The indent should default to four spaces when the file does not exist.',
-        );
-    }
-
     /**
      * @throws Exception|ParsingException
      */

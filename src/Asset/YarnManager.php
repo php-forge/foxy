@@ -4,12 +4,20 @@ declare(strict_types=1);
 
 namespace Foxy\Asset;
 
-final class YarnManager extends AbstractAuditableAssetManager
+use Foxy\Audit\AuditParserInterface;
+use Foxy\Audit\Parser\YarnAuditParser;
+
+final class YarnManager extends AbstractAssetManager
 {
     private const array AUDIT_ENVIRONMENT = [
         'YARN_NPM_AUDIT_EXCLUDE_PACKAGES' => '__FOXY_AUDIT_NO_MATCH__',
         'YARN_NPM_AUDIT_IGNORE_ADVISORIES' => '__FOXY_AUDIT_NO_MATCH__',
     ];
+
+    public function getAuditParser(): AuditParserInterface
+    {
+        return new YarnAuditParser();
+    }
 
     public function getLockPackageName(): string
     {

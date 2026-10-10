@@ -7,6 +7,7 @@ namespace Foxy\Tests\Asset;
 use Composer\Package\RootPackageInterface;
 use Composer\Util\ProcessExecutor;
 use Foxy\Asset\NpmManager;
+use Foxy\Audit\Parser\NpmAuditParser;
 use Foxy\Config\Config;
 use Foxy\Exception\{Message, RuntimeException};
 use Foxy\Tests\Provider\NpmAssetManagerProvider;
@@ -237,6 +238,11 @@ final class NpmAssetManagerTest extends AuditableAssetManager
         return $command . ($noDev
             ? ' --omit=dev --include=optional --include=peer'
             : ' --include=dev --include=optional --include=peer');
+    }
+
+    protected function getValidAuditParserClass(): string
+    {
+        return NpmAuditParser::class;
     }
 
     protected function getValidInstallCommand(): string

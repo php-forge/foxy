@@ -6,10 +6,12 @@ namespace Foxy\Asset;
 
 use Composer\IO\IOInterface;
 use Composer\Util\{Filesystem, Platform};
+use Foxy\Audit\{AuditParserInterface, AuditProcessResult};
+use Foxy\Audit\Parser\NativeAuditParser;
 use Foxy\Config\Config;
 use Foxy\Exception\{Message, RuntimeException};
 use Foxy\Fallback\FallbackInterface;
-use Foxy\Native\NativeInstallerInterface;
+use Foxy\Native\{LockFile, NativeInstallerInterface, NpmRegistryInterface};
 use Throwable;
 
 use function array_unshift;
@@ -18,12 +20,15 @@ use function dirname;
 use function implode;
 use function is_dir;
 use function is_string;
+use function ksort;
 use function preg_match;
 use function realpath;
 use function sprintf;
 use function str_starts_with;
 use function strtolower;
 use function trim;
+
+use const SORT_STRING;
 
 /**
  * Provides the `native` asset manager: installs `package.json` dependencies from the npm registry in PHP, recording
@@ -41,6 +46,7 @@ final class NativeManager extends AbstractManifestAssetManager
      * @param Config $config Foxy configuration.
      * @param Filesystem $fs Filesystem used by the manifest handling.
      * @param NativeInstallerInterface $installer Installer that populates the install directory.
+     * @param NpmRegistryInterface $registry Registry that answers the security audit.
      * @param FallbackInterface|null $fallback Fallback restored when the installation fails, or `null` for none.
      */
     public function __construct(
@@ -48,9 +54,56 @@ final class NativeManager extends AbstractManifestAssetManager
         Config $config,
         Filesystem $fs,
         private readonly NativeInstallerInterface $installer,
+        private readonly NpmRegistryInterface $registry,
         FallbackInterface|null $fallback = null,
     ) {
         parent::__construct($io, $config, $fs, $fallback);
+    }
+
+    /**
+     * Runs the security audit of the locked registry packages with one request to the registry's bulk advisories
+     * endpoint.
+     *
+     * Local `file:` packages are skipped, and a lock without registry packages is clean without a request. The exit
+     * code is `1` when the document reports an advisory and `0` otherwise; the error output is always empty.
+     *
+     * @param bool $noDev Whether to exclude development dependencies, which the native manager cannot do.
+     *
+     * @throws RuntimeException if `foxy.lock` is missing or malformed, `$noDev` is `true`, the registry request fails,
+     * or the advisories document is malformed.
+     */
+    public function audit(bool $noDev): AuditProcessResult
+    {
+        if (!$this->hasLockFile()) {
+            throw new RuntimeException(
+                Message::ASSET_MANAGER_LOCK_FILE_MISSING->getMessage($this->getName(), $this->getLockFilePath()),
+            );
+        }
+
+        if ($noDev) {
+            throw new RuntimeException(
+                Message::ASSET_NATIVE_AUDIT_NO_DEV_UNSUPPORTED->getMessage(),
+            );
+        }
+
+        $versions = [];
+
+        foreach ((new LockFile($this->getLockFilePath()))->read()['packages'] as $package) {
+            if (!$package->isLocal()) {
+                $versions[$package->name] = [$package->version];
+            }
+        }
+
+        ksort($versions, SORT_STRING);
+
+        $document = [] === $versions ? '{}' : $this->registry->getAdvisories($versions);
+
+        return new AuditProcessResult([] === $this->getAuditParser()->parse($document) ? 0 : 1, $document, '');
+    }
+
+    public function getAuditParser(): AuditParserInterface
+    {
+        return new NativeAuditParser();
     }
 
     public function getLockPackageName(): string

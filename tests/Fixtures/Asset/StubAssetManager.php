@@ -8,6 +8,7 @@ use Composer\IO\IOInterface;
 use Composer\Package\RootPackageInterface;
 use Composer\Util\{Filesystem, ProcessExecutor};
 use Foxy\Asset\{AssetManagerInterface, AssetPackageInterface};
+use Foxy\Audit\{AuditParserInterface, AuditProcessResult};
 use Foxy\Config\Config;
 use Foxy\Exception\RuntimeException;
 use Foxy\Fallback\FallbackInterface;
@@ -34,6 +35,16 @@ final readonly class StubAssetManager implements AssetManagerInterface
     ) {}
 
     public function addDependencies(RootPackageInterface $rootPackage, array $dependencies): AssetPackageInterface
+    {
+        throw new RuntimeException('Not used in this test.');
+    }
+
+    public function audit(bool $noDev): AuditProcessResult
+    {
+        throw new RuntimeException('Not used in this test.');
+    }
+
+    public function getAuditParser(): AuditParserInterface
     {
         throw new RuntimeException('Not used in this test.');
     }

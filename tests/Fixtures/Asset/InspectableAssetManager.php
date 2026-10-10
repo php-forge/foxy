@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Foxy\Tests\Fixtures\Asset;
 
-use Foxy\Asset\{AbstractAuditableAssetManager, AssetPackageInterface};
+use Foxy\Asset\{AbstractAssetManager, AssetPackageInterface};
+use Foxy\Audit\AuditParserInterface;
+use Foxy\Audit\Parser\NpmAuditParser;
 
-final class InspectableAssetManager extends AbstractAuditableAssetManager
+final class InspectableAssetManager extends AbstractAssetManager
 {
     /**
      * @var array<string, string>|null
@@ -44,6 +46,11 @@ final class InspectableAssetManager extends AbstractAuditableAssetManager
     public function getAuditCommandForTest(bool $noDev = false): string
     {
         return $this->getAuditCommand($noDev);
+    }
+
+    public function getAuditParser(): AuditParserInterface
+    {
+        return new NpmAuditParser();
     }
 
     public function getAuditValidationForTest(): bool|null

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Foxy\Asset;
 
 use Composer\Util\Platform;
+use Foxy\Audit\AuditParserInterface;
+use Foxy\Audit\Parser\DenoAuditParser;
 use Foxy\Exception\{Message, RuntimeException};
 
 use function array_diff;
@@ -15,9 +17,14 @@ use function preg_match;
 use function str_starts_with;
 use function substr;
 
-final class DenoManager extends AbstractAuditableAssetManager
+final class DenoManager extends AbstractAssetManager
 {
     private const array AUDIT_ENVIRONMENT = ['NO_COLOR' => '1'];
+
+    public function getAuditParser(): AuditParserInterface
+    {
+        return new DenoAuditParser();
+    }
 
     public function getLockPackageName(): string
     {

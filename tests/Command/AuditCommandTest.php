@@ -173,9 +173,9 @@ final class AuditCommandTest extends TestCase
 
         $resolver
             ->expects(self::once())
-            ->method('resolve')
-            ->with('GHSA-aaaa-bbbb-cccc')
-            ->willThrowException(new RuntimeException("rate\nlimited\0now"));
+            ->method('resolveMany')
+            ->with(['GHSA-aaaa-bbbb-cccc'])
+            ->willReturn(['GHSA-aaaa-bbbb-cccc' => new RuntimeException("rate\nlimited\0now")]);
 
         $io = $this->createMock(IOInterface::class);
 
@@ -308,9 +308,9 @@ final class AuditCommandTest extends TestCase
 
         $resolver
             ->expects(self::once())
-            ->method('resolve')
-            ->with('GHSA-aaaa-bbbb-cccc')
-            ->willReturn(new CveResolution(['CVE-2026-12345'], CveStatus::RESOLVED));
+            ->method('resolveMany')
+            ->with(['GHSA-aaaa-bbbb-cccc'])
+            ->willReturn(['GHSA-aaaa-bbbb-cccc' => new CveResolution(['CVE-2026-12345'], CveStatus::RESOLVED)]);
 
         $io = $this->createMock(IOInterface::class);
 
@@ -377,7 +377,7 @@ final class AuditCommandTest extends TestCase
 
         $resolver
             ->expects(self::never())
-            ->method('resolve');
+            ->method('resolveMany');
 
         $tester = $this->createTester($runner, $resolver);
 

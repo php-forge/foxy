@@ -6,7 +6,7 @@ namespace Foxy\Tests;
 
 use Composer\{Cache, Composer, Config};
 use Composer\DependencyResolver\Operation\{InstallOperation, OperationInterface};
-use Composer\Installer\{InstallationManager, PackageEvent, PackageEvents};
+use Composer\Installer\{InstallationManager, InstallerEvents, PackageEvent, PackageEvents};
 use Composer\IO\IOInterface;
 use Composer\Package\{Package, RootPackageInterface};
 use Composer\Repository\RepositoryManager;
@@ -21,7 +21,6 @@ use Foxy\Native\NpmRegistry;
 use Foxy\Solver\SolverInterface;
 use Foxy\Tests\Fixtures\Asset\StubAssetManager;
 use Foxy\Tests\Provider\FoxyProvider;
-use Foxy\Util\ComposerUtil;
 use PHPUnit\Framework\Attributes\DataProviderExternal;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -567,7 +566,7 @@ final class FoxyTest extends TestCase
     {
         self::assertSame(
             [
-                ComposerUtil::getInitEventName() => [['init', 100]],
+                InstallerEvents::PRE_OPERATIONS_EXEC => [['init', 100]],
                 PackageEvents::POST_PACKAGE_INSTALL => [['initOnInstall', 100]],
                 ScriptEvents::POST_INSTALL_CMD => [['solveAssets', 100]],
                 ScriptEvents::POST_UPDATE_CMD => [['solveAssets', 100]],

@@ -7,23 +7,41 @@ namespace Foxy\Tests\Fixtures\Native;
 use Foxy\Exception\{Message, RuntimeException};
 use Foxy\Native\{NpmRegistry, NpmRegistryInterface, PackageMetadata, ResolvedPackage};
 
+use function count;
 use function file_put_contents;
 use function str_replace;
 
 /**
- * Provides an {@see NpmRegistryInterface} backed by in-memory metadata and tarball bytes that records every request.
+ * Provides an {@see NpmRegistryInterface} backed by in-memory metadata, tarball bytes, and an advisories document that
+ * records every request.
  */
 final class InMemoryRegistry implements NpmRegistryInterface
 {
+    /**
+     * @var list<array<string, non-empty-list<string>>> Versions passed to {@see getAdvisories()}, in request order.
+     */
+    public array $advisoryRequests = [];
+
     /**
      * @var list<string> Tarball URLs passed to {@see fetchTarball()}, in request order.
      */
     public array $fetched = [];
 
     /**
+     * @var list<array{names: list<string>, fetchedBefore: int}> Package names passed to {@see prefetchTarballs()} per
+     * call, with the number of {@see fetchTarball()} calls made before it.
+     */
+    public array $prefetched = [];
+
+    /**
      * @var list<string> Names passed to {@see getMetadata()}, in request order.
      */
     public array $requested = [];
+
+    /**
+     * Advisories document returned by {@see getAdvisories()}.
+     */
+    private string $advisories = '{}';
 
     /**
      * @var array<string, string> Tarball bytes keyed by tarball URL.
@@ -41,6 +59,16 @@ final class InMemoryRegistry implements NpmRegistryInterface
     public function add(PackageMetadata $metadata): self
     {
         $this->packages[$metadata->name] = $metadata;
+
+        return $this;
+    }
+
+    /**
+     * Registers the advisories document returned for every advisories request.
+     */
+    public function addAdvisories(string $document): self
+    {
+        $this->advisories = $document;
 
         return $this;
     }
@@ -75,11 +103,32 @@ final class InMemoryRegistry implements NpmRegistryInterface
         return $file;
     }
 
+    public function getAdvisories(array $versions): string
+    {
+        $this->advisoryRequests[] = $versions;
+
+        return $this->advisories;
+    }
+
     public function getMetadata(string $name): PackageMetadata
     {
         $this->requested[] = $name;
 
         return $this->packages[$name]
             ?? throw new RuntimeException(Message::NATIVE_PACKAGE_NOT_FOUND->getMessage($name, 'memory'));
+    }
+
+    /**
+     * Records the package names and the number of tarballs fetched so far, without side effects.
+     */
+    public function prefetchTarballs(array $packages): void
+    {
+        $names = [];
+
+        foreach ($packages as $package) {
+            $names[] = $package->name;
+        }
+
+        $this->prefetched[] = ['names' => $names, 'fetchedBefore' => count($this->fetched)];
     }
 }
