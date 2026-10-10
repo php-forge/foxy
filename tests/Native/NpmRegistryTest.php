@@ -25,7 +25,6 @@ use function file_get_contents;
 use function file_put_contents;
 use function hash;
 use function mkdir;
-use function preg_quote;
 use function React\Promise\reject;
 use function React\Promise\resolve;
 use function sha1;
@@ -310,7 +309,7 @@ final class NpmRegistryTest extends TestCase
     {
         $registry = $this->registry($this->prefetchDownloader(1, self::serve(NpmRegistryProvider::TARBALL)));
 
-        $registry->prefetchTarballs([$this->package()]);
+        $registry->prefetchTarballs([$this->package()], $this->directory);
 
         self::assertSame(
             NpmRegistryProvider::TARBALL,
@@ -339,7 +338,7 @@ final class NpmRegistryTest extends TestCase
         $cache->method('copyFrom')->willThrowException(new RuntimeException('disk full'));
 
         $this->registry($this->prefetchDownloader(1, self::serve(NpmRegistryProvider::TARBALL)), $cache, $io)
-            ->prefetchTarballs([$this->package()]);
+            ->prefetchTarballs([$this->package()], $this->directory);
 
         self::assertFileDoesNotExist(
             $this->copies[0][1],
@@ -357,7 +356,7 @@ final class NpmRegistryTest extends TestCase
         $io = self::verboseIo();
 
         $this->registry($this->prefetchDownloader(1, self::serve('corrupted')), io: $io)
-            ->prefetchTarballs([$this->package()]);
+            ->prefetchTarballs([$this->package()], $this->directory);
 
         self::assertFileDoesNotExist(
             $this->cacheEntry(),
@@ -380,7 +379,7 @@ final class NpmRegistryTest extends TestCase
         $io = self::verboseIo();
 
         $this->registry($this->prefetchDownloader(1, self::fail500(true)), io: $io)
-            ->prefetchTarballs([$this->package()]);
+            ->prefetchTarballs([$this->package()], $this->directory);
 
         self::assertFileDoesNotExist(
             $this->cacheEntry(),
@@ -406,7 +405,7 @@ final class NpmRegistryTest extends TestCase
                     self::TARBALL_URL === $url ? NpmRegistryProvider::TARBALL : self::LEFT_PAD_TARBALL,
                 )($url, $to),
             ),
-        )->prefetchTarballs([$this->package(), $this->leftPad()]);
+        )->prefetchTarballs([$this->package(), $this->leftPad()], $this->directory);
 
         self::assertSame(
             [self::TARBALL_URL, self::LEFT_PAD_URL],
@@ -418,10 +417,10 @@ final class NpmRegistryTest extends TestCase
             $this->copies[1][1],
             'Temporary files must have unique names.',
         );
-        self::assertMatchesRegularExpression(
-            '{^' . preg_quote(sys_get_temp_dir()) . '/foxy-tarball-[0-9a-f]{13}\d\.\d{8}\.tgz$}',
+        self::assertSame(
+            "{$this->directory}/scope-pkg-1.0.0.prefetch",
             $this->copies[0][1],
-            'Temporary file must be a unique `.tgz` in the system temporary directory.',
+            'Temporary file must live in the given directory, named after the package.',
         );
         self::assertSame(
             NpmRegistryProvider::TARBALL,
@@ -441,7 +440,7 @@ final class NpmRegistryTest extends TestCase
 
     public function testPrefetchTarballsHidesFailureNoticeAtNormalVerbosity(): void
     {
-        $this->registry($this->prefetchDownloader(1, self::fail500(false)))->prefetchTarballs([$this->package()]);
+        $this->registry($this->prefetchDownloader(1, self::fail500(false)))->prefetchTarballs([$this->package()], $this->directory);
 
         self::assertSame(
             '',
@@ -455,7 +454,7 @@ final class NpmRegistryTest extends TestCase
         $io = self::verboseIo();
 
         $this->registry($this->prefetchDownloader(1, self::fail500(false)), io: $io)
-            ->prefetchTarballs([$this->package()]);
+            ->prefetchTarballs([$this->package()], $this->directory);
 
         self::assertFileDoesNotExist(
             $this->cacheEntry(),
@@ -476,7 +475,7 @@ final class NpmRegistryTest extends TestCase
     {
         $this->seedCache(NpmRegistryProvider::TARBALL);
 
-        $this->registry($this->idleDownloader())->prefetchTarballs([$this->package()]);
+        $this->registry($this->idleDownloader())->prefetchTarballs([$this->package()], $this->directory);
 
         self::assertSame(
             [],
@@ -487,7 +486,7 @@ final class NpmRegistryTest extends TestCase
 
     public function testPrefetchTarballsRequestsNothingForEmptyList(): void
     {
-        $this->registry($this->idleDownloader())->prefetchTarballs([]);
+        $this->registry($this->idleDownloader())->prefetchTarballs([], $this->directory);
 
         self::assertSame(
             [],
@@ -505,7 +504,7 @@ final class NpmRegistryTest extends TestCase
             }
         };
 
-        $this->registry($this->idleDownloader(), $cache)->prefetchTarballs([$this->package()]);
+        $this->registry($this->idleDownloader(), $cache)->prefetchTarballs([$this->package()], $this->directory);
 
         self::assertFileDoesNotExist(
             $this->cacheEntry(),
@@ -517,6 +516,7 @@ final class NpmRegistryTest extends TestCase
     {
         $this->registry($this->idleDownloader())->prefetchTarballs(
             [new ResolvedPackage('no-url', '1.0.0'), new ResolvedPackage('empty-url', '1.0.0', '', 'sha512-AAAA')],
+            $this->directory,
         );
 
         self::assertSame(
@@ -530,7 +530,7 @@ final class NpmRegistryTest extends TestCase
     {
         $cache = new Cache(new NullIO(), $this->cacheDir, 'a-z0-9_./', null, true);
 
-        $this->registry($this->idleDownloader(), $cache)->prefetchTarballs([$this->package()]);
+        $this->registry($this->idleDownloader(), $cache)->prefetchTarballs([$this->package()], $this->directory);
 
         self::assertFileDoesNotExist(
             $this->cacheEntry(),
@@ -543,7 +543,7 @@ final class NpmRegistryTest extends TestCase
         $this->seedCache(NpmRegistryProvider::TARBALL);
 
         $this->registry($this->prefetchDownloader(1, self::serve(self::LEFT_PAD_TARBALL)))
-            ->prefetchTarballs([$this->package(), $this->leftPad()]);
+            ->prefetchTarballs([$this->package(), $this->leftPad()], $this->directory);
 
         self::assertSame(
             self::LEFT_PAD_URL,

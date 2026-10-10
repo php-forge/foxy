@@ -43,9 +43,11 @@ interface NpmRegistryInterface
      * Downloads the tarballs missing from the cache in parallel, verifying each before it is cached.
      *
      * The prefetch is best-effort: a tarball that fails to download or to verify is left out of the cache, and the
-     * later {@see fetchTarball()} downloads it again and reports the error.
+     * later {@see fetchTarball()} downloads it again and reports the error. Each download lands in the given
+     * directory until it is verified, never in a shared temporary directory.
      *
      * @param list<ResolvedPackage> $packages Registry packages whose tarballs are wanted.
+     * @param string $directory Existing directory that holds each tarball while it is verified.
      */
-    public function prefetchTarballs(array $packages): void;
+    public function prefetchTarballs(array $packages, string $directory): void;
 }

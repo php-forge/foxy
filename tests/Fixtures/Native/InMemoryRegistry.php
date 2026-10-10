@@ -121,7 +121,7 @@ final class InMemoryRegistry implements NpmRegistryInterface
     /**
      * Records the package names and the number of tarballs fetched so far, without side effects.
      */
-    public function prefetchTarballs(array $packages): void
+    public function prefetchTarballs(array $packages, string $directory): void
     {
         $names = [];
 
@@ -129,6 +129,6 @@ final class InMemoryRegistry implements NpmRegistryInterface
             $names[] = $package->name;
         }
 
-        $this->prefetched[] = ['names' => $names, 'fetchedBefore' => count($this->fetched)];
+        $this->prefetched[] = ['names' => $names, 'directory' => $directory, 'fetchedBefore' => count($this->fetched)];
     }
 }

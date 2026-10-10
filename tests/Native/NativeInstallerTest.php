@@ -458,7 +458,13 @@ final class NativeInstallerTest extends TestCase
         $this->install($registry);
 
         self::assertSame(
-            [['names' => ['@popperjs/core', 'bootstrap', 'left-pad'], 'fetchedBefore' => 0]],
+            [
+                [
+                    'names' => ['@popperjs/core', 'bootstrap', 'left-pad'],
+                    'directory' => "{$this->root}/node_modules/.foxy-tmp",
+                    'fetchedBefore' => 0,
+                ],
+            ],
             $registry->prefetched,
             'One prefetch must list every registry package, without the local one, before any fetch.',
         );
@@ -479,8 +485,8 @@ final class NativeInstallerTest extends TestCase
 
         self::assertSame(
             [
-                ['names' => ['left-pad'], 'fetchedBefore' => 0],
-                ['names' => ['left-pad'], 'fetchedBefore' => 1],
+                ['names' => ['left-pad'], 'directory' => "{$this->root}/node_modules/.foxy-tmp", 'fetchedBefore' => 0],
+                ['names' => ['left-pad'], 'directory' => "{$this->root}/node_modules/.foxy-tmp", 'fetchedBefore' => 1],
             ],
             $registry->prefetched,
             'A reinstall from the lock must prefetch the locked packages again.',

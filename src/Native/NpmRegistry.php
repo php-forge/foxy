@@ -29,8 +29,6 @@ use function str_replace;
 use function str_starts_with;
 use function strlen;
 use function substr;
-use function sys_get_temp_dir;
-use function uniqid;
 use function unlink;
 
 use const JSON_THROW_ON_ERROR;
@@ -87,8 +85,9 @@ final readonly class NpmRegistry implements NpmRegistryInterface
     {
         $resolved = $package->resolved ?? '';
         $integrity = $package->integrity ?? '';
+
         $key = $this->tarballKey($package);
-        $file = "{$directory}/" . str_replace(['@', '/'], ['', '-'], $package->name) . "-{$package->version}.tgz";
+        $file = $this->tarballFile($package, $directory, 'tgz');
 
         if ($this->cache->copyTo($key, $file)) {
             if ($this->matchesIntegrity($file, $integrity)) {
@@ -181,11 +180,13 @@ final readonly class NpmRegistry implements NpmRegistryInterface
      * Nothing is downloaded when the cache is disabled or read-only, since the downloads could not be kept. A package
      * without a tarball URL is skipped. A download that fails, does not match its integrity value, or cannot be
      * cached is discarded with a verbose notice; {@see fetchTarball()} downloads it again and reports the error.
-     * Every temporary file is removed before the method returns.
+     * Each download is written into the given directory, as {@see fetchTarball()} does, and removed before the
+     * method returns.
      *
      * @param list<ResolvedPackage> $packages Registry packages whose tarballs are wanted.
+     * @param string $directory Existing directory that holds each tarball while it is verified.
      */
-    public function prefetchTarballs(array $packages): void
+    public function prefetchTarballs(array $packages, string $directory): void
     {
         if (!$this->cache->isEnabled() || $this->cache->isReadOnly()) {
             return;
@@ -195,13 +196,14 @@ final readonly class NpmRegistry implements NpmRegistryInterface
 
         foreach ($packages as $package) {
             $resolved = $package->resolved ?? '';
+
             $key = $this->tarballKey($package);
 
             if ('' === $resolved || false !== $this->cache->getAge($key)) {
                 continue;
             }
 
-            $file = sys_get_temp_dir() . '/' . uniqid('foxy-tarball-', true) . '.tgz';
+            $file = $this->tarballFile($package, $directory, 'prefetch');
 
             $this->httpDownloader->addCopy($resolved, $file)->then(
                 function () use ($package, $key, $file, $resolved): void {
@@ -349,6 +351,15 @@ final readonly class NpmRegistry implements NpmRegistryInterface
                 $retry++;
             }
         }
+    }
+
+    /**
+     * Returns the path of a package's tarball inside the directory: the name with `@` dropped and `/` as `-`, the
+     * version, and the extension.
+     */
+    private function tarballFile(ResolvedPackage $package, string $directory, string $extension): string
+    {
+        return "{$directory}/" . str_replace(['@', '/'], ['', '-'], $package->name) . "-{$package->version}.{$extension}";
     }
 
     /**

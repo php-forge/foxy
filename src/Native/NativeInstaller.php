@@ -244,7 +244,7 @@ final readonly class NativeInstaller implements NativeInstallerInterface
         }
 
         if ([] !== $downloads) {
-            $this->registry->prefetchTarballs($downloads);
+            $this->registry->prefetchTarballs($downloads, $temporary);
         }
 
         foreach ($packages as $package) {

@@ -32,7 +32,8 @@ were removed.
 The `native` manager now supports `composer foxy:audit` through the registry's bulk advisories endpoint; `--no-dev`
 is rejected for it, as for Deno, because the native manager installs development dependencies together with the
 others. `Foxy\Asset\NativeManager` takes the `NpmRegistryInterface` as its last constructor argument, and
-`NpmRegistryInterface` gained `getAdvisories(array $versions): string` and `prefetchTarballs(array $packages): void`;
+`NpmRegistryInterface` gained `getAdvisories(array $versions): string` and
+`prefetchTarballs(array $packages, string $directory): void`;
 custom registries must implement both. The registry now uses the HTTP downloader of Composer's loop, so the
 parallel downloads need no configuration.
 
