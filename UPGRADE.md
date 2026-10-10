@@ -1,5 +1,40 @@
 # Upgrading Foxy
 
+## Upgrading from 0.3.x to 0.4.x
+
+Foxy 0.4 adds the `native` asset manager and keeps every existing configuration and manager behavior unchanged. No
+action is required for projects that use Bun, Deno, npm, pnpm, or Yarn.
+
+### Composer constraint
+
+```bash
+composer require php-forge/foxy:^0.4 --with-all-dependencies
+```
+
+Library authors that keep Foxy in `require` or `require-dev` should widen their constraint to `^0.3 || ^0.4` or
+`^0.4`.
+
+### Native manager
+
+Set `config.foxy.manager` to `native` to install the merged `package.json` without a JavaScript manager. Foxy
+resolves the dependencies against the npm registry (configurable through `registry-url`), verifies and extracts the
+tarballs into a flat `node_modules`, and records the result in `foxy.lock`. Commit that file. The native manager is
+never selected by availability: a project that previously failed with `No asset manager was found.` keeps failing
+until `manager` is set to `native` or `foxy.lock` exists. Its scope and limits are documented in
+[Native manager](docs/config.md#native-manager).
+
+When `manager` is `null`, `foxy.lock` is now a recognized lockfile. A project that keeps both `foxy.lock` and another
+manager's lockfile must configure `manager` explicitly.
+
+### Custom manager implementations
+
+`AbstractAssetManager` now extends the new `AbstractManifestAssetManager`, which holds the manifest merging, root
+package paths, lock file detection, and fallback restoration shared by every manager. `AbstractAssetManager` keeps
+its constructor and every public and protected member, so subclasses need no change. Managers that do not run an
+external binary can extend `AbstractManifestAssetManager` directly and implement `getName()`,
+`getLockPackageName()`, `getVersionConstraint()`, `isAvailable()`, `run()`, and `validate()`; `Foxy` reads the root
+manifest path through `AbstractManifestAssetManager::getPackageJsonPath()` for both bases.
+
 ## Upgrading from 0.2.x to 0.3.x
 
 Foxy 0.3 raises the runtime baseline and aligns its documented integration target with the PHP 8.3 development line.

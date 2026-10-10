@@ -453,6 +453,135 @@ final class MessageProvider
             ['/project/package.json'],
             'Unable to read JSON file "/project/package.json".',
         ];
+        yield 'NATIVE_EXTENSION_MISSING' => [
+            Message::NATIVE_EXTENSION_MISSING,
+            ['zlib'],
+            'The native manager requires the "zlib" PHP extension.',
+        ];
+        yield 'NATIVE_INSTALL_DIR_INVALID' => [
+            Message::NATIVE_INSTALL_DIR_INVALID,
+            ['/project'],
+            'The native install directory "/project" must not be the root package directory, one of its parents, or a '
+            . 'filesystem root.',
+        ];
+        yield 'NATIVE_INTEGRITY_MISMATCH' => [
+            Message::NATIVE_INTEGRITY_MISMATCH,
+            ['https://registry.npmjs.org/bootstrap/-/bootstrap-5.3.8.tgz'],
+            'The tarball "https://registry.npmjs.org/bootstrap/-/bootstrap-5.3.8.tgz" failed its integrity check.',
+        ];
+        yield 'NATIVE_LOCAL_PACKAGE_MISSING' => [
+            Message::NATIVE_LOCAL_PACKAGE_MISSING,
+            ['./vendor/acme/theme', '@composer-asset/acme--theme'],
+            'The local package "./vendor/acme/theme" of "@composer-asset/acme--theme" has no package.json.',
+        ];
+        yield 'NATIVE_LOCK_INVALID' => [
+            Message::NATIVE_LOCK_INVALID,
+            ['/project/foxy.lock'],
+            'The lock file "/project/foxy.lock" is malformed; delete it and run the installation again.',
+        ];
+        yield 'NATIVE_MANIFEST_DEPENDENCIES_INVALID' => [
+            Message::NATIVE_MANIFEST_DEPENDENCIES_INVALID,
+            ['dependencies', '/project/package.json'],
+            'The "dependencies" field of "/project/package.json" must map package names to version strings.',
+        ];
+        yield 'NATIVE_METADATA_INVALID' => [
+            Message::NATIVE_METADATA_INVALID,
+            ['bootstrap', 'versions must be a JSON object'],
+            'The registry metadata of "bootstrap" is malformed: versions must be a JSON object.',
+        ];
+        yield 'NATIVE_METADATA_REASON_DIST_HASH_REQUIRED' => [
+            Message::NATIVE_METADATA_REASON_DIST_HASH_REQUIRED,
+            ['versions.5.3.8'],
+            'versions.5.3.8 must declare dist.integrity or dist.shasum',
+        ];
+        yield 'NATIVE_METADATA_REASON_JSON_INVALID' => [
+            Message::NATIVE_METADATA_REASON_JSON_INVALID,
+            [],
+            'the document is not valid JSON',
+        ];
+        yield 'NATIVE_METADATA_REASON_OBJECT_REQUIRED' => [
+            Message::NATIVE_METADATA_REASON_OBJECT_REQUIRED,
+            ['versions'],
+            'versions must be a JSON object',
+        ];
+        yield 'NATIVE_METADATA_REASON_STRING_MAP_REQUIRED' => [
+            Message::NATIVE_METADATA_REASON_STRING_MAP_REQUIRED,
+            ['dist-tags'],
+            'dist-tags must map names to strings',
+        ];
+        yield 'NATIVE_METADATA_REASON_STRING_REQUIRED' => [
+            Message::NATIVE_METADATA_REASON_STRING_REQUIRED,
+            ['versions.5.3.8.dist.tarball'],
+            'versions.5.3.8.dist.tarball must be a string',
+        ];
+        yield 'NATIVE_PACKAGE_COPY_FAILED' => [
+            Message::NATIVE_PACKAGE_COPY_FAILED,
+            ['/project/vendor/acme/theme', '/project/node_modules/@composer-asset/acme--theme'],
+            'Unable to copy the local package "/project/vendor/acme/theme" to '
+            . '"/project/node_modules/@composer-asset/acme--theme".',
+        ];
+        yield 'NATIVE_PACKAGE_NOT_FOUND' => [
+            Message::NATIVE_PACKAGE_NOT_FOUND,
+            ['@acme/missing', 'https://registry.npmjs.org'],
+            'The package "@acme/missing" was not found in the registry "https://registry.npmjs.org".',
+        ];
+        yield 'NATIVE_PACKAGE_REMOVE_FAILED' => [
+            Message::NATIVE_PACKAGE_REMOVE_FAILED,
+            ['/project/node_modules/bootstrap'],
+            'Unable to remove the package directory "/project/node_modules/bootstrap".',
+        ];
+        yield 'NATIVE_RANGE_INVALID' => [
+            Message::NATIVE_RANGE_INVALID,
+            ['>=1, <2', 'bootstrap'],
+            'The version ">=1, <2" of "bootstrap" is neither a valid npm range nor a dist-tag.',
+        ];
+        yield 'NATIVE_REGISTRY_REQUEST_FAILED' => [
+            Message::NATIVE_REGISTRY_REQUEST_FAILED,
+            ['https://registry.npmjs.org/bootstrap', 'HTTP/1.1 500 Internal Server Error'],
+            'The registry request "https://registry.npmjs.org/bootstrap" failed: HTTP/1.1 500 Internal Server Error',
+        ];
+        yield 'NATIVE_SPEC_UNSUPPORTED' => [
+            Message::NATIVE_SPEC_UNSUPPORTED,
+            ['github:twbs/bootstrap', 'bootstrap'],
+            'The native manager does not support the "github:twbs/bootstrap" specification of "bootstrap"; '
+                . 'use npm, pnpm, Yarn, Bun, or Deno.',
+        ];
+        yield 'NATIVE_TARBALL_INVALID' => [
+            Message::NATIVE_TARBALL_INVALID,
+            ['bootstrap-5.3.8.tgz', 'the archive is truncated'],
+            'The tarball "bootstrap-5.3.8.tgz" cannot be extracted: the archive is truncated.',
+        ];
+        yield 'NATIVE_TARBALL_REASON_ENTRY_ESCAPES' => [
+            Message::NATIVE_TARBALL_REASON_ENTRY_ESCAPES,
+            ['package/../../etc/passwd'],
+            'the entry "package/../../etc/passwd" escapes the package directory',
+        ];
+        yield 'NATIVE_TARBALL_REASON_NOT_USTAR' => [
+            Message::NATIVE_TARBALL_REASON_NOT_USTAR,
+            [],
+            'the archive is not a valid ustar archive',
+        ];
+        yield 'NATIVE_TARBALL_REASON_TRUNCATED' => [
+            Message::NATIVE_TARBALL_REASON_TRUNCATED,
+            [],
+            'the archive is truncated',
+        ];
+        yield 'NATIVE_TARBALL_REASON_UNREADABLE' => [
+            Message::NATIVE_TARBALL_REASON_UNREADABLE,
+            [],
+            'the archive cannot be opened',
+        ];
+        yield 'NATIVE_TARBALL_REASON_WRITE_FAILED' => [
+            Message::NATIVE_TARBALL_REASON_WRITE_FAILED,
+            ['dist/css/bootstrap.css'],
+            'the entry "dist/css/bootstrap.css" cannot be written',
+        ];
+        yield 'NATIVE_VERSION_CONFLICT' => [
+            Message::NATIVE_VERSION_CONFLICT,
+            ['bootstrap', '"^5.0" from root, "^4.0" from acme@1.0.0'],
+            'No version of "bootstrap" satisfies "^5.0" from root, "^4.0" from acme@1.0.0; install it with npm, pnpm, '
+                . 'Yarn, Bun, or Deno.',
+        ];
         yield 'SOLVER_ASSET_DIR_CREATE_FAILED' => [
             Message::SOLVER_ASSET_DIR_CREATE_FAILED,
             ['/project/vendor/foxy/composer-asset'],

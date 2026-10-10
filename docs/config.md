@@ -45,22 +45,24 @@ manager-prefixed environment variable should contain the scalar value for the ac
 
 ## Options
 
-| Option                    | Type             | Default                                  | Description                                                                          |
-| ------------------------- | ---------------- | ---------------------------------------- | ------------------------------------------------------------------------------------ |
-| `enabled`                 | boolean          | `true`                                   | Enables Foxy processing.                                                             |
-| `manager`                 | string or `null` | `null`                                   | Selects `bun`, `deno`, `npm`, `pnpm`, or `yarn`; `null` enables automatic selection. |
-| `manager-version`         | string or map    | Empty                                    | Adds a constraint within the built-in supported manager range.                       |
-| `manager-bin`             | string or map    | Manager executable                       | Overrides the manager executable.                                                    |
-| `manager-options`         | string or map    | Empty                                    | Appends options to both install and update commands.                                 |
-| `manager-install-options` | string or map    | Empty                                    | Appends options only to install commands.                                            |
-| `manager-update-options`  | string or map    | Empty                                    | Appends options only to update commands.                                             |
-| `manager-timeout`         | integer or map   | No practical limit                       | Sets the manager process timeout in seconds.                                         |
-| `run-asset-manager`       | boolean          | `true`                                   | Controls automatic manager probing and install or update execution.                  |
-| `fallback-asset`          | boolean          | `true`                                   | Restores `package.json` after asset processing fails.                                |
-| `fallback-composer`       | boolean          | `true`                                   | Restores Composer lock and vendor state after asset solving fails.                   |
-| `composer-asset-dir`      | string or `null` | `<vendor-dir>/php-forge/composer-asset/` | Sets the mock package directory.                                                     |
-| `enable-packages`         | array or object  | `[]`                                     | Includes or excludes Composer packages by pattern.                                   |
-| `root-package-json-dir`   | string or `null` | Project or package root                  | Sets the directory containing `package.json`.                                        |
+| Option                    | Type             | Default                                  | Description                                                                        |
+| ------------------------- | ---------------- | ---------------------------------------- | ---------------------------------------------------------------------------------- |
+| `enabled`                 | boolean          | `true`                                   | Enables Foxy processing.                                                           |
+| `manager`                 | string or `null` | `null`                                   | Selects `bun`, `deno`, `native`, `npm`, `pnpm`, or `yarn`; `null` means automatic. |
+| `manager-version`         | string or map    | Empty                                    | Adds a constraint within the built-in supported manager range.                     |
+| `manager-bin`             | string or map    | Manager executable                       | Overrides the manager executable.                                                  |
+| `manager-options`         | string or map    | Empty                                    | Appends options to both install and update commands.                               |
+| `manager-install-options` | string or map    | Empty                                    | Appends options only to install commands.                                          |
+| `manager-update-options`  | string or map    | Empty                                    | Appends options only to update commands.                                           |
+| `manager-timeout`         | integer or map   | No practical limit                       | Sets the manager process timeout in seconds.                                       |
+| `run-asset-manager`       | boolean          | `true`                                   | Controls automatic manager probing and install or update execution.                |
+| `fallback-asset`          | boolean          | `true`                                   | Restores `package.json` after asset processing fails.                              |
+| `fallback-composer`       | boolean          | `true`                                   | Restores Composer lock and vendor state after asset solving fails.                 |
+| `composer-asset-dir`      | string or `null` | `<vendor-dir>/php-forge/composer-asset/` | Sets the mock package directory.                                                   |
+| `enable-packages`         | array or object  | `[]`                                     | Includes or excludes Composer packages by pattern.                                 |
+| `root-package-json-dir`   | string or `null` | Project or package root                  | Sets the directory containing `package.json`.                                      |
+| `registry-url`            | string           | `https://registry.npmjs.org`             | Sets the npm registry used by the `native` manager.                                |
+| `native-install-dir`      | string           | `node_modules`                           | Sets the directory the `native` manager installs into.                             |
 
 ## Disabling Foxy
 
@@ -90,9 +92,11 @@ Set the manager explicitly when local development and CI must always use the sam
 }
 ```
 
-When `manager` is `null`, Foxy looks for one recognized native lockfile. Multiple recognized lockfiles require explicit
-selection. Without a lockfile, available executables are considered in this order: npm, pnpm, Yarn, Bun, and Deno.
-Commit the native lockfile generated by the selected manager. Foxy reports an error when an explicitly configured
+When `manager` is `null`, Foxy looks for one recognized lockfile (`package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`,
+`bun.lock`, `deno.lock`, or `foxy.lock`). Multiple recognized lockfiles require explicit selection. Without a lockfile,
+available executables are considered in this order: npm, pnpm, Yarn, Bun, and Deno. The `native` manager is never
+selected by availability; it is used only when `manager` is `native` or when `foxy.lock` is the single recognized
+lockfile. Commit the lockfile generated by the selected manager. Foxy reports an error when an explicitly configured
 manager is unknown, or when execution is enabled and its executable is unavailable.
 
 When `run-asset-manager` is `false`, automatic selection does not probe executables. Foxy uses the manager identified
@@ -110,6 +114,9 @@ When manager execution is enabled, Foxy validates the selected manager against i
 | npm     | `>=10.9.8`          |
 | pnpm    | `^11.23.0`          |
 | Yarn    | `^4.18.0`           |
+
+The `native` manager has no binary and no version constraint; `manager-version`, `manager-bin`, `manager-options`,
+`manager-install-options`, `manager-update-options`, and `manager-timeout` do not apply to it.
 
 The `manager-version` option adds another Composer constraint that is evaluated together with the built-in constraint.
 It can narrow the accepted versions for a project, but it cannot replace or widen Foxy's supported range.
@@ -233,6 +240,103 @@ registers each Composer asset directory as a member of the `workspaces` list in 
   }
 }
 ```
+
+## Native manager
+
+Set `manager` to `native` to install the frontend dependencies without Bun, Deno, npm, pnpm, or Yarn:
+
+```json
+{
+  "config": {
+    "foxy": {
+      "manager": "native"
+    }
+  }
+}
+```
+
+Foxy then performs the installation itself, in PHP:
+
+1. It reads `dependencies` and `devDependencies` from the merged root `package.json`. Each `file:` entry (the
+   Composer assets and any other local package) is copied into `node_modules/<name>`, and its own `dependencies`,
+   non-optional `peerDependencies`, and `optionalDependencies` join the resolution.
+2. It resolves every other dependency against the registry with asset-packagist semantics: a flat `node_modules`
+   with one version per package. Constraints from the root manifest, the local packages, and the transitive
+   `dependencies`, `peerDependencies`, and `optionalDependencies` are intersected per package name, and the highest
+   satisfying version wins. Dist-tags such as `latest` or `next` are honored. A conflict that only nested
+   `node_modules` could solve is reported as an error that names every constraint and its origin; install such a
+   project with a JavaScript manager instead. Unsatisfiable or missing optional dependencies are skipped with a
+   warning, and a deprecated selection is reported with the registry's deprecation text.
+3. It downloads each tarball from the URL published by the registry, verifies it against the registry's
+   `integrity` value (SHA-512, with the legacy SHA-1 `shasum` as a fallback), and extracts it into
+   `node_modules/<name>`, stripping the archive's top-level directory like npm does. Tarballs are cached in
+   `<cache-files-dir>/foxy/` and are subject to Composer's `cache-files-ttl`, `cache-files-maxsize`, and
+   `cache-read-only` settings; every cached tarball is verified again before use.
+4. It writes `foxy.lock`, which records the root requirements, the requirements of every local package, and the
+   selected version, tarball URL, and integrity of every installed package. `composer install` with a lock that
+   matches the current manifests reinstalls exactly those tarballs without a single metadata request;
+   `composer update`, or a lock that no longer matches, resolves again and rewrites the lock. Commit `foxy.lock`.
+5. It removes entries of the install directory that are not part of the installation (dot-entries such as `.bin`
+   are left alone).
+
+The install directory is `node_modules` next to `package.json` by default. `native-install-dir` changes it; a
+relative value is resolved from `root-package-json-dir`, an absolute value is used as is. A Yii 2 application that
+keeps the framework's default `@npm` alias can install straight into `vendor/npm-asset`:
+
+```json
+{
+  "config": {
+    "foxy": {
+      "manager": "native",
+      "native-install-dir": "vendor/npm-asset"
+    }
+  }
+}
+```
+
+Foxy owns that directory: everything in it that the lock does not list is removed on every install, so do not point
+it at a directory that also receives asset-packagist packages from Composer. The root package directory, any of its
+parents, and filesystem roots are rejected. Scoped packages keep the npm layout (`vendor/npm-asset/@popperjs/core`),
+not asset-packagist's `popperjs--core` form.
+
+The native manager requires the PHP `zlib` extension and prints `Installing`, `Updating`, and `Removing` lines like
+the other managers. Its registry requests go through Composer's HTTP layer: proxies, `cafile`, `disable-tls`, and the
+credentials stored in `auth.json` for the registry host all apply, so a private registry can be configured with
+`registry-url` plus Composer authentication:
+
+```json
+{
+  "config": {
+    "foxy": {
+      "manager": "native",
+      "registry-url": "https://npm.example.com"
+    }
+  }
+}
+```
+
+The registry is expected to answer the npm metadata API (`GET /<name>` with
+`Accept: application/vnd.npm.install-v1+json`) and to serve the tarball URLs it publishes. HTTP 429 responses are
+retried up to three times, honoring `Retry-After` up to 60 seconds; other failures are reported immediately.
+
+The native manager implements the subset that frontend assets need. It does not support:
+
+- `npm:` aliases, `git`, `github:`, `http(s)`, `workspace:`, and `link:` specifications; each is rejected with an
+  error that names the dependency.
+- Nested `node_modules`: two packages that require incompatible versions of the same dependency cannot be installed
+  together.
+- Lifecycle scripts (`preinstall`, `install`, `postinstall`, `prepare`), `bin` links, `os`, `cpu`, and `engines`
+  filters, `overrides`, and `resolutions`. Scripts are never executed; packages that need a build step at install
+  time must be installed with a JavaScript manager.
+- Prerelease identifiers that Composer's version parser does not understand, such as `5.0.0-next.3` or
+  `1.0.0-canary.1`: those versions are skipped, and a range or dist-tag that selects one is rejected. Prereleases
+  named `alpha`, `beta`, `RC`, `dev`, and `patch` are matched with npm's rule: only a range that names a prerelease
+  of the same `major.minor.patch` can select it.
+- Symbolic and hard links inside tarballs (skipped) and `..` or absolute entry paths (rejected).
+- `composer foxy:audit`.
+
+Selection by availability is also disabled for this manager: without `manager: native` or a `foxy.lock` file, a
+project without a JavaScript manager still reports `No asset manager was found.`.
 
 ## Manager timeout
 

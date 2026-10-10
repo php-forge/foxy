@@ -4,22 +4,33 @@ declare(strict_types=1);
 
 namespace Foxy;
 
-use Composer\Composer;
+use Composer\{Cache, Composer};
 use Composer\DependencyResolver\Operation\InstallOperation;
 use Composer\EventDispatcher\EventSubscriberInterface;
+use Composer\Factory;
 use Composer\Installer\{PackageEvent, PackageEvents};
 use Composer\IO\IOInterface;
 use Composer\Plugin\Capability\CommandProvider as ComposerCommandProvider;
 use Composer\Plugin\{Capable, PluginInterface};
 use Composer\Script\{Event, ScriptEvents};
 use Composer\Util\{Filesystem, ProcessExecutor};
-use Foxy\Asset\{AbstractAssetManager, AssetManagerFinder, AssetManagerInterface};
-use Foxy\Asset\{BunManager, DenoManager, NpmManager, PnpmManager, YarnManager};
+use Foxy\Asset\{
+    AbstractManifestAssetManager,
+    AssetManagerFinder,
+    AssetManagerInterface,
+    BunManager,
+    DenoManager,
+    NativeManager,
+    NpmManager,
+    PnpmManager,
+    YarnManager,
+};
 use Foxy\Audit\{AuditReport, AuditRequest, AuditRunner, AuditRunnerInterface, AuditableAssetManagerInterface};
 use Foxy\Command\FoxyCommandProvider;
 use Foxy\Config\{Config, ConfigBuilder};
 use Foxy\Exception\{Message, RuntimeException};
 use Foxy\Fallback\{AssetFallback, ComposerFallback};
+use Foxy\Native\{DependencyResolver, NativeInstaller, NpmRegistry, TarballExtractor};
 use Foxy\Solver\{Solver, SolverInterface};
 use Foxy\Util\{ComposerUtil, ConsoleUtil};
 use Seld\JsonLint\ParsingException;
@@ -66,6 +77,8 @@ final class Foxy implements PluginInterface, EventSubscriberInterface, Capable, 
         'fallback-asset' => true,
         'fallback-composer' => true,
         'enable-packages' => [],
+        'registry-url' => NpmRegistry::DEFAULT_URL,
+        'native-install-dir' => 'node_modules',
     ];
 
     private bool $initialized = false;
@@ -90,8 +103,9 @@ final class Foxy implements PluginInterface, EventSubscriberInterface, Capable, 
             return;
         }
 
-        $this->assetManager = $this->getAssetManager($io, $this->config, $executor, $fs);
-        $packageJsonPath = $this->assetManager instanceof AbstractAssetManager
+        $this->assetManager = $this->getAssetManager($composer, $io, $this->config, $executor, $fs);
+
+        $packageJsonPath = $this->assetManager instanceof AbstractManifestAssetManager
             ? $this->assetManager->getPackageJsonPath()
             : $this->assetManager->getPackageName();
 
@@ -203,6 +217,43 @@ final class Foxy implements PluginInterface, EventSubscriberInterface, Capable, 
     }
 
     /**
+     * Returns the native manager, wired to the npm registry with Composer's HTTP settings, authentication, and
+     * `<cache-files-dir>/foxy` tarball cache. Performs no I/O.
+     *
+     * @param Composer $composer The Composer instance that provides the HTTP and cache settings.
+     * @param IOInterface $io The IO interface.
+     * @param Config $config The config of plugin.
+     * @param Filesystem $fs The composer filesystem.
+     */
+    private function createNativeManager(
+        Composer $composer,
+        IOInterface $io,
+        Config $config,
+        Filesystem $fs,
+    ): NativeManager {
+        $composerConfig = $composer->getConfig();
+
+        $cache = new Cache($io, $composerConfig->get('cache-files-dir') . '/foxy', 'a-z0-9_./', $fs);
+
+        $cache->setReadOnly(true === $composerConfig->get('cache-read-only'));
+
+        $registry = new NpmRegistry(
+            Factory::createHttpDownloader($io, $composerConfig),
+            $cache,
+            $io,
+            (string) $config->get('registry-url'),
+        );
+
+        return new NativeManager(
+            $io,
+            $config,
+            $fs,
+            new NativeInstaller($io, $fs, $registry, new DependencyResolver($registry, $io), new TarballExtractor($fs)),
+        );
+    }
+
+    /**
+     * @param Composer $composer The Composer instance.
      * @param IOInterface $io The IO interface.
      * @param Config $config The config of plugin.
      * @param ProcessExecutor $executor The process executor.
@@ -211,6 +262,7 @@ final class Foxy implements PluginInterface, EventSubscriberInterface, Capable, 
      * @throws RuntimeException When the asset manager is not found.
      */
     private function getAssetManager(
+        Composer $composer,
         IOInterface $io,
         Config $config,
         ProcessExecutor $executor,
@@ -221,6 +273,8 @@ final class Foxy implements PluginInterface, EventSubscriberInterface, Capable, 
         foreach (self::$assetManagers as $class) {
             $amf->addManager(new $class($io, $config, $executor, $fs));
         }
+
+        $amf->addManager($this->createNativeManager($composer, $io, $config, $fs));
 
         /** @var string|null $manager */
         $manager = $config->get('manager');

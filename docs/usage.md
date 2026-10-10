@@ -7,7 +7,7 @@ Authorize and require the plugin in the application:
 ```json
 {
   "require": {
-    "php-forge/foxy": "^0.3"
+    "php-forge/foxy": "^0.4"
   },
   "config": {
     "allow-plugins": {
@@ -32,7 +32,8 @@ The project may provide its own frontend dependencies in `package.json`:
 ```
 
 During Composer install and update operations, Foxy merges eligible Composer package assets into this file and runs
-the selected frontend manager. Existing non-Foxy dependencies are preserved.
+the selected frontend manager. Existing non-Foxy dependencies are preserved. With `"manager": "native"`, Foxy
+installs the merged file itself and writes `foxy.lock`; see [Native manager](config.md#native-manager).
 
 ## Security auditing
 
@@ -46,6 +47,8 @@ The command requires the selected manager's native lockfile, validates the manag
 security report. It reads the lockfile and does not run an install, update, fix, or fallback. Foxy supports npm audit
 report version 2 starting with npm 10.9.8 and the current report schemas emitted by pnpm 11, Yarn 4, and Bun 1.4;
 legacy report formats are rejected instead of being interpreted heuristically.
+
+The `native` manager does not support the audit command yet; `composer foxy:audit` returns status `2` for it.
 
 Deno does not provide a machine-readable report. Foxy runs `deno audit --level=low` with `NO_COLOR=1` against
 `deno.lock` and parses its text report strictly. The parser is validated against Deno 2.9.7 and returns status `2`
@@ -136,7 +139,7 @@ Use a runtime dependency when every consumer of the library must process its fro
 ```json
 {
   "require": {
-    "php-forge/foxy": "^0.3"
+    "php-forge/foxy": "^0.4"
   }
 }
 ```
@@ -148,7 +151,7 @@ Use a development dependency when Foxy is optional for library development:
 ```json
 {
   "require-dev": {
-    "php-forge/foxy": "^0.3"
+    "php-forge/foxy": "^0.4"
   }
 }
 ```
@@ -213,6 +216,9 @@ exclude a package that does. See [Package selection](config.md#package-selection
 - `package.json` writes use four-space indentation and preserve empty object and array semantics.
 - `root-package-json-dir` controls project reads, writes, and manager working directory.
 - Manager execution does not change the PHP process working directory.
+- The `native` manager installs one version per package into a flat directory (`node_modules` unless
+  `native-install-dir` says otherwise), verifies every tarball against its registry integrity value, and reinstalls
+  from `foxy.lock` without registry metadata requests.
 - Asset restoration occurs when package merging or manager execution fails and `fallback-asset` is enabled.
 - Composer lock and vendor restoration occurs after any solve exception or non-zero manager result when
   `fallback-composer` is enabled.

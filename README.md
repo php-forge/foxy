@@ -24,7 +24,7 @@
 </p>
 
 <p align="center">
-    <strong>Foxy is a Composer plugin that aggregates frontend dependencies declared by Composer packages into one package.json and delegates installation to Bun, Deno, npm, pnpm, or Yarn.</strong>
+    <strong>Foxy is a Composer plugin that aggregates frontend dependencies declared by Composer packages into one package.json and delegates installation to Bun, Deno, npm, pnpm, or Yarn, or installs them itself without any JavaScript manager.</strong>
 </p>
 
 ## Features
@@ -44,14 +44,15 @@
   - npm `>=10.9.8` with a Node.js version supported by the selected npm release.
   - pnpm `^11.23.0` with Node.js `>=22.13.0`.
   - Yarn `^4.18.0` with Node.js `>=18.12.0`; use a Node.js release that still receives security updates.
+- Or no frontend manager at all: the `native` manager installs the dependencies with PHP and the `zlib` extension.
 
 ## Installation
 
-Authorize the Composer plugin and install Foxy 0.3:
+Authorize the Composer plugin and install Foxy 0.4:
 
 ```bash
 composer config allow-plugins.php-forge/foxy true
-composer require php-forge/foxy:^0.3
+composer require php-forge/foxy:^0.4
 ```
 
 Selecting a manager explicitly is recommended for reproducible local and CI behavior:
@@ -59,7 +60,7 @@ Selecting a manager explicitly is recommended for reproducible local and CI beha
 ```json
 {
   "require": {
-    "php-forge/foxy": "^0.3"
+    "php-forge/foxy": "^0.4"
   },
   "config": {
     "allow-plugins": {
@@ -72,13 +73,34 @@ Selecting a manager explicitly is recommended for reproducible local and CI beha
 }
 ```
 
-Valid manager values are `bun`, `deno`, `npm`, `pnpm`, and `yarn`. When automatic manager execution is enabled and
-`manager` is omitted, Foxy first looks for one recognized native lockfile and then checks available executables.
+Valid manager values are `bun`, `deno`, `native`, `npm`, `pnpm`, and `yarn`. When automatic manager execution is
+enabled and `manager` is omitted, Foxy first looks for one recognized lockfile and then checks available executables.
 Configure the manager explicitly when the project contains lockfiles from more than one manager.
 
 During automatic Composer processing, `run-asset-manager=false` prevents Foxy from requiring or probing a manager
 binary. Automatic selection uses the single recognized lockfile when present, or npm as the manifest adapter when no
 lockfile exists. An explicit `composer foxy:audit` still validates and runs the selected manager.
+
+## Without Node.js
+
+Set `manager` to `native` and Foxy resolves the merged `package.json` against the npm registry, downloads the
+tarballs, verifies their integrity, and extracts them into a flat `node_modules` directory using PHP alone (or into
+the directory `native-install-dir` names):
+
+```json
+{
+  "config": {
+    "foxy": {
+      "manager": "native"
+    }
+  }
+}
+```
+
+The selected versions are recorded in `foxy.lock`; commit it so that `composer install` reinstalls exactly the same
+files without consulting the registry. The native manager keeps one version per package, like asset-packagist, and
+does not run lifecycle scripts. `native-install-dir` moves the install directory, for example to `vendor/npm-asset`
+for Yii 2's default `@npm` alias. See the [native manager reference](docs/config.md#native-manager) for its scope.
 
 ## Frontend security audit
 
