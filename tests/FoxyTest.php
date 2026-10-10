@@ -926,6 +926,7 @@ final class FoxyTest extends TestCase
     {
         return (new ReflectionClass($object))->getProperty($name)->getValue($object);
     }
+
     /**
      * Replaces the finder built by activation with one that holds only the given manager.
      */
@@ -951,5 +952,4 @@ final class FoxyTest extends TestCase
     {
         return $this->invokeFoxyMethod($foxy, 'getAssetManager');
     }
-
 }
