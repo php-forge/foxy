@@ -151,27 +151,12 @@ final class InspectableAssetManager extends AbstractAssetManager
 
     protected function getAuditCommand(bool $noDev): string
     {
-        return $this->buildUnconfiguredCommand('inspectable', $noDev ? ['audit', '--prod'] : ['audit']);
+        return $this->buildUnconfiguredCommand($this->getDefaultBinary(), $noDev ? ['audit', '--prod'] : ['audit']);
     }
 
     protected function getAuditEnvironment(): array
     {
         return [...parent::getAuditEnvironment(), ...($this->auditEnvironment ?? [])];
-    }
-
-    protected function getInstallCommand(): string
-    {
-        return $this->buildCommand('inspectable', 'install', 'install');
-    }
-
-    protected function getUpdateCommand(): string
-    {
-        return $this->buildCommand('inspectable', 'update', 'update');
-    }
-
-    protected function getVersionCommand(): string
-    {
-        return $this->buildUnconfiguredCommand('inspectable', '--version');
     }
 
     protected function normalizeVersionOutput(string $output): string

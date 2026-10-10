@@ -42,12 +42,15 @@ final readonly class Solver implements SolverInterface
      * @param AssetManagerInterface $assetManager The asset manager instance.
      * @param Config $config The config instance.
      * @param FallbackInterface|null $composerFallback The composer fallback instance.
+     * @param FallbackInterface|null $assetFallback Fallback restored when the asset manager fails to merge the
+     * dependencies, throws while running, or returns a non-zero code, or `null` for none.
      */
     public function __construct(
         private AssetManagerInterface $assetManager,
         private Config $config,
         private Filesystem $fs,
         private FallbackInterface|null $composerFallback = null,
+        private FallbackInterface|null $assetFallback = null,
     ) {}
 
     public function setUpdatable($updatable): self
@@ -87,9 +90,8 @@ final readonly class Solver implements SolverInterface
             $dispatcher->dispatch(FoxyEvents::PRE_SOLVE, new PreSolveEvent($assetDir, $packages));
             $this->prepareAssetDirectory($assetDir, $vendorDir);
             $assets = $this->getAssets($composer, $assetDir, $packages);
-            $this->assetManager->addDependencies($composer->getPackage(), $assets);
 
-            $res = $this->assetManager->run();
+            $res = $this->runAssetManager($composer, $assets);
 
             $dispatcher->dispatch(FoxyEvents::POST_SOLVE, new PostSolveEvent($assetDir, $packages, $res));
 
@@ -333,6 +335,28 @@ final readonly class Solver implements SolverInterface
     }
 
     /**
+     * Restores the asset fallback without hiding the asset manager failure.
+     *
+     * @throws RuntimeException if the restoration fails, with the asset manager failure as the previous exception.
+     */
+    private function restoreAssetAfterFailure(Throwable $exception): void
+    {
+        if (null === $this->assetFallback) {
+            return;
+        }
+
+        try {
+            $this->assetFallback->restore();
+        } catch (Throwable $fallbackException) {
+            throw new RuntimeException(
+                Message::SOLVER_ASSET_FALLBACK_RESTORE_FAILED->getMessage($fallbackException->getMessage()),
+                0,
+                $exception,
+            );
+        }
+    }
+
+    /**
      * Restore Composer state without hiding the original asset failure.
      */
     private function restoreComposerAfterFailure(Throwable $exception): never
@@ -352,6 +376,37 @@ final readonly class Solver implements SolverInterface
         }
 
         throw $exception;
+    }
+
+    /**
+     * Merges the asset dependencies and runs the asset manager, restoring the asset fallback when either step throws
+     * or the manager returns a non-zero code.
+     *
+     * @param array $assets The asset dependencies to merge into the asset package.
+     *
+     * @return int The asset manager result code.
+     */
+    private function runAssetManager(Composer $composer, array $assets): int
+    {
+        try {
+            $this->assetManager->addDependencies($composer->getPackage(), $assets);
+
+            $res = $this->assetManager->run();
+        } catch (Throwable $exception) {
+            $this->restoreAssetAfterFailure($exception);
+
+            throw $exception;
+        }
+
+        if (0 !== $res) {
+            $this->restoreAssetAfterFailure(
+                new RuntimeException(
+                    Message::SOLVER_ASSET_MANAGER_FAILED->getMessage($res),
+                ),
+            );
+        }
+
+        return $res;
     }
 
     /**

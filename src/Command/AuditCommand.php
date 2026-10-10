@@ -138,7 +138,10 @@ final class AuditCommand extends BaseCommand
     private function sanitize(string $value): string
     {
         $sanitized = preg_replace('/[\x00-\x1F\x7F]+/u', ' ', $value);
-        $sanitized ??= preg_replace('/[\x00-\x1F\x7F]+/', ' ', $value) ?? $value;
+
+        if (null === $sanitized) {
+            $sanitized = preg_replace('/[\x00-\x1F\x7F]+/', ' ', $value) ?? $value;
+        }
 
         return trim($sanitized);
     }

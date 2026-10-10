@@ -11,7 +11,6 @@ use Foxy\Asset\{AssetManagerInterface, AssetPackageInterface};
 use Foxy\Audit\{AuditParserInterface, AuditProcessResult};
 use Foxy\Config\Config;
 use Foxy\Exception\RuntimeException;
-use Foxy\Fallback\FallbackInterface;
 
 final readonly class StubAssetManager implements AssetManagerInterface
 {
@@ -92,11 +91,6 @@ final readonly class StubAssetManager implements AssetManagerInterface
     public function run(): int
     {
         return 0;
-    }
-
-    public function setFallback(FallbackInterface $fallback): self
-    {
-        return $this;
     }
 
     public function setUpdatable(bool $updatable): self

@@ -23,13 +23,31 @@ class Config
 {
     private array $cacheEnv = [];
 
-    private string|null $resolvedManager = null;
+    private string|null $scopedManager = null;
 
     /**
      * @param array $config The config.
      * @param array $defaults The default values.
      */
     public function __construct(private readonly array $config, private readonly array $defaults = []) {}
+
+    /**
+     * Returns a copy whose `manager-*` map entries resolve for the given manager.
+     *
+     * The current instance is never modified; environment values are returned unscoped.
+     *
+     * @param string $manager The manager name used as the key of `manager-*` maps.
+     *
+     * @return static The manager-scoped copy.
+     */
+    public function forManager(string $manager): static
+    {
+        $view = clone $this;
+
+        $view->scopedManager = $manager;
+
+        return $view;
+    }
 
     /**
      * Get the config value.
@@ -81,14 +99,6 @@ class Config
         $value = $this->get($key);
 
         return true === $value || 1 === $value || '1' === $value;
-    }
-
-    /**
-     * Set the manager selected during automatic discovery.
-     */
-    public function setResolvedManager(string $manager): void
-    {
-        $this->resolvedManager = $manager;
     }
 
     /**
@@ -172,7 +182,7 @@ class Config
     {
         if (str_starts_with($key, 'manager-') && is_array($value)) {
             /** @var int|string $manager */
-            $manager = $this->resolvedManager ?? $this->get('manager', '');
+            $manager = $this->scopedManager ?? $this->get('manager', '');
 
             $value = array_key_exists($manager, $value)
                 ? $value[$manager]

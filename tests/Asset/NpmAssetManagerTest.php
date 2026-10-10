@@ -199,7 +199,7 @@ final class NpmAssetManagerTest extends AuditableAssetManager
         try {
             ProcessExecutor::setTimeout(42);
 
-            $manager = new NpmManager($this->io, $this->config, $executor, $this->fs, $this->fallback);
+            $manager = new NpmManager($this->io, $this->config, $executor, $this->fs);
 
             self::assertSame(
                 0,
@@ -223,7 +223,7 @@ final class NpmAssetManagerTest extends AuditableAssetManager
 
     protected function getManager(): NpmManager
     {
-        return new NpmManager($this->io, $this->config, $this->executor, $this->fs, $this->fallback);
+        return new NpmManager($this->io, $this->config, $this->executor, $this->fs);
     }
 
     protected function getUnsupportedVersion(): string

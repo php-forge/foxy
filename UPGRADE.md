@@ -31,9 +31,10 @@ were removed.
 
 The `native` manager now supports `composer foxy:audit` through the registry's bulk advisories endpoint; `--no-dev`
 is rejected for it, as for Deno, because the native manager installs development dependencies together with the
-others. `Foxy\Asset\NativeManager` takes the `NpmRegistryInterface` in its constructor, and `NpmRegistryInterface`
-gained `getAdvisories(array $versions): string` and `prefetchTarballs(array $packages): void`; custom registries must
-implement both.
+others. `Foxy\Asset\NativeManager` takes the `NpmRegistryInterface` as its last constructor argument, and
+`NpmRegistryInterface` gained `getAdvisories(array $versions): string` and `prefetchTarballs(array $packages): void`;
+custom registries must implement both. The registry now uses the HTTP downloader of Composer's loop, so the
+parallel downloads need no configuration.
 
 ### CVE lookups resolve in batches
 
@@ -55,7 +56,8 @@ instead of by every Composer command; `composer foxy:audit` reports them with ex
 
 `Foxy\Config\Config::setResolvedManager()` was removed. Probing or validating a manager no longer changes the shared
 `Config`; `Config::forManager(string $manager): static` returns a copy whose `manager-*` map entries resolve for that
-manager, and `AbstractManifestAssetManager::getManagerConfig()` (protected) gives each built-in manager its own view.
+manager, and `AbstractManifestAssetManager::getManagerConfig()` (protected) gives each manager its own view, built
+on every call.
 Custom managers that called `setResolvedManager()` remove the call and read `manager-*` keys through
 `getManagerConfig()`.
 
@@ -69,9 +71,12 @@ override `getDefaultBinary()`; managers that implement the three methods keep wo
 ### Asset rollback belongs to the solver
 
 `AssetManagerInterface::setFallback()` was removed, together with the fallback constructor argument, the protected
-`$fallback` property, and `restoreAfterFailure()` of `AbstractAssetManager`. `Foxy\Solver\Solver` takes the asset
-fallback as its last constructor argument and restores the manifest when the dependency merge or the manager run
-fails, in the same cases as before; managers no longer restore anything.
+`$fallback` property, and `restoreAfterFailure()` of `AbstractAssetManager`; its constructor is now
+`(IOInterface $io, Config $config, ProcessExecutor $executor, Filesystem $fs, VersionConverterInterface|null
+$versionConverter = null)`, so a custom manager that passed a fallback must drop that argument.
+`Foxy\Solver\Solver` takes the asset fallback as its last constructor argument and restores the manifest when the
+dependency merge or the manager run throws or returns a non-zero code, before the `foxy.post-solve` event, as the
+managers did; a listener of that event that throws no longer triggers an asset restore, only the Composer one.
 
 ### Composer rollback events
 

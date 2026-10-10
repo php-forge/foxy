@@ -10,9 +10,7 @@ use Foxy\Audit\{AuditParserInterface, AuditProcessResult};
 use Foxy\Audit\Parser\NativeAuditParser;
 use Foxy\Config\Config;
 use Foxy\Exception\{Message, RuntimeException};
-use Foxy\Fallback\FallbackInterface;
 use Foxy\Native\{LockFile, NativeInstallerInterface, NpmRegistryInterface};
-use Throwable;
 
 use function array_unshift;
 use function basename;
@@ -47,7 +45,6 @@ final class NativeManager extends AbstractManifestAssetManager
      * @param Filesystem $fs Filesystem used by the manifest handling.
      * @param NativeInstallerInterface $installer Installer that populates the install directory.
      * @param NpmRegistryInterface $registry Registry that answers the security audit.
-     * @param FallbackInterface|null $fallback Fallback restored when the installation fails, or `null` for none.
      */
     public function __construct(
         IOInterface $io,
@@ -55,9 +52,8 @@ final class NativeManager extends AbstractManifestAssetManager
         Filesystem $fs,
         private readonly NativeInstallerInterface $installer,
         private readonly NpmRegistryInterface $registry,
-        FallbackInterface|null $fallback = null,
     ) {
-        parent::__construct($io, $config, $fs, $fallback);
+        parent::__construct($io, $config, $fs);
     }
 
     /**
@@ -122,12 +118,10 @@ final class NativeManager extends AbstractManifestAssetManager
     }
 
     /**
-     * Records `native` as the resolved manager and returns whether `foxy.lock` exists.
+     * Returns whether `foxy.lock` exists; the native manager needs no executable.
      */
     public function isAvailable(): bool
     {
-        $this->config->setResolvedManager($this->getName());
-
         return $this->hasLockFile();
     }
 
@@ -146,12 +140,11 @@ final class NativeManager extends AbstractManifestAssetManager
      * Installs the dependencies, or updates them when updates are allowed by {@see setUpdatable()}, as `composer update`
      * does, even if nothing is installed yet.
      *
-     * Returns `0` without doing anything when `run-asset-manager` is disabled. The fallback is restored when the
-     * installation fails, and the installer exception is rethrown.
+     * Returns `0` without doing anything when `run-asset-manager` is disabled. An installer exception propagates
+     * unchanged.
      *
      * @throws RuntimeException if the `zlib` extension is missing, the configured root package directory does not
-     * exist, the install directory is invalid, the installation fails, or the fallback cannot be restored after a
-     * failure.
+     * exist, the install directory is invalid, or the installation fails.
      */
     public function run(): int
     {
@@ -172,18 +165,12 @@ final class NativeManager extends AbstractManifestAssetManager
             ),
         );
 
-        try {
-            $this->installer->install(
-                $this->getPackageJsonPath(),
-                $this->getLockFilePath(),
-                $installDirectory,
-                $updatable,
-            );
-        } catch (Throwable $exception) {
-            $this->restoreAfterFailure($exception);
-
-            throw $exception;
-        }
+        $this->installer->install(
+            $this->getPackageJsonPath(),
+            $this->getLockFilePath(),
+            $installDirectory,
+            $updatable,
+        );
 
         return 0;
     }

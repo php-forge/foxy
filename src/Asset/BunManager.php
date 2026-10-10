@@ -73,22 +73,15 @@ final class BunManager extends AbstractAssetManager
             $command[] = '--prod';
         }
 
-        return $this->buildUnconfiguredCommand($this->getBinary(), $command);
+        return $this->buildUnconfiguredCommand($this->getDefaultBinary(), $command);
     }
 
-    protected function getInstallCommand(): string
+    /**
+     * Returns the platform-specific Bun binary name.
+     */
+    protected function getDefaultBinary(): string
     {
-        return $this->buildCommand($this->getBinary(), 'install', 'install');
-    }
-
-    protected function getUpdateCommand(): string
-    {
-        return $this->buildCommand($this->getBinary(), 'update', 'update');
-    }
-
-    protected function getVersionCommand(): string
-    {
-        return $this->buildUnconfiguredCommand($this->getBinary(), '--version');
+        return Platform::isWindows() ? 'bun.exe' : 'bun';
     }
 
     protected function validateAuditConfiguration(bool $noDev): void
@@ -142,14 +135,6 @@ final class BunManager extends AbstractAssetManager
         }
 
         return null;
-    }
-
-    /**
-     * Returns the platform-specific Bun binary name.
-     */
-    private function getBinary(): string
-    {
-        return Platform::isWindows() ? 'bun.exe' : 'bun';
     }
 
     /**

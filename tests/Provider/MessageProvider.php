@@ -95,17 +95,6 @@ final class MessageProvider
             ['npm'],
             'The "npm" binary must be installed.',
         ];
-        yield 'ASSET_MANAGER_EXITED_WITH_STATUS' => [
-            Message::ASSET_MANAGER_EXITED_WITH_STATUS,
-            [7],
-            'The asset manager exited with status code 7.',
-        ];
-        yield 'ASSET_MANAGER_FALLBACK_RESTORE_FAILED' => [
-            Message::ASSET_MANAGER_FALLBACK_RESTORE_FAILED,
-            ['Unable to write fallback asset file "/project/package.json".'],
-            'The asset manager failed and its fallback could not be restored: Unable to write fallback asset file '
-            . '"/project/package.json".',
-        ];
         yield 'ASSET_MANAGER_LOCKED_UNAVAILABLE' => [
             Message::ASSET_MANAGER_LOCKED_UNAVAILABLE,
             ['pnpm'],
@@ -638,6 +627,12 @@ final class MessageProvider
             Message::SOLVER_ASSET_DIR_UNMANAGED,
             ['/project/vendor/foxy/composer-asset'],
             'The Composer asset directory "/project/vendor/foxy/composer-asset" is not marked as managed by Foxy.',
+        ];
+        yield 'SOLVER_ASSET_FALLBACK_RESTORE_FAILED' => [
+            Message::SOLVER_ASSET_FALLBACK_RESTORE_FAILED,
+            ['Unable to write fallback asset file "/project/package.json".'],
+            'The asset manager failed and its fallback could not be restored: Unable to write fallback asset file '
+            . '"/project/package.json".',
         ];
         yield 'SOLVER_ASSET_MANAGER_FAILED' => [
             Message::SOLVER_ASSET_MANAGER_FAILED,

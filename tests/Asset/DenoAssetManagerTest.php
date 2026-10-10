@@ -189,30 +189,6 @@ final class DenoAssetManagerTest extends AuditableAssetManager
         );
     }
 
-    public function testAddDependenciesRestoresFallbackWhenWorkspacesAreInvalid(): void
-    {
-        $this->fallback->expects(self::once())->method('restore');
-
-        try {
-            $this->addDependenciesFromPackage(
-                ['workspaces' => 'packages/*'],
-                ['@composer-asset/foo--bar' => 'path/foo/bar/package.json'],
-            );
-
-            self::fail(
-                'Expected invalid workspaces to be rejected.',
-            );
-        } catch (RuntimeException $exception) {
-            self::assertSame(
-                Message::ASSET_DENO_WORKSPACES_INVALID->getMessage(
-                    $this->cwd . DIRECTORY_SEPARATOR . 'package.json',
-                ),
-                $exception->getMessage(),
-                'The exception message should indicate the invalid workspaces',
-            );
-        }
-    }
-
     public function testAddDependenciesUsesRootPackageJsonDir(): void
     {
         $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'root-package';
@@ -322,7 +298,7 @@ final class DenoAssetManagerTest extends AuditableAssetManager
                 ->method('getErrorOutput')
                 ->willReturn('');
 
-            (new DenoManager($this->io, $this->config, $executor, new Filesystem(), $this->fallback))->audit(false);
+            (new DenoManager($this->io, $this->config, $executor, new Filesystem()))->audit(false);
 
             self::assertSame(
                 ['1', '1', '1'],
@@ -631,7 +607,7 @@ final class DenoAssetManagerTest extends AuditableAssetManager
 
     protected function getManager(): DenoManager
     {
-        return new DenoManager($this->io, $this->config, $this->executor, new Filesystem(), $this->fallback);
+        return new DenoManager($this->io, $this->config, $this->executor, new Filesystem());
     }
 
     protected function getUnsupportedVersion(): string

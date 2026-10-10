@@ -11,7 +11,6 @@ use Foxy\Asset\NativeManager;
 use Foxy\Audit\Parser\NativeAuditParser;
 use Foxy\Config\Config;
 use Foxy\Exception\{Message, RuntimeException};
-use Foxy\Fallback\FallbackInterface;
 use Foxy\Native\NativeInstallerInterface;
 use Foxy\Tests\Fixtures\Native\InMemoryRegistry;
 use Foxy\Tests\Provider\NativeManagerProvider;
@@ -54,7 +53,6 @@ final class NativeManagerTest extends TestCase
     private const string UPDATING = '<info>Updating frontend dependencies with the native manager</info>';
 
     private string $cwd = '';
-    private FallbackInterface&MockObject $fallback;
     private NativeInstallerInterface&MockObject $installer;
     private IOInterface&MockObject $io;
 
@@ -187,23 +185,18 @@ final class NativeManagerTest extends TestCase
         );
     }
 
-    public function testIsAvailableRequiresLockFileAndResolvesManager(): void
+    public function testIsAvailableRequiresLockFile(): void
     {
         $config = new Config(['manager-timeout' => ['native' => 5]]);
         $manager = new NativeManager($this->io, $config, new Filesystem(), $this->installer, $this->registry);
 
-        self::assertNull(
-            $config->get('manager-timeout'),
-            'No manager-keyed value applies before resolution.',
-        );
         self::assertFalse(
             $manager->isAvailable(),
             'A missing lock file must not make the manager available.',
         );
-        self::assertSame(
-            5,
+        self::assertNull(
             $config->get('manager-timeout'),
-            'The manager must be recorded as resolved.',
+            'Probing must not scope the shared configuration.',
         );
 
         file_put_contents("{$this->cwd}/foxy.lock", '{}');
@@ -372,7 +365,7 @@ final class NativeManagerTest extends TestCase
         );
     }
 
-    public function testRunRestoresFallbackAndRethrowsInstallerFailure(): void
+    public function testRunRethrowsInstallerFailureUnchanged(): void
     {
         $failure = new RuntimeException('Install failed.');
 
@@ -380,9 +373,6 @@ final class NativeManagerTest extends TestCase
             ->expects(self::once())
             ->method('install')
             ->willThrowException($failure);
-        $this->fallback
-            ->expects(self::once())
-            ->method('restore');
 
         try {
             $this->manager(['run-asset-manager' => true])->run();
@@ -525,36 +515,6 @@ final class NativeManagerTest extends TestCase
         );
 
         $this->manager()->audit(false);
-    }
-
-    public function testThrowRuntimeExceptionWhenFallbackRestoreFails(): void
-    {
-        $failure = new RuntimeException('Install failed.');
-
-        $this->installer
-            ->method('install')
-            ->willThrowException($failure);
-        $this->fallback
-            ->expects(self::once())
-            ->method('restore')
-            ->willThrowException(new RuntimeException('Fallback failed.'));
-
-        try {
-            $this->manager(['run-asset-manager' => true])->run();
-
-            self::fail('Expected the fallback restoration to fail.');
-        } catch (RuntimeException $exception) {
-            self::assertSame(
-                Message::ASSET_MANAGER_FALLBACK_RESTORE_FAILED->getMessage('Fallback failed.'),
-                $exception->getMessage(),
-                'The fallback failure must be reported.',
-            );
-            self::assertSame(
-                $failure,
-                $exception->getPrevious(),
-                'The installer exception must be preserved.',
-            );
-        }
     }
 
     public function testThrowRuntimeExceptionWhenInstallDirectoryIsDanglingSymlink(): void
@@ -705,7 +665,6 @@ final class NativeManagerTest extends TestCase
     {
         parent::setUp();
 
-        $this->fallback = $this->createMock(FallbackInterface::class);
         $this->installer = $this->createMock(NativeInstallerInterface::class);
         $this->io = $this->createMock(IOInterface::class);
         $this->registry = new InMemoryRegistry();
@@ -779,7 +738,6 @@ final class NativeManagerTest extends TestCase
             new Filesystem(),
             $this->installer,
             $this->registry,
-            $this->fallback,
         );
     }
 

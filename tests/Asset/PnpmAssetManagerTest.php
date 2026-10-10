@@ -58,7 +58,6 @@ final class PnpmAssetManagerTest extends AuditableAssetManager
             $this->config,
             new ProcessExecutor($this->io),
             $this->fs,
-            $this->fallback,
         );
 
         $result = $manager->audit(false);
@@ -81,7 +80,7 @@ final class PnpmAssetManagerTest extends AuditableAssetManager
 
     protected function getManager(): PnpmManager
     {
-        return new PnpmManager($this->io, $this->config, $this->executor, $this->fs, $this->fallback);
+        return new PnpmManager($this->io, $this->config, $this->executor, $this->fs);
     }
 
     protected function getUnsupportedVersion(): string

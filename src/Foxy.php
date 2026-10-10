@@ -7,7 +7,6 @@ namespace Foxy;
 use Composer\{Cache, Composer};
 use Composer\DependencyResolver\Operation\InstallOperation;
 use Composer\EventDispatcher\EventSubscriberInterface;
-use Composer\Factory;
 use Composer\Installer\{InstallerEvents, PackageEvent, PackageEvents};
 use Composer\IO\IOInterface;
 use Composer\Plugin\Capability\CommandProvider as ComposerCommandProvider;
@@ -45,6 +44,8 @@ final class Foxy implements PluginInterface, EventSubscriberInterface, Capable, 
 
     private AssetManagerInterface $assetManager;
 
+    private AssetManagerFinder $assetManagerFinder;
+
     /**
      * @var list<class-string<AssetManagerInterface>> The list of the classes of asset managers.
      */
@@ -81,7 +82,11 @@ final class Foxy implements PluginInterface, EventSubscriberInterface, Capable, 
         'native-install-dir' => 'node_modules',
     ];
 
+    private Filesystem $fs;
+
     private bool $initialized = false;
+
+    private IOInterface $io;
 
     private SolverInterface $solver;
 
@@ -103,17 +108,10 @@ final class Foxy implements PluginInterface, EventSubscriberInterface, Capable, 
             return;
         }
 
-        $this->assetManager = $this->getAssetManager($composer, $io, $this->config, $executor, $fs);
-
-        $packageJsonPath = $this->assetManager instanceof AbstractManifestAssetManager
-            ? $this->assetManager->getPackageJsonPath()
-            : $this->assetManager->getPackageName();
-
-        $this->assetFallback = new AssetFallback($io, $this->config, $packageJsonPath, $fs);
+        $this->io = $io;
+        $this->fs = $fs;
+        $this->assetManagerFinder = $this->createAssetManagerFinder($composer, $io, $this->config, $executor, $fs);
         $this->composerFallback = new ComposerFallback($composer, $io, $this->config, $input, $fs);
-        $this->solver = new Solver($this->assetManager, $this->config, $fs, $this->composerFallback);
-
-        $this->assetManager->setFallback($this->assetFallback);
     }
 
     public function audit(AuditRequest $request): AuditReport
@@ -124,7 +122,7 @@ final class Foxy implements PluginInterface, EventSubscriberInterface, Capable, 
             );
         }
 
-        return (new AuditRunner($this->assetManager))->audit($request);
+        return (new AuditRunner($this->getAssetManager()))->audit($request);
     }
 
     public function deactivate(Composer $composer, IOInterface $io): void
@@ -162,11 +160,11 @@ final class Foxy implements PluginInterface, EventSubscriberInterface, Capable, 
             return;
         }
 
-        $this->assetFallback->save();
+        $this->getAssetFallback()->save();
         $this->composerFallback->save();
 
         if ($this->isEnabled('run-asset-manager')) {
-            $this->assetManager->validate();
+            $this->getAssetManager()->validate();
         }
     }
 
@@ -201,8 +199,10 @@ final class Foxy implements PluginInterface, EventSubscriberInterface, Capable, 
             return;
         }
 
-        $this->solver->setUpdatable(str_contains($event->getName(), 'update'));
-        $this->solver->solve($event->getComposer(), $event->getIO());
+        $solver = $this->getSolver();
+
+        $solver->setUpdatable(str_contains($event->getName(), 'update'));
+        $solver->solve($event->getComposer(), $event->getIO());
     }
 
     public function uninstall(Composer $composer, IOInterface $io): void
@@ -211,10 +211,37 @@ final class Foxy implements PluginInterface, EventSubscriberInterface, Capable, 
     }
 
     /**
-     * Returns the native manager, wired to the npm registry with Composer's HTTP settings, authentication, and
-     * `<cache-files-dir>/foxy` tarball cache. Performs no I/O.
+     * Returns the finder holding every built-in manager; builds the managers without probing any executable.
      *
-     * @param Composer $composer The Composer instance that provides the HTTP and cache settings.
+     * @param Composer $composer The Composer instance.
+     * @param IOInterface $io The IO interface.
+     * @param Config $config The config of plugin.
+     * @param ProcessExecutor $executor The process executor.
+     * @param Filesystem $fs The composer filesystem.
+     */
+    private function createAssetManagerFinder(
+        Composer $composer,
+        IOInterface $io,
+        Config $config,
+        ProcessExecutor $executor,
+        Filesystem $fs,
+    ): AssetManagerFinder {
+        $amf = new AssetManagerFinder();
+
+        foreach (self::$assetManagers as $class) {
+            $amf->addManager(new $class($io, $config, $executor, $fs));
+        }
+
+        $amf->addManager($this->createNativeManager($composer, $io, $config, $fs));
+
+        return $amf;
+    }
+
+    /**
+     * Returns the native manager, wired to the npm registry through the HTTP downloader of Composer's loop (its HTTP
+     * settings, authentication, and parallel downloads) and the `<cache-files-dir>/foxy` tarball cache. Performs no I/O.
+     *
+     * @param Composer $composer The Composer instance that provides the HTTP downloader and the cache settings.
      * @param IOInterface $io The IO interface.
      * @param Config $config The config of plugin.
      * @param Filesystem $fs The composer filesystem.
@@ -232,7 +259,7 @@ final class Foxy implements PluginInterface, EventSubscriberInterface, Capable, 
         $cache->setReadOnly(true === $composerConfig->get('cache-read-only'));
 
         $registry = new NpmRegistry(
-            Factory::createHttpDownloader($io, $composerConfig),
+            $composer->getLoop()->getHttpDownloader(),
             $cache,
             $io,
             (string) $config->get('registry-url'),
@@ -248,33 +275,57 @@ final class Foxy implements PluginInterface, EventSubscriberInterface, Capable, 
     }
 
     /**
-     * @param Composer $composer The Composer instance.
-     * @param IOInterface $io The IO interface.
-     * @param Config $config The config of plugin.
-     * @param ProcessExecutor $executor The process executor.
-     * @param Filesystem $fs The composer filesystem.
+     * Returns the asset fallback of the resolved manager, resolving the manager first.
      *
-     * @throws RuntimeException When the asset manager is not found.
+     * @throws RuntimeException if the asset manager cannot be resolved.
      */
-    private function getAssetManager(
-        Composer $composer,
-        IOInterface $io,
-        Config $config,
-        ProcessExecutor $executor,
-        Filesystem $fs,
-    ): AssetManagerInterface {
-        $amf = new AssetManagerFinder();
+    private function getAssetFallback(): AssetFallback
+    {
+        $this->getAssetManager();
 
-        foreach (self::$assetManagers as $class) {
-            $amf->addManager(new $class($io, $config, $executor, $fs));
+        return $this->assetFallback;
+    }
+
+    /**
+     * Resolves the asset manager on first use and builds its asset fallback; later calls return the same manager.
+     *
+     * The manager is assigned last, so a selection failure leaves nothing resolved and the next call retries.
+     *
+     * @throws RuntimeException if the configured manager is unknown or no manager can be selected.
+     */
+    private function getAssetManager(): AssetManagerInterface
+    {
+        if (!isset($this->assetManager)) {
+            /** @var string|null $name */
+            $name = $this->config->get('manager');
+
+            $manager = $this->assetManagerFinder->findManager($name, $this->isEnabled('run-asset-manager'));
+
+            $path = $manager instanceof AbstractManifestAssetManager
+                ? $manager->getPackageJsonPath()
+                : $manager->getPackageName();
+
+            $this->assetFallback = new AssetFallback($this->io, $this->config, $path, $this->fs);
+            $this->assetManager = $manager;
         }
 
-        $amf->addManager($this->createNativeManager($composer, $io, $config, $fs));
+        return $this->assetManager;
+    }
 
-        /** @var string|null $manager */
-        $manager = $config->get('manager');
-
-        return $amf->findManager($manager, $this->isEnabled('run-asset-manager'));
+    /**
+     * Returns the solver, built on first use with the resolved manager and both fallbacks unless one was injected.
+     *
+     * @throws RuntimeException if the asset manager cannot be resolved.
+     */
+    private function getSolver(): SolverInterface
+    {
+        return $this->solver ??= new Solver(
+            $this->getAssetManager(),
+            $this->config,
+            $this->fs,
+            $this->composerFallback,
+            $this->getAssetFallback(),
+        );
     }
 
     /**

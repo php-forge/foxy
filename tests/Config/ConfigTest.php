@@ -75,6 +75,99 @@ final class ConfigTest extends TestCase
         }
     }
 
+    public function testForManagerKeepsEnvironmentValuesUnscoped(): void
+    {
+        $config = new FoxyConfig(['manager-bin' => ['npm' => '/opt/npm', 'yarn' => '/opt/yarn']]);
+
+        putenv('FOXY__MANAGER_BIN=/env/bin');
+
+        try {
+            $value = $config->forManager('yarn')->get('manager-bin');
+        } finally {
+            putenv('FOXY__MANAGER_BIN');
+        }
+
+        self::assertSame(
+            '/env/bin',
+            $value,
+            'Environment scalar must pass through the manager view.',
+        );
+    }
+
+    public function testForManagerOverridesConfiguredManager(): void
+    {
+        $config = new FoxyConfig(
+            [
+                'manager' => 'npm',
+                'manager-bin' => ['npm' => '/opt/npm', 'yarn' => '/opt/yarn'],
+            ],
+        );
+
+        $view = $config->forManager('yarn');
+
+        self::assertSame(
+            '/opt/yarn',
+            $view->get('manager-bin'),
+            'Scoped manager must win over the configured `manager`.',
+        );
+        self::assertSame(
+            '/opt/npm',
+            $config->get('manager-bin'),
+            'Original configuration must keep resolving the configured `manager`.',
+        );
+    }
+
+    public function testForManagerReturnsDefaultForUnknownManager(): void
+    {
+        $config = new FoxyConfig(['manager-bin' => ['npm' => '/opt/npm']]);
+
+        self::assertSame(
+            'pnpm',
+            $config->forManager('pnpm')->get('manager-bin', 'pnpm'),
+            'Missing map entry must fall back to the default value.',
+        );
+    }
+
+    public function testForManagerSelectsConfiguredManagerEntry(): void
+    {
+        $config = new FoxyConfig(['manager-bin' => ['npm' => '/opt/npm', 'yarn' => '/opt/yarn']]);
+
+        self::assertSame(
+            '/opt/yarn',
+            $config->forManager('yarn')->get('manager-bin'),
+            'View must select its own entry of a configured map.',
+        );
+        self::assertNull(
+            $config->get('manager-bin'),
+            'Unscoped configuration must not select any map entry.',
+        );
+    }
+
+    public function testForManagerSelectsManagerSpecificDefaults(): void
+    {
+        $config = new FoxyConfig(
+            [],
+            ['manager-version' => ['npm' => '>=10.9.8', 'yarn' => '^4.18.0']],
+        );
+
+        $view = $config->forManager('yarn');
+
+        self::assertNotSame(
+            $config,
+            $view,
+            'Scoped view must be a distinct instance.',
+        );
+        self::assertSame(
+            '^4.18.0',
+            $view->get('manager-version'),
+            'View must select its manager-specific default.',
+        );
+        self::assertNull(
+            $config->get('manager-version'),
+            'Original configuration must stay unscoped.',
+        );
+    }
+
     /**
      * @param string $key The key.
      * @param array $expected The expected value.
@@ -264,27 +357,6 @@ final class ConfigTest extends TestCase
             $expected,
             $config->isEnabled('feature'),
             'Feature state must match the configured value.',
-        );
-    }
-
-    public function testResolvedManagerSelectsManagerSpecificDefaults(): void
-    {
-        $config = new FoxyConfig(
-            [],
-            ['manager-version' => ['npm' => '>=10.9.8', 'yarn' => '^4.18.0']],
-        );
-
-        self::assertNull(
-            $config->get('manager-version'),
-            'Manager-specific default must remain unresolved initially.',
-        );
-
-        $config->setResolvedManager('yarn');
-
-        self::assertSame(
-            '^4.18.0',
-            $config->get('manager-version'),
-            'Resolved manager must select its configured version constraint.',
         );
     }
 

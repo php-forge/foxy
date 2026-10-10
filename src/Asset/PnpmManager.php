@@ -51,21 +51,6 @@ final class PnpmManager extends AbstractAssetManager
             ProcessExecutor::escape('--config.auditConfig={ignoreGhsas:[]}'),
         ];
 
-        return $this->buildUnconfiguredCommand('pnpm', $command);
-    }
-
-    protected function getInstallCommand(): string
-    {
-        return $this->buildCommand('pnpm', 'install', 'install');
-    }
-
-    protected function getUpdateCommand(): string
-    {
-        return $this->buildCommand('pnpm', 'update', 'update');
-    }
-
-    protected function getVersionCommand(): string
-    {
-        return $this->buildUnconfiguredCommand('pnpm', '--version');
+        return $this->buildUnconfiguredCommand($this->getDefaultBinary(), $command);
     }
 }

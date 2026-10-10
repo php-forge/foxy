@@ -812,7 +812,7 @@ final class BunAssetManagerTest extends AuditableAssetManager
 
     protected function getManager(): BunManager
     {
-        return new BunManager($this->io, $this->config, $this->executor, $this->fs, $this->fallback);
+        return new BunManager($this->io, $this->config, $this->executor, $this->fs);
     }
 
     protected function getUnsupportedVersion(): string

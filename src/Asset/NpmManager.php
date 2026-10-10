@@ -71,22 +71,7 @@ final class NpmManager extends AbstractAssetManager
 
         $command = [...$command, $noDev ? '--omit=dev' : '--include=dev', '--include=optional', '--include=peer'];
 
-        return $this->buildUnconfiguredCommand('npm', $command);
-    }
-
-    protected function getInstallCommand(): string
-    {
-        return $this->buildCommand('npm', 'install', 'install');
-    }
-
-    protected function getUpdateCommand(): string
-    {
-        return $this->buildCommand('npm', 'update', 'update');
-    }
-
-    protected function getVersionCommand(): string
-    {
-        return $this->buildUnconfiguredCommand('npm', '--version');
+        return $this->buildUnconfiguredCommand($this->getDefaultBinary(), $command);
     }
 
     /**

@@ -130,20 +130,6 @@ enum Message: string
     case ASSET_MANAGER_BINARY_NOT_INSTALLED = 'The "%s" binary must be installed.';
 
     /**
-     * Error when the asset manager exits with a non-zero status code.
-     *
-     * Format: "The asset manager exited with status code %d."
-     */
-    case ASSET_MANAGER_EXITED_WITH_STATUS = 'The asset manager exited with status code %d.';
-
-    /**
-     * Error when restoring the fallback after an asset manager failure also fails.
-     *
-     * Format: "The asset manager failed and its fallback could not be restored: %s"
-     */
-    case ASSET_MANAGER_FALLBACK_RESTORE_FAILED = 'The asset manager failed and its fallback could not be restored: %s';
-
-    /**
      * Error when an audit is requested without the manager lock file.
      *
      * Format: "The %s lock file "%s" was not found."
@@ -891,6 +877,13 @@ enum Message: string
      * Format: "The Composer asset directory "%s" is not marked as managed by Foxy."
      */
     case SOLVER_ASSET_DIR_UNMANAGED = 'The Composer asset directory "%s" is not marked as managed by Foxy.';
+
+    /**
+     * Error when restoring the asset fallback after an asset manager failure also fails.
+     *
+     * Format: "The asset manager failed and its fallback could not be restored: %s"
+     */
+    case SOLVER_ASSET_FALLBACK_RESTORE_FAILED = 'The asset manager failed and its fallback could not be restored: %s';
 
     /**
      * Error when the asset manager ends with a non-zero code.

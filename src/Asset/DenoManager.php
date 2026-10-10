@@ -98,7 +98,7 @@ final class DenoManager extends AbstractAssetManager
 
     protected function getAuditCommand(bool $noDev): string
     {
-        return $this->buildUnconfiguredCommand($this->getBinary(), ['audit', '--level=low']);
+        return $this->buildUnconfiguredCommand($this->getDefaultBinary(), ['audit', '--level=low']);
     }
 
     protected function getAuditEnvironment(): array
@@ -106,21 +106,19 @@ final class DenoManager extends AbstractAssetManager
         return self::AUDIT_ENVIRONMENT;
     }
 
-    protected function getInstallCommand(): string
+    /**
+     * Returns the platform-specific Deno binary name.
+     */
+    protected function getDefaultBinary(): string
     {
-        return $this->buildCommand($this->getBinary(), 'install', 'install');
+        return Platform::isWindows() ? 'deno.exe' : 'deno';
     }
 
     protected function getUpdateCommand(): string
     {
-        return $this->buildCommand($this->getBinary(), 'update', ['update', '--lockfile-only', '--recursive'])
+        return $this->buildCommand($this->getDefaultBinary(), 'update', ['update', '--lockfile-only', '--recursive'])
             . ' && '
             . $this->getInstallCommand();
-    }
-
-    protected function getVersionCommand(): string
-    {
-        return $this->buildUnconfiguredCommand($this->getBinary(), '--version');
     }
 
     protected function normalizeVersionOutput(string $output): string
@@ -135,14 +133,6 @@ final class DenoManager extends AbstractAssetManager
                 Message::ASSET_DENO_AUDIT_NO_DEV_UNSUPPORTED->getMessage(),
             );
         }
-    }
-
-    /**
-     * Returns the platform-specific Deno binary name.
-     */
-    private function getBinary(): string
-    {
-        return Platform::isWindows() ? 'deno.exe' : 'deno';
     }
 
     /**

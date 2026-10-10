@@ -11,8 +11,6 @@ use Foxy\Audit\AuditProcessResult;
 use Foxy\Config\Config;
 use Foxy\Converter\{SemverConverter, VersionConverterInterface};
 use Foxy\Exception\{Message, RuntimeException};
-use Foxy\Fallback\FallbackInterface;
-use Throwable;
 use UnexpectedValueException;
 
 use function array_key_exists;
@@ -31,10 +29,9 @@ abstract class AbstractAssetManager extends AbstractManifestAssetManager
         Config $config,
         protected ProcessExecutor $executor,
         Filesystem $fs,
-        FallbackInterface|null $fallback = null,
         protected VersionConverterInterface|null $versionConverter = null,
     ) {
-        parent::__construct($io, $config, $fs, $fallback);
+        parent::__construct($io, $config, $fs);
 
         $this->versionConverter ??= new SemverConverter();
     }
@@ -43,21 +40,6 @@ abstract class AbstractAssetManager extends AbstractManifestAssetManager
      * Get the command to audit the asset dependencies.
      */
     abstract protected function getAuditCommand(bool $noDev): string;
-
-    /**
-     * Get the command to install the asset dependencies.
-     */
-    abstract protected function getInstallCommand(): string;
-
-    /**
-     * Get the command to update the asset dependencies.
-     */
-    abstract protected function getUpdateCommand(): string;
-
-    /**
-     * Get the command to retrieve the version.
-     */
-    abstract protected function getVersionCommand(): string;
 
     public function audit(bool $noDev): AuditProcessResult
     {
@@ -92,8 +74,6 @@ abstract class AbstractAssetManager extends AbstractManifestAssetManager
 
     public function isAvailable(): bool
     {
-        $this->config->setResolvedManager($this->getName());
-
         return null !== $this->getVersion();
     }
 
@@ -112,36 +92,16 @@ abstract class AbstractAssetManager extends AbstractManifestAssetManager
 
         $this->io->write($info);
 
-        $res = $this->withManagerTimeout(
-            function () use ($updatable, $managerWorkingDirectory): int {
-                try {
-                    $cmd = $updatable ? $this->getUpdateCommand() : $this->getInstallCommand();
-
-                    return $this->executeManagerCommand($cmd, $managerWorkingDirectory);
-                } catch (Throwable $exception) {
-                    $this->restoreAfterFailure($exception);
-
-                    throw $exception;
-                }
-            },
+        return $this->withManagerTimeout(
+            fn(): int => $this->executeManagerCommand(
+                $updatable ? $this->getUpdateCommand() : $this->getInstallCommand(),
+                $managerWorkingDirectory,
+            ),
         );
-
-        if (0 !== $res && null !== $this->fallback) {
-            $this->restoreAfterFailure(
-                new RuntimeException(
-                    Message::ASSET_MANAGER_EXITED_WITH_STATUS->getMessage($res),
-                    $res,
-                ),
-            );
-        }
-
-        return $res;
     }
 
     public function validate(): void
     {
-        $this->config->setResolvedManager($this->getName());
-
         $version = $this->getVersion();
 
         if (null === $version) {
@@ -173,7 +133,7 @@ abstract class AbstractAssetManager extends AbstractManifestAssetManager
         }
 
         /** @var string|null $constraintVersion */
-        $constraintVersion = $this->config->get('manager-version');
+        $constraintVersion = $this->getManagerConfig()->get('manager-version');
 
         if (
             is_string($constraintVersion)
@@ -195,8 +155,8 @@ abstract class AbstractAssetManager extends AbstractManifestAssetManager
      */
     protected function buildCommand(string $defaultBin, string $action, array|string $command): string
     {
-        $gOptions = trim((string) $this->config->get('manager-options', ''));
-        $options = trim((string) $this->config->get("manager-{$action}-options", ''));
+        $gOptions = trim((string) $this->getManagerConfig()->get('manager-options', ''));
+        $options = trim((string) $this->getManagerConfig()->get("manager-{$action}-options", ''));
 
         return $this->buildUnconfiguredCommand($defaultBin, $command)
             . ($gOptions === '' ? '' : " {$gOptions}")
@@ -223,6 +183,32 @@ abstract class AbstractAssetManager extends AbstractManifestAssetManager
         return [];
     }
 
+    /**
+     * Returns the executable used when `manager-bin` is not configured; defaults to the manager name.
+     */
+    protected function getDefaultBinary(): string
+    {
+        return $this->getName();
+    }
+
+    /**
+     * Returns the command that installs the asset dependencies, followed by the `manager-options` and
+     * `manager-install-options` values.
+     */
+    protected function getInstallCommand(): string
+    {
+        return $this->buildCommand($this->getDefaultBinary(), 'install', 'install');
+    }
+
+    /**
+     * Returns the command that updates the asset dependencies, followed by the `manager-options` and
+     * `manager-update-options` values.
+     */
+    protected function getUpdateCommand(): string
+    {
+        return $this->buildCommand($this->getDefaultBinary(), 'update', 'update');
+    }
+
     protected function getVersion(): string|null
     {
         if ($this->version === '' && $this->versionConverter !== null) {
@@ -240,6 +226,14 @@ abstract class AbstractAssetManager extends AbstractManifestAssetManager
         }
 
         return $this->version;
+    }
+
+    /**
+     * Returns the command that prints the manager version, without the install and update options.
+     */
+    protected function getVersionCommand(): string
+    {
+        return $this->buildUnconfiguredCommand($this->getDefaultBinary(), '--version');
     }
 
     /**
@@ -270,7 +264,7 @@ abstract class AbstractAssetManager extends AbstractManifestAssetManager
         $timeout = ProcessExecutor::getTimeout();
 
         /** @var int $managerTimeout */
-        $managerTimeout = $this->config->get('manager-timeout', PHP_INT_MAX);
+        $managerTimeout = $this->getManagerConfig()->get('manager-timeout', PHP_INT_MAX);
 
         ProcessExecutor::setTimeout($managerTimeout);
 
@@ -302,7 +296,7 @@ abstract class AbstractAssetManager extends AbstractManifestAssetManager
     private function getManagerBinary(string $defaultBin): string
     {
         /** @var string $bin */
-        $bin = $this->config->get('manager-bin', $defaultBin);
+        $bin = $this->getManagerConfig()->get('manager-bin', $defaultBin);
 
         return Platform::isWindows() ? str_replace('/', '\\', $bin) : $bin;
     }

@@ -10,10 +10,8 @@ use Composer\Util\Filesystem;
 use Exception;
 use Foxy\Config\Config;
 use Foxy\Exception\{Message, RuntimeException};
-use Foxy\Fallback\FallbackInterface;
 use Foxy\Json\JsonFile;
 use Seld\JsonLint\ParsingException;
-use Throwable;
 
 use function is_dir;
 use function is_string;
@@ -24,8 +22,8 @@ use function rtrim;
 use const DIRECTORY_SEPARATOR;
 
 /**
- * Provides the asset manifest handling shared by every asset manager: dependency merging, root package paths, lock
- * file detection, and fallback restoration after a failure.
+ * Provides the asset manifest handling shared by every asset manager: dependency merging, root package paths, and lock
+ * file detection.
  */
 abstract class AbstractManifestAssetManager implements AssetManagerInterface
 {
@@ -37,7 +35,6 @@ abstract class AbstractManifestAssetManager implements AssetManagerInterface
         protected IOInterface $io,
         protected Config $config,
         protected Filesystem $fs,
-        protected FallbackInterface|null $fallback = null,
     ) {}
 
     /**
@@ -45,32 +42,26 @@ abstract class AbstractManifestAssetManager implements AssetManagerInterface
      */
     public function addDependencies(RootPackageInterface $rootPackage, array $dependencies): AssetPackageInterface
     {
-        try {
-            $assetPackage = new AssetPackage(
-                $rootPackage,
-                new JsonFile($this->getPackageJsonPath(), null, $this->io),
-            );
+        $assetPackage = new AssetPackage(
+            $rootPackage,
+            new JsonFile($this->getPackageJsonPath(), null, $this->io),
+        );
 
-            $previousDependencies = $assetPackage->getInstalledDependencies();
+        $previousDependencies = $assetPackage->getInstalledDependencies();
 
-            $assetPackage->removeUnusedDependencies($dependencies);
+        $assetPackage->removeUnusedDependencies($dependencies);
 
-            $alreadyInstalledDependencies = $assetPackage->addNewDependencies($dependencies);
+        $alreadyInstalledDependencies = $assetPackage->addNewDependencies($dependencies);
 
-            if ($this->config->isEnabled('run-asset-manager')) {
-                $this->actionWhenComposerDependenciesAreAlreadyInstalled($alreadyInstalledDependencies);
-            }
-
-            $this->actionWhenComposerDependenciesAreMerged($assetPackage, $previousDependencies);
-
-            $this->io->write('<info>Merging Composer dependencies in the asset package</info>');
-
-            return $assetPackage->write();
-        } catch (Throwable $exception) {
-            $this->restoreAfterFailure($exception);
-
-            throw $exception;
+        if ($this->config->isEnabled('run-asset-manager')) {
+            $this->actionWhenComposerDependenciesAreAlreadyInstalled($alreadyInstalledDependencies);
         }
+
+        $this->actionWhenComposerDependenciesAreMerged($assetPackage, $previousDependencies);
+
+        $this->io->write('<info>Merging Composer dependencies in the asset package</info>');
+
+        return $assetPackage->write();
     }
 
     public function getPackageJsonPath(): string
@@ -96,13 +87,6 @@ abstract class AbstractManifestAssetManager implements AssetManagerInterface
     public function isUpdatable(): bool
     {
         return $this->updatable && $this->isInstalled();
-    }
-
-    public function setFallback(FallbackInterface $fallback): static
-    {
-        $this->fallback = $fallback;
-
-        return $this;
     }
 
     public function setUpdatable(bool $updatable): static
@@ -136,6 +120,16 @@ abstract class AbstractManifestAssetManager implements AssetManagerInterface
     protected function getLockFilePath(): string
     {
         return $this->getRootPackagePath($this->getLockPackageName());
+    }
+
+    /**
+     * Returns the configuration scoped to this manager, so `manager-*` map entries resolve to its own value.
+     *
+     * The view is built on each call because {@see getName()} must not run from a constructor.
+     */
+    protected function getManagerConfig(): Config
+    {
+        return $this->config->forManager($this->getName());
     }
 
     protected function getManagerWorkingDirectory(): string|null
@@ -186,25 +180,6 @@ abstract class AbstractManifestAssetManager implements AssetManagerInterface
     protected function getRootPackagePath(string $path): string
     {
         return rtrim($this->getRootPackageDir(), '/\\') . DIRECTORY_SEPARATOR . $path;
-    }
-
-    /**
-     * Restore the asset manifest without hiding the manager failure.
-     */
-    final protected function restoreAfterFailure(Throwable $exception): void
-    {
-        if (null === $this->fallback) {
-            return;
-        }
-
-        try {
-            $this->fallback->restore();
-        } catch (Throwable $fallbackException) {
-            throw new RuntimeException(
-                Message::ASSET_MANAGER_FALLBACK_RESTORE_FAILED->getMessage($fallbackException->getMessage()),
-                previous: $exception,
-            );
-        }
     }
 
     /**

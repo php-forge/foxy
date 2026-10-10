@@ -474,15 +474,18 @@ final class NpmRegistryTest extends TestCase
 
     public function testPrefetchTarballsRequestsNothingWithDisabledCache(): void
     {
-        mkdir("{$this->root}/locked", 0o555);
-
-        $cache = new Cache(new NullIO(), "{$this->root}/locked", 'a-z0-9_./');
+        $cache = new class (new NullIO(), $this->cacheDir, 'a-z0-9_./') extends Cache {
+            public function isEnabled(): bool
+            {
+                return false;
+            }
+        };
 
         $this->registry($this->idleDownloader(), $cache)->prefetchTarballs([$this->package()]);
 
-        self::assertFalse(
-            $cache->isEnabled(),
-            'Cache in a read-only directory must be disabled.',
+        self::assertFileDoesNotExist(
+            $this->cacheEntry(),
+            'Disabled cache must stay empty.',
         );
     }
 

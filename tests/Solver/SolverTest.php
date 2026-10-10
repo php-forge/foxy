@@ -47,6 +47,7 @@ use const DIRECTORY_SEPARATOR;
  */
 class SolverTest extends TestCase
 {
+    private FallbackInterface|MockObject|null $assetFallback = null;
     private Composer|MockObject|null $composer = null;
     private \Composer\Config|MockObject|null $composerConfig = null;
     private FallbackInterface|MockObject|null $composerFallback = null;
@@ -445,10 +446,16 @@ class SolverTest extends TestCase
             ->willReturn($resRunManager);
 
         if (0 === $resRunManager) {
+            $this->assetFallback
+                ->expects(self::never())
+                ->method('restore');
             $this->composerFallback
                 ->expects(self::never())
                 ->method('restore');
         } else {
+            $this->assetFallback
+                ->expects(self::once())
+                ->method('restore');
             $this->composerFallback
                 ->expects(self::once())
                 ->method('restore');
@@ -688,6 +695,43 @@ class SolverTest extends TestCase
             ],
             $observedEvents,
         );
+    }
+
+    public function testSolveDoesNotRestoreAssetFallbackWhenPostSolveListenerThrows(): void
+    {
+        $this->addInstalledPackages();
+
+        $failure = new \RuntimeException('Listener failed.');
+
+        $this->onPostSolve(
+            static function () use ($failure): never {
+                throw $failure;
+            },
+        );
+        $this->manager
+            ->expects(self::once())
+            ->method('run')
+            ->willReturn(0);
+        $this->assetFallback
+            ->expects(self::never())
+            ->method('restore');
+        $this->composerFallback
+            ->expects(self::once())
+            ->method('restore');
+
+        try {
+            $this->solver->solve($this->composer, $this->io);
+
+            self::fail(
+                'Expected the listener failure.',
+            );
+        } catch (\RuntimeException $exception) {
+            self::assertSame(
+                $failure,
+                $exception,
+                'Listener failure must be rethrown unchanged.',
+            );
+        }
     }
 
     public function testSolveIgnoresPackageWithoutAssetActivation(): void
@@ -1173,6 +1217,146 @@ class SolverTest extends TestCase
         $solver->solve($this->composer, $this->io);
     }
 
+    public function testSolveRestoresAssetFallbackBeforeComposerFallbackWhenMergeFails(): void
+    {
+        $this->addInstalledPackages();
+
+        $failure = new \RuntimeException('Merge failed.');
+        $restored = [];
+
+        $this->manager
+            ->expects(self::once())
+            ->method('addDependencies')
+            ->willThrowException($failure);
+        $this->manager
+            ->expects(self::never())
+            ->method('run');
+        $this->assetFallback
+            ->expects(self::once())
+            ->method('restore')
+            ->willReturnCallback(
+                static function () use (&$restored): void {
+                    $restored[] = 'asset';
+                },
+            );
+        $this->composerFallback
+            ->expects(self::once())
+            ->method('restore')
+            ->willReturnCallback(
+                static function () use (&$restored): void {
+                    $restored[] = 'composer';
+                },
+            );
+
+        try {
+            $this->solver->solve($this->composer, $this->io);
+
+            self::fail(
+                'Expected the merge failure.',
+            );
+        } catch (\RuntimeException $exception) {
+            self::assertSame(
+                $failure,
+                $exception,
+                'Merge failure must be rethrown unchanged.',
+            );
+        }
+
+        self::assertSame(
+            ['asset', 'composer'],
+            $restored,
+            'Order: asset fallback first, Composer fallback second.',
+        );
+    }
+
+    public function testSolveRestoresAssetFallbackBeforePostSolveWhenManagerReturnsNonZero(): void
+    {
+        $this->addInstalledPackages();
+
+        $observed = [];
+
+        $this->onPostSolve(
+            static function () use (&$observed): void {
+                $observed[] = 'post-solve';
+            },
+        );
+        $this->manager
+            ->expects(self::once())
+            ->method('run')
+            ->willReturn(3);
+        $this->assetFallback
+            ->expects(self::once())
+            ->method('restore')
+            ->willReturnCallback(
+                static function () use (&$observed): void {
+                    $observed[] = 'asset';
+                },
+            );
+        $this->composerFallback
+            ->expects(self::once())
+            ->method('restore')
+            ->willReturnCallback(
+                static function () use (&$observed): void {
+                    $observed[] = 'composer';
+                },
+            );
+
+        try {
+            $this->solver->solve($this->composer, $this->io);
+
+            self::fail(
+                'Expected the non-zero result to fail.',
+            );
+        } catch (RuntimeException $exception) {
+            self::assertSame(
+                Message::SOLVER_ASSET_MANAGER_FAILED->getMessage(3),
+                $exception->getMessage(),
+                'Message must carry the manager result code.',
+            );
+        }
+
+        self::assertSame(
+            ['asset', 'post-solve', 'composer'],
+            $observed,
+            'Order: asset restore, `foxy.post-solve`, Composer restore.',
+        );
+    }
+
+    public function testSolveRestoresAssetFallbackWhenManagerThrows(): void
+    {
+        $this->addInstalledPackages();
+
+        $failure = new \RuntimeException('Manager process failed.');
+
+        $this->manager
+            ->expects(self::once())
+            ->method('addDependencies');
+        $this->manager
+            ->expects(self::once())
+            ->method('run')
+            ->willThrowException($failure);
+        $this->assetFallback
+            ->expects(self::once())
+            ->method('restore');
+        $this->composerFallback
+            ->expects(self::once())
+            ->method('restore');
+
+        try {
+            $this->solver->solve($this->composer, $this->io);
+
+            self::fail(
+                'Expected the manager failure.',
+            );
+        } catch (\RuntimeException $exception) {
+            self::assertSame(
+                $failure,
+                $exception,
+                'Manager failure must be rethrown unchanged.',
+            );
+        }
+    }
+
     public function testSolveRestoresComposerWhenAssetManifestCannotBeRead(): void
     {
         $sourceContent = '{"name":"source-package","version":"1.0.0"}';
@@ -1192,6 +1376,9 @@ class SolverTest extends TestCase
         $this->manager
             ->expects(self::never())
             ->method('run');
+        $this->assetFallback
+            ->expects(self::never())
+            ->method('restore');
         $this->composerFallback
             ->expects(self::once())
             ->method('restore');
@@ -1521,6 +1708,148 @@ class SolverTest extends TestCase
         $solver->solve($this->composer, $this->io);
     }
 
+    public function testThrowRuntimeExceptionWhenAssetAndComposerFallbackRestoresFail(): void
+    {
+        $this->addInstalledPackages();
+
+        $failure = new \RuntimeException('Manager failed.');
+
+        $this->manager
+            ->expects(self::once())
+            ->method('run')
+            ->willThrowException($failure);
+        $this->assetFallback
+            ->expects(self::once())
+            ->method('restore')
+            ->willThrowException(new \RuntimeException('Asset fallback failed.'));
+        $this->composerFallback
+            ->expects(self::once())
+            ->method('restore')
+            ->willThrowException(new \RuntimeException('Composer fallback failed.'));
+
+        try {
+            $this->solver->solve($this->composer, $this->io);
+
+            self::fail(
+                'Expected both fallback restorations to fail.',
+            );
+        } catch (RuntimeException $exception) {
+            self::assertSame(
+                Message::SOLVER_COMPOSER_FALLBACK_RESTORE_FAILED->getMessage('Composer fallback failed.'),
+                $exception->getMessage(),
+                'Outer message must embed the Composer fallback failure.',
+            );
+            $previous = $exception->getPrevious();
+
+            self::assertInstanceOf(
+                RuntimeException::class,
+                $previous,
+                'Previous exception must be a Foxy runtime exception.',
+            );
+            self::assertSame(
+                Message::SOLVER_ASSET_FALLBACK_RESTORE_FAILED->getMessage('Asset fallback failed.'),
+                $previous->getMessage(),
+                'Previous exception must be the asset fallback failure.',
+            );
+            self::assertSame(
+                $failure,
+                $previous->getPrevious(),
+                'Manager failure must end the previous chain.',
+            );
+        }
+    }
+
+    public function testThrowRuntimeExceptionWhenAssetFallbackRestoreFails(): void
+    {
+        $this->addInstalledPackages();
+
+        $failure = new \RuntimeException('Manager failed.');
+
+        $this->manager
+            ->expects(self::once())
+            ->method('run')
+            ->willThrowException($failure);
+        $this->assetFallback
+            ->expects(self::once())
+            ->method('restore')
+            ->willThrowException(new \RuntimeException('Asset fallback failed.'));
+        $this->composerFallback
+            ->expects(self::once())
+            ->method('restore');
+
+        try {
+            $this->solver->solve($this->composer, $this->io);
+
+            self::fail(
+                'Expected the asset fallback restoration to fail.',
+            );
+        } catch (RuntimeException $exception) {
+            self::assertSame(
+                Message::SOLVER_ASSET_FALLBACK_RESTORE_FAILED->getMessage('Asset fallback failed.'),
+                $exception->getMessage(),
+                'Message must embed the asset fallback failure.',
+            );
+            self::assertSame(
+                0,
+                $exception->getCode(),
+                "Exception code must be '0'.",
+            );
+            self::assertSame(
+                $failure,
+                $exception->getPrevious(),
+                'Manager failure must be the previous exception.',
+            );
+        }
+    }
+
+    public function testThrowRuntimeExceptionWhenAssetFallbackRestoreFailsAfterNonZeroResult(): void
+    {
+        $this->addInstalledPackages();
+
+        $postSolveDispatched = false;
+
+        $this->onPostSolve(
+            static function () use (&$postSolveDispatched): void {
+                $postSolveDispatched = true;
+            },
+        );
+        $this->manager
+            ->expects(self::once())
+            ->method('run')
+            ->willReturn(7);
+        $this->assetFallback
+            ->expects(self::once())
+            ->method('restore')
+            ->willThrowException(new \RuntimeException('Asset fallback failed.'));
+        $this->composerFallback
+            ->expects(self::once())
+            ->method('restore');
+
+        try {
+            $this->solver->solve($this->composer, $this->io);
+
+            self::fail(
+                'Expected the asset fallback restoration to fail.',
+            );
+        } catch (RuntimeException $exception) {
+            self::assertSame(
+                Message::SOLVER_ASSET_FALLBACK_RESTORE_FAILED->getMessage('Asset fallback failed.'),
+                $exception->getMessage(),
+                'Message must embed the asset fallback failure.',
+            );
+            self::assertSame(
+                Message::SOLVER_ASSET_MANAGER_FAILED->getMessage(7),
+                $exception->getPrevious()?->getMessage(),
+                'Previous exception must carry the manager result code.',
+            );
+        }
+
+        self::assertFalse(
+            $postSolveDispatched,
+            'A failed asset restore must stop before `foxy.post-solve`.',
+        );
+    }
+
     public function testValidateAssetDirectoryThrowsWhenProjectDirectoryIsUnavailable(): void
     {
         MockerState::addCondition('Foxy\\Solver', 'getcwd', [], false);
@@ -1550,6 +1879,7 @@ class SolverTest extends TestCase
         $this->package = $this->createMock(RootPackageInterface::class);
         $this->manager = $this->createMock(AssetManagerInterface::class);
         $this->composerFallback = $this->createMock(FallbackInterface::class);
+        $this->assetFallback = $this->createMock(FallbackInterface::class);
         $this->sfs->mkdir($this->cwd);
         $this->vendorDir = $this->cwd . '/vendor';
         $this->composerConfig
@@ -1597,7 +1927,13 @@ class SolverTest extends TestCase
                 fn(): EventDispatcher => $this->dispatcher ?? throw new LogicException('Missing event dispatcher.'),
             );
 
-        $this->solver = new Solver($this->manager, $this->config, $this->fs, $this->composerFallback);
+        $this->solver = new Solver(
+            $this->manager,
+            $this->config,
+            $this->fs,
+            $this->composerFallback,
+            $this->assetFallback,
+        );
     }
 
     protected function tearDown(): void
@@ -1618,6 +1954,7 @@ class SolverTest extends TestCase
         $this->package = null;
         $this->manager = null;
         $this->composerFallback = null;
+        $this->assetFallback = null;
         $this->solver = null;
         $this->oldCwd = null;
         $this->cwd = null;
@@ -1664,6 +2001,26 @@ class SolverTest extends TestCase
     private function invokeSolverMethodOn(SolverInterface $solver, string $method, mixed ...$arguments): mixed
     {
         return (new ReflectionClass($solver))->getMethod($method)->invoke($solver, ...$arguments);
+    }
+
+    /**
+     * Replaces the event dispatcher with one that runs the callback when `foxy.post-solve` is dispatched.
+     */
+    private function onPostSolve(callable $callback): void
+    {
+        $this->dispatcher = $this->createMock(EventDispatcher::class);
+
+        $this->dispatcher
+            ->method('dispatch')
+            ->willReturnCallback(
+                static function (string $name) use ($callback): int {
+                    if (FoxyEvents::POST_SOLVE === $name) {
+                        $callback();
+                    }
+
+                    return 0;
+                },
+            );
     }
 
     /**

@@ -7,7 +7,6 @@ namespace Foxy\Asset;
 use Composer\Package\RootPackageInterface;
 use Foxy\Audit\{AuditParserInterface, AuditProcessResult};
 use Foxy\Exception\RuntimeException;
-use Foxy\Fallback\FallbackInterface;
 
 interface AssetManagerInterface
 {
@@ -77,11 +76,6 @@ interface AssetManagerInterface
      * Run the asset manager to install/update the asset dependencies.
      */
     public function run(): int;
-
-    /**
-     * @param FallbackInterface $fallback The fallback
-     */
-    public function setFallback(FallbackInterface $fallback): self;
 
     /**
      * Define if the asset manager can be use the update command.

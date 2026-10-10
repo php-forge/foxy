@@ -87,7 +87,7 @@ final class YarnAssetManagerTest extends AuditableAssetManager
                 ->method('getErrorOutput')
                 ->willReturn('');
 
-            $manager = new YarnManager($this->io, $this->config, $executor, $this->fs, $this->fallback);
+            $manager = new YarnManager($this->io, $this->config, $executor, $this->fs);
 
             $manager->audit(false);
 
@@ -176,7 +176,7 @@ final class YarnAssetManagerTest extends AuditableAssetManager
                     },
                 );
 
-            $manager = new YarnManager($this->io, $this->config, $executor, $this->fs, $this->fallback);
+            $manager = new YarnManager($this->io, $this->config, $executor, $this->fs);
 
             try {
                 $manager->audit(false);
@@ -249,7 +249,7 @@ final class YarnAssetManagerTest extends AuditableAssetManager
 
     protected function getManager(): YarnManager
     {
-        return new YarnManager($this->io, $this->config, $this->executor, $this->fs, $this->fallback);
+        return new YarnManager($this->io, $this->config, $this->executor, $this->fs);
     }
 
     protected function getUnsupportedVersion(): string

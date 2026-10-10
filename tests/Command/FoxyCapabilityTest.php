@@ -6,7 +6,7 @@ namespace Foxy\Tests\Command;
 
 use Composer\Plugin\Capability\CommandProvider as ComposerCommandProvider;
 use Composer\Plugin\Capable;
-use Foxy\Asset\AssetManagerInterface;
+use Foxy\Asset\{AssetManagerFinder, AssetManagerInterface};
 use Foxy\Audit\{AuditProcessResult, AuditRequest, AuditRunnerInterface, Severity};
 use Foxy\Audit\Parser\NpmAuditParser;
 use Foxy\Command\FoxyCommandProvider;
@@ -85,6 +85,21 @@ final class FoxyCapabilityTest extends TestCase
             $foxy->getCapabilities(),
             'Command capability must map to its provider.',
         );
+    }
+
+    public function testThrowRuntimeExceptionWhenAuditFindsNoAssetManager(): void
+    {
+        $foxy = new Foxy();
+
+        self::setProperty($foxy, 'config', new Config(['enabled' => true]));
+        self::setProperty($foxy, 'assetManagerFinder', new AssetManagerFinder([]));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            Message::ASSET_MANAGER_NONE_FOUND->getMessage(),
+        );
+
+        $foxy->audit(new AuditRequest());
     }
 
     public function testThrowRuntimeExceptionWhenPluginIsDisabled(): void
