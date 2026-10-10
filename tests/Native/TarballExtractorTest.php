@@ -15,7 +15,6 @@ use PHPUnit\Framework\TestCase;
 use function file_get_contents;
 use function file_put_contents;
 use function fileperms;
-use function is_dir;
 use function is_executable;
 use function mkdir;
 use function scandir;
@@ -476,8 +475,8 @@ final class TarballExtractorTest extends TestCase
 
         (new TarballExtractor(new Filesystem()))->extract($tarball, $target, self::LABEL);
 
-        self::assertTrue(
-            is_dir($target),
+        self::assertDirectoryExists(
+            $target,
             'Destination must be a directory.',
         );
 

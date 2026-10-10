@@ -22,7 +22,6 @@ use function ksort;
 use function sort;
 use function str_starts_with;
 use function strlen;
-use function strval;
 use function substr;
 
 use const SORT_STRING;
@@ -93,7 +92,7 @@ final readonly class NativeInstaller implements NativeInstallerInterface
         $locals = [];
 
         foreach ($rootSpecs as $name => $spec) {
-            $name = strval($name);
+            $name = (string) $name;
 
             if (!str_starts_with($spec, self::FILE_PROTOCOL)) {
                 $requirements[] = new Requirement($name, $spec, '');
@@ -340,7 +339,7 @@ final readonly class NativeInstaller implements NativeInstallerInterface
 
         foreach ([[$dependencies, false], [$peers, false], [$optionalDependencies, true]] as [$group, $optional]) {
             foreach ($group as $dependency => $spec) {
-                $dependency = strval($dependency);
+                $dependency = (string) $dependency;
 
                 if (str_starts_with($spec, self::FILE_PROTOCOL)) {
                     throw new RuntimeException(

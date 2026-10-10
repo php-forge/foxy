@@ -51,7 +51,7 @@ final readonly class ResolvedPackage
     /**
      * Returns the package entry written to `foxy.lock`.
      *
-     * @return array{version: string, resolved: string, integrity: string}|array{version: string, file: string}
+     * @return array{version: string, file: string}|array{version: string, resolved: string, integrity: string}
      */
     public function toLock(): array
     {

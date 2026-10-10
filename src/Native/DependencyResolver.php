@@ -203,17 +203,17 @@ final readonly class DependencyResolver
         $requirements = [];
 
         foreach ($version->dependencies as $name => $spec) {
-            $requirements[] = new Requirement(strval($name), $spec, $source);
+            $requirements[] = new Requirement((string) $name, $spec, $source);
         }
 
         foreach ($version->peerDependencies as $name => $spec) {
-            if (!in_array(strval($name), $optionalPeers, true)) {
-                $requirements[] = new Requirement(strval($name), $spec, $source);
+            if (!in_array((string) $name, $optionalPeers, true)) {
+                $requirements[] = new Requirement((string) $name, $spec, $source);
             }
         }
 
         foreach ($version->optionalDependencies as $name => $spec) {
-            $requirements[] = new Requirement(strval($name), $spec, $source, true);
+            $requirements[] = new Requirement((string) $name, $spec, $source, true);
         }
 
         return $requirements;

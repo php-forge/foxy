@@ -14,7 +14,6 @@ use UnexpectedValueException;
 use function explode;
 use function implode;
 use function in_array;
-use function intval;
 use function str_replace;
 use function trim;
 
@@ -138,7 +137,7 @@ final readonly class NpmRange implements Stringable
      */
     private static function bump(string $major, string|null $minor): string
     {
-        return null === $minor ? (string) (intval($major) + 1) : "{$major}." . (intval($minor) + 1);
+        return null === $minor ? (string) ((int) $major + 1) : "{$major}." . ((int) $minor + 1);
     }
 
     /**

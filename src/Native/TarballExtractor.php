@@ -213,10 +213,9 @@ final readonly class TarballExtractor
      *
      * The ustar `prefix` field is prepended to the name only for POSIX headers; GNU headers use that area otherwise.
      *
+     * @throws RuntimeException if the magic, the checksum or a number field is invalid.
      * @return array{name: string, size: int, type: string, mode: int, link: string}|null The entry header, or `null`
      * for the end-of-archive block.
-     *
-     * @throws RuntimeException if the magic, the checksum or a number field is invalid.
      */
     private function parseHeader(string $header, string $label): array|null
     {
@@ -258,9 +257,8 @@ final readonly class TarballExtractor
     /**
      * Parses the `<length> <key>=<value>\n` records of a PAX extended header.
      *
-     * @return array<string, string> Record values keyed by record name.
-     *
      * @throws RuntimeException if a record is malformed.
+     * @return array<string, string> Record values keyed by record name.
      */
     private function paxRecords(string $data, string $label): array
     {
@@ -331,9 +329,8 @@ final readonly class TarballExtractor
      *
      * Backslashes count as path separators, so a name cannot escape the destination through the Windows separator.
      *
-     * @return string|null The target path, or `null` when nothing remains after the first component.
-     *
      * @throws RuntimeException if the name is absolute or holds a `..` segment.
+     * @return string|null The target path, or `null` when nothing remains after the first component.
      */
     private function targetPath(string $name, string $destination, string $label): string|null
     {
