@@ -87,7 +87,7 @@ final readonly class NpmRegistry implements NpmRegistryInterface
         $integrity = $package->integrity ?? '';
 
         $key = $this->tarballKey($package);
-        $file = $this->tarballFile($package, $directory, 'tgz');
+        $file = $this->tarballFile($package, $directory, '.tgz');
 
         if ($this->cache->copyTo($key, $file)) {
             if ($this->matchesIntegrity($file, $integrity)) {
@@ -203,7 +203,8 @@ final readonly class NpmRegistry implements NpmRegistryInterface
                 continue;
             }
 
-            $file = $this->tarballFile($package, $directory, 'prefetch');
+            // The URL hash keeps `@scope/pkg` and `scope-pkg` apart while their downloads run side by side.
+            $file = $this->tarballFile($package, $directory, '-' . sha1($resolved) . '.prefetch');
 
             $this->httpDownloader->addCopy($resolved, $file)->then(
                 function () use ($package, $key, $file, $resolved): void {
@@ -354,12 +355,12 @@ final readonly class NpmRegistry implements NpmRegistryInterface
     }
 
     /**
-     * Returns the path of a package's tarball inside the directory: the name with `@` dropped and `/` as `-`, the
-     * version, and the extension.
+     * Returns the path of a package's file inside the directory: the name with `@` dropped and `/` as `-`, the
+     * version, and the suffix.
      */
-    private function tarballFile(ResolvedPackage $package, string $directory, string $extension): string
+    private function tarballFile(ResolvedPackage $package, string $directory, string $suffix): string
     {
-        return "{$directory}/" . str_replace(['@', '/'], ['', '-'], $package->name) . "-{$package->version}.{$extension}";
+        return "{$directory}/" . str_replace(['@', '/'], ['', '-'], $package->name) . "-{$package->version}{$suffix}";
     }
 
     /**

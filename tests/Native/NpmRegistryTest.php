@@ -418,7 +418,7 @@ final class NpmRegistryTest extends TestCase
             'Temporary files must have unique names.',
         );
         self::assertSame(
-            "{$this->directory}/scope-pkg-1.0.0.prefetch",
+            "{$this->directory}/scope-pkg-1.0.0-" . sha1(self::TARBALL_URL) . '.prefetch',
             $this->copies[0][1],
             'Temporary file must live in the given directory, named after the package.',
         );
@@ -468,6 +468,45 @@ final class NpmRegistryTest extends TestCase
             'Prefetching the tarball of "@scope/pkg" (1.0.0) failed: Internal Server Error' . PHP_EOL,
             $io->getOutput(),
             'Verbose notice must name the package and the cause.',
+        );
+    }
+
+    public function testPrefetchTarballsKeepsCollidingNamesApart(): void
+    {
+        $unscoped = new ResolvedPackage(
+            'scope-pkg',
+            '1.0.0',
+            self::LEFT_PAD_URL,
+            'sha512-' . base64_encode(hash('sha512', self::LEFT_PAD_TARBALL, true)),
+        );
+
+        $registry = $this->registry(
+            $this->prefetchDownloader(
+                2,
+                static fn(string $url, string $to): PromiseInterface => self::serve(
+                    self::TARBALL_URL === $url ? NpmRegistryProvider::TARBALL : self::LEFT_PAD_TARBALL,
+                )($url, $to),
+            ),
+        );
+        $registry->prefetchTarballs([$this->package(), $unscoped], $this->directory);
+
+        self::assertSame(
+            [
+                "{$this->directory}/scope-pkg-1.0.0-" . sha1(self::TARBALL_URL) . '.prefetch',
+                "{$this->directory}/scope-pkg-1.0.0-" . sha1(self::LEFT_PAD_URL) . '.prefetch',
+            ],
+            [$this->copies[0][1], $this->copies[1][1]],
+            'Packages sharing a normalized name must get distinct temporary files.',
+        );
+        self::assertSame(
+            NpmRegistryProvider::TARBALL,
+            file_get_contents($this->cacheEntry()),
+            'Scoped package must be cached.',
+        );
+        self::assertSame(
+            self::LEFT_PAD_TARBALL,
+            file_get_contents($registry->fetchTarball($unscoped, $this->directory)),
+            'Unscoped package must be served from the cache.',
         );
     }
 
