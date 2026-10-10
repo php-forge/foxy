@@ -39,7 +39,8 @@ use const JSON_THROW_ON_ERROR;
  *
  * Requests answered with HTTP 429 are retried up to three times, waiting the `Retry-After` seconds (capped at 60)
  * or 1, 2, and 4 seconds. Tarballs are cached and verified against their Subresource Integrity value on every cache
- * hit and every download; a prefetch fills the cache with parallel downloads and no retry.
+ * hit and every download; a prefetch fills the cache with parallel downloads and no retry. Every metadata request,
+ * tarball download, prefetch, and cache hit is written at very verbose level (`-vv`).
  */
 final readonly class NpmRegistry implements NpmRegistryInterface
 {
@@ -59,7 +60,7 @@ final readonly class NpmRegistry implements NpmRegistryInterface
      * @param HttpDownloader $httpDownloader Downloader that performs the requests; {@see prefetchTarballs()} needs the
      * async-enabled instance returned by `Composer::getLoop()->getHttpDownloader()`.
      * @param Cache $cache Tarball cache.
-     * @param IOInterface $io Output for the retry and failed prefetch notices.
+     * @param IOInterface $io Output for the retry and failed prefetch notices and the very verbose registry traffic.
      * @param string $url Registry base URL; a trailing slash is ignored.
      * @param (Closure(int): void)|null $delay Replacement for `sleep()` during the 429 back-off, or `null` to sleep.
      */
@@ -91,12 +92,15 @@ final readonly class NpmRegistry implements NpmRegistryInterface
 
         if ($this->cache->copyTo($key, $file)) {
             if ($this->matchesIntegrity($file, $integrity)) {
+                $this->trace("Loading {$package->name} ({$package->version}) from cache");
+
                 return $file;
             }
 
             $this->cache->remove($key);
         }
 
+        $this->trace("Downloading {$package->name} ({$package->version}) from {$resolved}");
         $this->send($resolved, fn(): Response => $this->httpDownloader->copy($resolved, $file));
 
         if (!$this->matchesIntegrity($file, $integrity)) {
@@ -154,6 +158,8 @@ final readonly class NpmRegistry implements NpmRegistryInterface
     {
         $url = $this->registryUrl() . '/' . str_replace('/', '%2F', $name);
 
+        $this->trace("Fetching metadata for {$name} ({$url})");
+
         $response = $this->send(
             $url,
             fn(): Response => $this->httpDownloader->get($url, ['http' => ['header' => [self::METADATA_ACCEPT]]]),
@@ -206,6 +212,7 @@ final readonly class NpmRegistry implements NpmRegistryInterface
             // The URL hash keeps `@scope/pkg` and `scope-pkg` apart while their downloads run side by side.
             $file = $this->tarballFile($package, $directory, '-' . sha1($resolved) . '.prefetch');
 
+            $this->trace("Prefetching {$package->name} ({$package->version}) from {$resolved}");
             $this->httpDownloader->addCopy($resolved, $file)->then(
                 function () use ($package, $key, $file, $resolved): void {
                     try {
@@ -369,5 +376,13 @@ final readonly class NpmRegistry implements NpmRegistryInterface
     private function tarballKey(ResolvedPackage $package): string
     {
         return "tarball/{$package->name}/{$package->version}-" . sha1($package->resolved ?? '') . '.tgz';
+    }
+
+    /**
+     * Writes a registry traffic line at very verbose level (`-vv`).
+     */
+    private function trace(string $message): void
+    {
+        $this->io->writeError($message, true, IOInterface::VERY_VERBOSE);
     }
 }

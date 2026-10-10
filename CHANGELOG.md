@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - refactor: deduplicate internals, centralize exception messages in `Foxy\Exception\Message`, and normalize their wording.
 - feat: add the `native` asset manager that installs frontend dependencies from the npm registry in PHP, without a JavaScript manager.
 - feat!: audit the `native` manager, make every manager auditable, select the manager on first use, and speed up CVE lookups and installs.
+- feat!: keep installed native packages between runs, report native installs by verbosity, and drop the `$defaultBin` command parameter.
 
 ## 0.3.0 October 7, 2026
 

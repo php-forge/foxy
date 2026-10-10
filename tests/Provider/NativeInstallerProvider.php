@@ -44,4 +44,19 @@ final class NativeInstallerProvider
         yield 'dependencies' => ['dependencies'];
         yield 'peer dependencies' => ['peerDependencies'];
     }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function staleEntries(): iterable
+    {
+        yield 'package in a scope' => [
+            '@old/pkg/index.js',
+            '  - Removing @old/pkg',
+        ];
+        yield 'top-level package' => [
+            'stale/index.js',
+            '  - Removing stale',
+        ];
+    }
 }

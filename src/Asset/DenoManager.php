@@ -98,7 +98,7 @@ final class DenoManager extends AbstractAssetManager
 
     protected function getAuditCommand(bool $noDev): string
     {
-        return $this->buildUnconfiguredCommand($this->getDefaultBinary(), ['audit', '--level=low']);
+        return $this->buildUnconfiguredCommand(['audit', '--level=low']);
     }
 
     protected function getAuditEnvironment(): array
@@ -116,7 +116,7 @@ final class DenoManager extends AbstractAssetManager
 
     protected function getUpdateCommand(): string
     {
-        return $this->buildCommand($this->getDefaultBinary(), 'update', ['update', '--lockfile-only', '--recursive'])
+        return $this->buildCommand('update', ['update', '--lockfile-only', '--recursive'])
             . ' && '
             . $this->getInstallCommand();
     }

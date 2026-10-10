@@ -47,7 +47,7 @@ final class CustomBinaryAssetManager extends AbstractAssetManager
 
     protected function getAuditCommand(bool $noDev): string
     {
-        return $this->buildUnconfiguredCommand($this->getDefaultBinary(), 'audit');
+        return $this->buildUnconfiguredCommand('audit');
     }
 
     protected function getDefaultBinary(): string

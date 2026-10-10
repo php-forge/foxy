@@ -71,7 +71,7 @@ final class NpmManager extends AbstractAssetManager
 
         $command = [...$command, $noDev ? '--omit=dev' : '--include=dev', '--include=optional', '--include=peer'];
 
-        return $this->buildUnconfiguredCommand($this->getDefaultBinary(), $command);
+        return $this->buildUnconfiguredCommand($command);
     }
 
     /**

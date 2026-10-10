@@ -119,6 +119,49 @@ final class NpmRegistryTest extends TestCase
         );
     }
 
+    public function testFetchTarballReportsCacheHitAtVeryVerbose(): void
+    {
+        $io = self::veryVerboseIo();
+
+        $this->seedCache(NpmRegistryProvider::TARBALL);
+        $this->registry($this->idleDownloader(), io: $io)->fetchTarball($this->package(), $this->directory);
+
+        self::assertSame(
+            'Loading @scope/pkg (1.0.0) from cache' . PHP_EOL,
+            $io->getOutput(),
+            'The cache hit must be traced.',
+        );
+    }
+
+    public function testFetchTarballReportsDownloadAfterCorruptedCacheHit(): void
+    {
+        $io = self::veryVerboseIo();
+
+        $this->seedCache('corrupted');
+        $this->registry($this->tarballDownloader(NpmRegistryProvider::TARBALL), io: $io)
+            ->fetchTarball($this->package(), $this->directory);
+
+        self::assertSame(
+            'Downloading @scope/pkg (1.0.0) from ' . self::TARBALL_URL . PHP_EOL,
+            $io->getOutput(),
+            'A rejected cache copy must be traced as a download only.',
+        );
+    }
+
+    public function testFetchTarballReportsDownloadAtVeryVerbose(): void
+    {
+        $io = self::veryVerboseIo();
+
+        $this->registry($this->tarballDownloader(NpmRegistryProvider::TARBALL), io: $io)
+            ->fetchTarball($this->package(), $this->directory);
+
+        self::assertSame(
+            'Downloading @scope/pkg (1.0.0) from ' . self::TARBALL_URL . PHP_EOL,
+            $io->getOutput(),
+            'The download must be traced with its URL.',
+        );
+    }
+
     public function testFetchTarballRetriesTooManyRequests(): void
     {
         $calls = 0;
@@ -241,6 +284,24 @@ final class NpmRegistryTest extends TestCase
             'Retrying "' . self::ADVISORIES_URL . '" after a 429 response (1 s)' . PHP_EOL,
             $this->io->getOutput(),
             'The retry must be announced.',
+        );
+    }
+
+    public function testGetMetadataReportsRequestAtVeryVerbose(): void
+    {
+        $io = self::veryVerboseIo();
+        $downloader = $this->createMock(HttpDownloader::class);
+
+        $downloader
+            ->method('get')
+            ->willReturn($this->metadataResponse());
+
+        $this->registry($downloader, io: $io)->getMetadata('@scope/pkg');
+
+        self::assertSame(
+            'Fetching metadata for @scope/pkg (' . self::METADATA_URL . ')' . PHP_EOL,
+            $io->getOutput(),
+            'The request must be traced with its URL.',
         );
     }
 
@@ -507,6 +568,21 @@ final class NpmRegistryTest extends TestCase
             self::LEFT_PAD_TARBALL,
             file_get_contents($registry->fetchTarball($unscoped, $this->directory)),
             'Unscoped package must be served from the cache.',
+        );
+    }
+
+    public function testPrefetchTarballsReportsQueuedDownloadsAtVeryVerbose(): void
+    {
+        $io = self::veryVerboseIo();
+
+        $this->seedCache(NpmRegistryProvider::TARBALL);
+        $this->registry($this->prefetchDownloader(1, self::serve(self::LEFT_PAD_TARBALL)), io: $io)
+            ->prefetchTarballs([$this->package(), $this->leftPad()], $this->directory);
+
+        self::assertSame(
+            'Prefetching left-pad (1.3.0) from ' . self::LEFT_PAD_URL . PHP_EOL,
+            $io->getOutput(),
+            'Only the queued download must be traced.',
         );
     }
 
@@ -1042,5 +1118,10 @@ final class NpmRegistryTest extends TestCase
     private static function verboseIo(): BufferIO
     {
         return new BufferIO('', OutputInterface::VERBOSITY_VERBOSE);
+    }
+
+    private static function veryVerboseIo(): BufferIO
+    {
+        return new BufferIO('', OutputInterface::VERBOSITY_VERY_VERBOSE);
     }
 }

@@ -73,7 +73,7 @@ final class BunManager extends AbstractAssetManager
             $command[] = '--prod';
         }
 
-        return $this->buildUnconfiguredCommand($this->getDefaultBinary(), $command);
+        return $this->buildUnconfiguredCommand($command);
     }
 
     /**
