@@ -635,6 +635,192 @@ enum Message: string
     case JSON_FILE_UNREADABLE = 'Unable to read JSON file "%s".';
 
     /**
+     * Error when a PHP extension required by the native manager is not loaded.
+     *
+     * Format: "The native manager requires the "%s" PHP extension."
+     */
+    case NATIVE_EXTENSION_MISSING = 'The native manager requires the "%s" PHP extension.';
+
+    /**
+     * Error when the native install directory would make the installer prune the project.
+     *
+     * Format: "The native install directory "%s" must not be the root package directory, one of its parents, or a
+     * filesystem root."
+     */
+    case NATIVE_INSTALL_DIR_INVALID = 'The native install directory "%s" must not be the root package directory, one of '
+        . 'its parents, or a filesystem root.';
+
+    /**
+     * Error when a downloaded tarball does not match its integrity hash.
+     *
+     * Format: "The tarball "%s" failed its integrity check."
+     */
+    case NATIVE_INTEGRITY_MISMATCH = 'The tarball "%s" failed its integrity check.';
+
+    /**
+     * Error when a `file:` dependency directory has no `package.json`.
+     *
+     * Format: "The local package "%s" of "%s" has no package.json."
+     */
+    case NATIVE_LOCAL_PACKAGE_MISSING = 'The local package "%s" of "%s" has no package.json.';
+
+    /**
+     * Error when a requirement rejects the version of a local package.
+     *
+     * Format: "The local package "%s" (%s) does not satisfy %s; install it with npm, pnpm, Yarn, Bun, or Deno."
+     */
+    case NATIVE_LOCAL_VERSION_CONFLICT = 'The local package "%s" (%s) does not satisfy %s; install it with npm, pnpm, '
+        . 'Yarn, Bun, or Deno.';
+
+    /**
+     * Error when the native manager lock file is malformed.
+     *
+     * Format: "The lock file "%s" is malformed; delete it and run the installation again."
+     */
+    case NATIVE_LOCK_INVALID = 'The lock file "%s" is malformed; delete it and run the installation again.';
+
+    /**
+     * Error when a manifest dependency field does not map package names to version strings.
+     *
+     * Format: "The "%s" field of "%s" must map package names to version strings."
+     */
+    case NATIVE_MANIFEST_DEPENDENCIES_INVALID = 'The "%s" field of "%s" must map package names to version strings.';
+
+    /**
+     * Error when the registry metadata of a package is malformed.
+     *
+     * Format: "The registry metadata of "%s" is malformed: %s."
+     */
+    case NATIVE_METADATA_INVALID = 'The registry metadata of "%s" is malformed: %s.';
+
+    /**
+     * Reason fragment when a registry version declares neither `dist.integrity` nor `dist.shasum`.
+     *
+     * Format: "%s must declare dist.integrity or dist.shasum"
+     */
+    case NATIVE_METADATA_REASON_DIST_HASH_REQUIRED = '%s must declare dist.integrity or dist.shasum';
+
+    /**
+     * Reason fragment when the registry metadata document is not valid JSON.
+     *
+     * Format: "the document is not valid JSON"
+     */
+    case NATIVE_METADATA_REASON_JSON_INVALID = 'the document is not valid JSON';
+
+    /**
+     * Reason fragment when a registry metadata member is not an object.
+     *
+     * Format: "%s must be a JSON object"
+     */
+    case NATIVE_METADATA_REASON_OBJECT_REQUIRED = '%s must be a JSON object';
+
+    /**
+     * Reason fragment when a registry metadata member does not map names to strings.
+     *
+     * Format: "%s must map names to strings"
+     */
+    case NATIVE_METADATA_REASON_STRING_MAP_REQUIRED = '%s must map names to strings';
+
+    /**
+     * Reason fragment when a registry metadata member is not a non-empty string.
+     *
+     * Format: "%s must be a string"
+     */
+    case NATIVE_METADATA_REASON_STRING_REQUIRED = '%s must be a string';
+
+    /**
+     * Error when a local `file:` package cannot be copied into `node_modules`.
+     *
+     * Format: "Unable to copy the local package "%s" to "%s"."
+     */
+    case NATIVE_PACKAGE_COPY_FAILED = 'Unable to copy the local package "%s" to "%s".';
+
+    /**
+     * Error when the registry does not know a package.
+     *
+     * Format: "The package "%s" was not found in the registry "%s"."
+     */
+    case NATIVE_PACKAGE_NOT_FOUND = 'The package "%s" was not found in the registry "%s".';
+
+    /**
+     * Error when an installed package directory cannot be removed.
+     *
+     * Format: "Unable to remove the package directory "%s"."
+     */
+    case NATIVE_PACKAGE_REMOVE_FAILED = 'Unable to remove the package directory "%s".';
+
+    /**
+     * Error when a dependency version is neither a valid npm range nor a dist-tag.
+     *
+     * Format: "The version "%s" of "%s" is neither a valid npm range nor a dist-tag."
+     */
+    case NATIVE_RANGE_INVALID = 'The version "%s" of "%s" is neither a valid npm range nor a dist-tag.';
+
+    /**
+     * Error when a registry request fails.
+     *
+     * Format: "The registry request "%s" failed: %s"
+     */
+    case NATIVE_REGISTRY_REQUEST_FAILED = 'The registry request "%s" failed: %s';
+
+    /**
+     * Error when a dependency uses a specification the native manager does not support.
+     *
+     * Format: "The native manager does not support the "%s" specification of "%s"; use npm, pnpm, Yarn, Bun, or Deno."
+     */
+    case NATIVE_SPEC_UNSUPPORTED = 'The native manager does not support the "%s" specification of "%s"; use npm, pnpm, '
+        . 'Yarn, Bun, or Deno.';
+
+    /**
+     * Error when a tarball cannot be extracted.
+     *
+     * Format: "The tarball "%s" cannot be extracted: %s."
+     */
+    case NATIVE_TARBALL_INVALID = 'The tarball "%s" cannot be extracted: %s.';
+
+    /**
+     * Reason fragment when a tarball entry resolves outside the package directory.
+     *
+     * Format: "the entry "%s" escapes the package directory"
+     */
+    case NATIVE_TARBALL_REASON_ENTRY_ESCAPES = 'the entry "%s" escapes the package directory';
+
+    /**
+     * Reason fragment when a tarball header fails the ustar magic or checksum check.
+     *
+     * Format: "the archive is not a valid ustar archive"
+     */
+    case NATIVE_TARBALL_REASON_NOT_USTAR = 'the archive is not a valid ustar archive';
+
+    /**
+     * Reason fragment when a tarball ends inside a header or a data block.
+     *
+     * Format: "the archive is truncated"
+     */
+    case NATIVE_TARBALL_REASON_TRUNCATED = 'the archive is truncated';
+
+    /**
+     * Reason fragment when a tarball cannot be opened as a gzip stream.
+     *
+     * Format: "the archive cannot be opened"
+     */
+    case NATIVE_TARBALL_REASON_UNREADABLE = 'the archive cannot be opened';
+
+    /**
+     * Reason fragment when a tarball entry cannot be written to disk.
+     *
+     * Format: "the entry "%s" cannot be written"
+     */
+    case NATIVE_TARBALL_REASON_WRITE_FAILED = 'the entry "%s" cannot be written';
+
+    /**
+     * Error when no registry version satisfies every accumulated constraint of a package.
+     *
+     * Format: "No version of "%s" satisfies %s; install it with npm, pnpm, Yarn, Bun, or Deno."
+     */
+    case NATIVE_VERSION_CONFLICT = 'No version of "%s" satisfies %s; install it with npm, pnpm, Yarn, Bun, or Deno.';
+
+    /**
      * Error when the Composer asset directory cannot be created.
      *
      * Format: "Unable to create Composer asset directory "%s"."
