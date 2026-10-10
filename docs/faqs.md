@@ -12,7 +12,8 @@ automation, every application must copy dependency names and constraints manuall
 library release.
 
 Foxy creates local frontend package representations for eligible Composer dependencies, merges them into the project
-`package.json`, and delegates version solving and installation to Bun, Deno, npm, pnpm, or Yarn.
+`package.json`, and delegates version solving and installation to Bun, Deno, npm, pnpm, or Yarn, or performs both
+itself with the `native` manager.
 
 ## How does package activation work?
 
@@ -36,12 +37,21 @@ different location.
 
 ## How does Foxy select a frontend manager?
 
-Set `config.foxy.manager` to `bun`, `deno`, `npm`, `pnpm`, or `yarn` for deterministic selection. When it is omitted and
-manager execution is enabled, Foxy first looks for one recognized native lockfile and then for an available manager
-executable. With execution disabled, it uses a single recognized lockfile or npm as the manifest adapter without probing
-binaries. Multiple recognized lockfiles require explicit selection in either mode.
+Set `config.foxy.manager` to `bun`, `deno`, `native`, `npm`, `pnpm`, or `yarn` for deterministic selection. When it is
+omitted and manager execution is enabled, Foxy first looks for one recognized lockfile and then for an available
+manager executable. With execution disabled, it uses a single recognized lockfile or npm as the manifest adapter
+without probing binaries. Multiple recognized lockfiles require explicit selection in either mode. The `native`
+manager is selected only explicitly or through its `foxy.lock` file, never by availability.
 
-Explicit selection and a committed native lockfile are recommended for CI.
+Explicit selection and a committed lockfile are recommended for CI.
+
+## Can Foxy install frontend dependencies without Node.js?
+
+Yes. Set `config.foxy.manager` to `native`. Foxy reads the merged `package.json`, resolves every dependency against
+the npm registry with one version per package, downloads and verifies the tarballs, extracts them into `node_modules`,
+and records the result in `foxy.lock`. PHP with the `zlib` extension is the only requirement. The native manager does
+not run lifecycle scripts, does not create `bin` links, and does not support `composer foxy:audit`. See
+[Native manager](config.md#native-manager) for the complete scope.
 
 ## How can frontend dependencies be checked for known CVEs?
 

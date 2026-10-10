@@ -57,6 +57,10 @@ final class InternalMockerExtension implements Extension
                 'name' => 'file_get_contents',
             ],
             [
+                'namespace' => 'Foxy\\Asset',
+                'name' => 'extension_loaded',
+            ],
+            [
                 'namespace' => 'Foxy\\Json',
                 'name' => 'file_get_contents',
             ],

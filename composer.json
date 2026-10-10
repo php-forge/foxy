@@ -24,10 +24,11 @@
     ],
     "require": {
         "php": "^8.3",
+        "composer-plugin-api": "^2.0",
         "composer/composer": "^2.10.2",
         "composer/pcre": "^3.3",
-        "composer-plugin-api": "^2.0",
         "composer/semver": "^3.4",
+        "seld/jsonlint": "^1.12",
         "symfony/console": "^7.4"
     },
     "require-dev": {

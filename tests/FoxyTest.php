@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Foxy\Tests;
 
-use Composer\Composer;
-use Composer\Config;
+use Composer\{Cache, Composer, Config};
 use Composer\DependencyResolver\Operation\{InstallOperation, OperationInterface};
 use Composer\Installer\{InstallationManager, PackageEvent, PackageEvents};
 use Composer\IO\IOInterface;
@@ -13,11 +12,12 @@ use Composer\Package\{Package, RootPackageInterface};
 use Composer\Repository\RepositoryManager;
 use Composer\Script\{Event, ScriptEvents};
 use Composer\Util\{Filesystem, ProcessExecutor};
-use Foxy\Asset\{AbstractAssetManager, AssetManagerInterface, DenoManager, NpmManager};
+use Foxy\Asset\{AbstractAssetManager, AssetManagerInterface, DenoManager, NativeManager, NpmManager};
 use Foxy\Config\Config as FoxyConfig;
 use Foxy\Exception\{Message, RuntimeException};
 use Foxy\Fallback\AssetFallback;
 use Foxy\Foxy;
+use Foxy\Native\NpmRegistry;
 use Foxy\Solver\SolverInterface;
 use Foxy\Tests\Fixtures\Asset\StubAssetManager;
 use Foxy\Tests\Provider\FoxyProvider;
@@ -30,6 +30,9 @@ use ReflectionException;
 use Seld\JsonLint\ParsingException;
 
 use function getcwd;
+use function sys_get_temp_dir;
+
+use const DIRECTORY_SEPARATOR;
 
 /**
  * Unit tests for the {@see Foxy} Composer plugin lifecycle and event handling.
@@ -39,6 +42,11 @@ use function getcwd;
 final class FoxyTest extends TestCase
 {
     private Composer|MockObject $composer;
+
+    /**
+     * @var array<string, bool|string|null> Composer configuration values that override the defaults of the mock.
+     */
+    private array $composerSettings = [];
     private IOInterface $io;
     private RootPackageInterface|MockObject $package;
 
@@ -62,16 +70,20 @@ final class FoxyTest extends TestCase
 
         self::assertTrue(
             $this->getFoxyProperty($foxy, 'initialized'),
+            'Initialization flag must be set.',
         );
         self::assertTrue(
             $this->getObjectProperty($assetFallback, 'snapshotSaved'),
+            'Asset snapshot must be saved.',
         );
         self::assertTrue(
             $this->getObjectProperty($composerFallback, 'snapshotSaved'),
+            'Composer snapshot must be saved.',
         );
         self::assertSame(
             $assetFallback,
             (new ReflectionClass(AbstractAssetManager::class))->getProperty('fallback')->getValue($assetManager),
+            'Manager and plugin must share the asset fallback.',
         );
     }
 
@@ -97,6 +109,7 @@ final class FoxyTest extends TestCase
         self::assertInstanceOf(
             AssetFallback::class,
             $assetFallback,
+            'Fallback must use the asset implementation.',
         );
 
         $fallbackReflection = new ReflectionClass($assetFallback);
@@ -112,6 +125,96 @@ final class FoxyTest extends TestCase
         self::assertSame(
             $expectedPath,
             $pathProperty->getValue($assetFallback),
+            'Fallback path must target the configured manifest.',
+        );
+    }
+
+    /**
+     * @throws ParsingException
+     */
+    public function testActivateDefaultsNativeInstallDirToNodeModules(): void
+    {
+        $this->package
+            ->method('getConfig')
+            ->willReturn(['foxy' => ['manager' => 'native', 'run-asset-manager' => false]]);
+
+        $foxy = new Foxy();
+
+        $foxy->activate($this->composer, $this->io);
+
+        $config = $this->getFoxyProperty($foxy, 'config');
+
+        self::assertInstanceOf(
+            FoxyConfig::class,
+            $config,
+            'The plugin must hold its configuration.',
+        );
+        self::assertSame(
+            'node_modules',
+            $config->get('native-install-dir'),
+            'The default must be `node_modules`.',
+        );
+    }
+
+    /**
+     * @throws ParsingException|ReflectionException
+     */
+    #[DataProviderExternal(FoxyProvider::class, 'cacheReadOnlyValues')]
+    public function testActivateHonorsCacheReadOnly(bool|null $value, bool $expected): void
+    {
+        $this->composerSettings['cache-read-only'] = $value;
+
+        $this->package
+            ->method('getConfig')
+            ->willReturn(['foxy' => ['manager' => 'native', 'run-asset-manager' => false]]);
+
+        $foxy = new Foxy();
+
+        $foxy->activate($this->composer, $this->io);
+
+        $cache = $this->getObjectProperty($this->getNativeRegistry($foxy), 'cache');
+
+        self::assertInstanceOf(
+            Cache::class,
+            $cache,
+            'The registry must hold a Composer cache.',
+        );
+        self::assertSame(
+            $expected,
+            $cache->isReadOnly(),
+            'The read-only flag must follow Composer.',
+        );
+        self::assertSame(
+            sys_get_temp_dir() . '/foxy-test-cache/foxy/',
+            $cache->getRoot(),
+            'Tarballs must be cached under the Composer files cache.',
+        );
+    }
+
+    /**
+     * @throws ParsingException
+     */
+    public function testActivateKeepsNpmFirstForAutomaticDiscovery(): void
+    {
+        $this->package
+            ->method('getConfig')
+            ->willReturn(
+                [
+                    'foxy' => [
+                        'root-package-json-dir' => __DIR__ . '/Fixtures/package/global',
+                        'run-asset-manager' => false,
+                    ],
+                ],
+            );
+
+        $foxy = new Foxy();
+
+        $foxy->activate($this->composer, $this->io);
+
+        self::assertInstanceOf(
+            NpmManager::class,
+            $this->getFoxyProperty($foxy, 'assetManager'),
+            'Npm manager must be selected first.',
         );
     }
 
@@ -151,6 +254,7 @@ final class FoxyTest extends TestCase
 
         self::assertTrue(
             $this->getFoxyProperty($foxy, 'initialized'),
+            'Initialization flag must be set.',
         );
     }
 
@@ -187,6 +291,7 @@ final class FoxyTest extends TestCase
 
         self::assertFalse(
             $this->getFoxyProperty($foxy, 'initialized'),
+            'Initialization flag must remain unset.',
         );
     }
 
@@ -210,6 +315,28 @@ final class FoxyTest extends TestCase
 
         self::assertFalse(
             $this->getFoxyProperty($foxy, 'initialized'),
+            'Initialization flag must remain unset.',
+        );
+    }
+
+    /**
+     * @throws ParsingException|ReflectionException
+     */
+    #[DataProviderExternal(FoxyProvider::class, 'registryUrls')]
+    public function testActivatePassesRegistryUrlToNativeRegistry(array $config, string $expected): void
+    {
+        $this->package
+            ->method('getConfig')
+            ->willReturn(['foxy' => ['manager' => 'native', 'run-asset-manager' => false, ...$config]]);
+
+        $foxy = new Foxy();
+
+        $foxy->activate($this->composer, $this->io);
+
+        self::assertSame(
+            $expected,
+            $this->getObjectProperty($this->getNativeRegistry($foxy), 'url'),
+            'The registry must use the configured URL.',
         );
     }
 
@@ -243,7 +370,32 @@ final class FoxyTest extends TestCase
         self::assertInstanceOf(
             DenoManager::class,
             $this->getFoxyProperty($foxy, 'assetManager'),
-            'The asset manager should be an instance of DenoManager',
+            'Deno manager must be selected.',
+        );
+    }
+
+    /**
+     * @throws ParsingException
+     */
+    public function testActivateResolvesNativeManager(): void
+    {
+        $this->package
+            ->method('getConfig')
+            ->willReturn(['foxy' => ['manager' => 'native', 'run-asset-manager' => false]]);
+
+        $foxy = new Foxy();
+
+        $foxy->activate($this->composer, $this->io);
+
+        self::assertInstanceOf(
+            NativeManager::class,
+            $this->getFoxyProperty($foxy, 'assetManager'),
+            'The native manager must be selected.',
+        );
+        self::assertSame(
+            getcwd() . DIRECTORY_SEPARATOR . 'package.json',
+            $this->getObjectProperty($this->getFoxyProperty($foxy, 'assetFallback'), 'path'),
+            'The fallback must target the root manifest.',
         );
     }
 
@@ -266,6 +418,7 @@ final class FoxyTest extends TestCase
 
         self::assertFalse(
             $assetManager->isInitialized($foxy),
+            'Uninitialized manager must remain undiscovered.',
         );
     }
 
@@ -301,6 +454,7 @@ final class FoxyTest extends TestCase
             self::assertSame(
                 'stub-package.json',
                 $pathProperty->getValue($assetFallback),
+                'Fallback path must use the package name.',
             );
         } finally {
             $assetManagersProperty->setValue(null, $originalAssetManagers);
@@ -351,6 +505,7 @@ final class FoxyTest extends TestCase
 
         $manager = $reflection->getMethod('getAssetManager')->invoke(
             $foxy,
+            $this->composer,
             $this->io,
             $config,
             $executor,
@@ -360,6 +515,7 @@ final class FoxyTest extends TestCase
         self::assertInstanceOf(
             NpmManager::class,
             $manager,
+            'Npm manager must be selected.',
         );
     }
 
@@ -390,9 +546,11 @@ final class FoxyTest extends TestCase
 
         self::assertTrue(
             $isEnabled->invoke($foxy),
+            'Truthy integer must enable the plugin.',
         );
         self::assertFalse(
             $isEnabled->invoke($foxy, 'run-asset-manager'),
+            'Disabled configuration must remain `false`.',
         );
     }
 
@@ -415,6 +573,7 @@ final class FoxyTest extends TestCase
                 ScriptEvents::POST_UPDATE_CMD => [['solveAssets', 100]],
             ],
             Foxy::getSubscribedEvents(),
+            'Event names and listeners must match the plugin lifecycle.',
         );
     }
 
@@ -555,7 +714,11 @@ final class FoxyTest extends TestCase
         $composerConfig
             ->method('get')
             ->willReturnCallback(
-                static fn($key, $flags = 0): string|null => 'vendor-dir' === $key ? getcwd() . '/vendor' : null,
+                fn($key, $flags = 0): bool|string|null => $this->composerSettings[$key] ?? match ($key) {
+                    'cache-files-dir' => sys_get_temp_dir() . '/foxy-test-cache',
+                    'vendor-dir' => getcwd() . '/vendor',
+                    default => null,
+                },
             );
 
         $this->io = $this->createMock(IOInterface::class);
@@ -590,6 +753,32 @@ final class FoxyTest extends TestCase
     private function getFoxyProperty(Foxy $foxy, string $name): mixed
     {
         return (new ReflectionClass($foxy))->getProperty($name)->getValue($foxy);
+    }
+
+    /**
+     * Returns the registry wired into the native manager selected by the plugin.
+     *
+     * @throws ReflectionException
+     */
+    private function getNativeRegistry(Foxy $foxy): NpmRegistry
+    {
+        $manager = $this->getFoxyProperty($foxy, 'assetManager');
+
+        self::assertInstanceOf(
+            NativeManager::class,
+            $manager,
+            'The native manager must be selected.',
+        );
+
+        $registry = $this->getObjectProperty($this->getObjectProperty($manager, 'installer'), 'registry');
+
+        self::assertInstanceOf(
+            NpmRegistry::class,
+            $registry,
+            'The installer must use the npm registry.',
+        );
+
+        return $registry;
     }
 
     private function getObjectProperty(object $object, string $name): mixed
