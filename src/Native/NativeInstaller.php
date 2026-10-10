@@ -6,7 +6,7 @@ namespace Foxy\Native;
 
 use Composer\IO\IOInterface;
 use Composer\Json\JsonFile;
-use Composer\Util\Filesystem;
+use Composer\Util\{Filesystem, Platform};
 use FilesystemIterator;
 use Foxy\Exception\{Message, RuntimeException};
 
@@ -18,10 +18,12 @@ use function file_exists;
 use function in_array;
 use function is_array;
 use function is_dir;
+use function is_file;
 use function is_link;
 use function is_string;
 use function ksort;
 use function sort;
+use function sprintf;
 use function str_starts_with;
 use function strlen;
 use function substr;
@@ -47,6 +49,7 @@ final readonly class NativeInstaller implements NativeInstallerInterface
      */
     private const string EXTRACTION_SUFFIX = '/package';
     private const string FILE_PROTOCOL = 'file:';
+    private const string OPTIONAL_SKIPPED = '<warning>The optional dependency "%s" (%s) was skipped: %s</warning>';
     private const string TEMPORARY_DIRECTORY = '.foxy-tmp';
 
     /**
@@ -67,7 +70,8 @@ final readonly class NativeInstaller implements NativeInstallerInterface
     /**
      * Installs the dependencies declared by the manifest, reading or rewriting the lock file.
      *
-     * A missing manifest declares no dependency. The `dependencies`, `devDependencies`, and `optionalDependencies` maps
+     * A missing manifest declares no dependency. An optional `file:` package whose `package.json` is missing is skipped
+     * with a warning. The `dependencies`, `devDependencies`, and `optionalDependencies` maps
      * are merged, an optional entry overriding a mandatory one of the same name as npm does; an unsatisfiable optional
      * entry is skipped with a warning. The lock file is reused when it is fresh (same requirements, same
      * local package versions) and `$update` is `false`; otherwise the requirements are resolved again and the lock
@@ -78,9 +82,9 @@ final readonly class NativeInstaller implements NativeInstallerInterface
      * @param string $installDirectory Path of the directory to populate (`node_modules` by default).
      * @param bool $update Whether to resolve again even when the lock file is fresh.
      *
-     * @throws RuntimeException if a manifest is invalid, a local package is missing, a requirement cannot be resolved
-     * or downloaded, the lock file is malformed, a local package cannot be copied, or an existing package directory
-     * cannot be removed.
+     * @throws RuntimeException if a manifest is invalid, a mandatory local package is missing, a local package overlaps
+     * the install directory, a requirement cannot be resolved or downloaded, the lock file is malformed, a local package
+     * cannot be copied, or an existing package directory cannot be removed.
      */
     public function install(string $manifestPath, string $lockPath, string $installDirectory, bool $update): void
     {
@@ -113,7 +117,22 @@ final readonly class NativeInstaller implements NativeInstallerInterface
                 }
 
                 $path = substr($spec, strlen(self::FILE_PROTOCOL));
-                $local = $this->readLocal($name, $this->localDirectory($manifestPath, $path));
+                $directory = $this->localDirectory($manifestPath, $path);
+
+                if ($optional && !is_file("{$directory}/package.json")) {
+                    $this->io->writeError(
+                        sprintf(
+                            self::OPTIONAL_SKIPPED,
+                            $name,
+                            $spec,
+                            Message::NATIVE_LOCAL_PACKAGE_MISSING->getMessage($directory, $name),
+                        ),
+                    );
+
+                    continue;
+                }
+
+                $local = $this->readLocal($name, $directory);
 
                 $fingerprint[$name] = $local['specs'];
 
@@ -126,6 +145,8 @@ final readonly class NativeInstaller implements NativeInstallerInterface
         }
 
         ksort($fingerprint, SORT_STRING);
+
+        $this->checkOverlaps($manifestPath, $installDirectory, $locals);
 
         $lock = new LockFile($lockPath);
 
@@ -143,6 +164,39 @@ final readonly class NativeInstaller implements NativeInstallerInterface
         }
 
         $this->installPackages($manifestPath, $installDirectory, $packages);
+    }
+
+    /**
+     * Checks that no local package directory is the install directory, lies under it, or contains it, since the
+     * installer removes and replaces the entries of the install directory.
+     *
+     * Both directories are compared after resolving symbolic links as far as PHP's `realpath()` resolves them; the
+     * install directory is created first so it can be resolved.
+     *
+     * @param array<string, ResolvedPackage> $locals Local packages keyed by name.
+     *
+     * @throws RuntimeException if a local package directory overlaps the install directory.
+     */
+    private function checkOverlaps(string $manifestPath, string $installDirectory, array $locals): void
+    {
+        if ([] === $locals) {
+            return;
+        }
+
+        $this->fs->ensureDirectoryExists($installDirectory);
+
+        $install = $this->fs->normalizePath(Platform::realpath($installDirectory)) . '/';
+
+        foreach ($locals as $name => $local) {
+            $directory = $this->localDirectory($manifestPath, (string) $local->path);
+            $source = $this->fs->normalizePath(Platform::realpath($directory)) . '/';
+
+            if (str_starts_with($source, $install) || str_starts_with($install, $source)) {
+                throw new RuntimeException(
+                    Message::NATIVE_INSTALL_DIR_OVERLAPS_LOCAL->getMessage($installDirectory, $name, $directory),
+                );
+            }
+        }
     }
 
     /**
@@ -267,7 +321,8 @@ final readonly class NativeInstaller implements NativeInstallerInterface
 
     /**
      * Removes the top-level install directory entries outside the install set, walking `@scope` directories one level
-     * and removing the scopes they empty. Dot-entries are left alone.
+     * and removing the scopes they empty. Dot-entries are left alone, and a symbolic link is removed as one entry
+     * without visiting its target.
      *
      * @param list<string> $installed Installed package names.
      *
@@ -282,7 +337,7 @@ final readonly class NativeInstaller implements NativeInstallerInterface
 
             $path = "{$installDirectory}/{$entry}";
 
-            if (!str_starts_with($entry, '@') || !is_dir($path)) {
+            if (!str_starts_with($entry, '@') || is_link($path) || !is_dir($path)) {
                 $this->pruneEntry($installDirectory, $entry, $installed);
 
                 continue;

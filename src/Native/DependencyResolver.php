@@ -28,8 +28,9 @@ use const SORT_STRING;
  * Each constraint is recorded with the requirement that declared it. The highest version satisfying every constraint
  * of a name is selected; a later constraint the selection violates triggers a re-pick, which abandons the previous
  * version and retracts the constraints it declared, cascading to every selection left without constraints, which is
- * dropped until something requires it again. A selection is never upgraded because its constraints loosened, and
- * re-selecting an abandoned version is reported as a version conflict, so resolution always ends. Local packages are
+ * dropped until something requires it again. A selection is never upgraded because its constraints loosened. An
+ * abandoned version satisfying every current constraint may be selected again once; abandoning it a second time is
+ * final, and selecting it again is reported as a version conflict, so resolution always ends. Local packages are
  * fixed selections that are never fetched.
  *
  * Dependencies, non-optional peer dependencies, and optional dependencies are followed. An optional constraint never
@@ -60,7 +61,7 @@ final readonly class DependencyResolver
      * local package is checked against its version and never fetched, and local packages are not part of the result.
      *
      * @throws RuntimeException if a mandatory requirement uses an unsupported protocol, an invalid range, has no
-     * version satisfying its mandatory constraints, would return to an abandoned version, rejects the version of a
+     * version satisfying its mandatory constraints, would return to a version abandoned twice, rejects the version of a
      * local package, or the registry fails.
      *
      * @return array<string, ResolvedPackage> Selected packages keyed and sorted by name.
@@ -68,6 +69,7 @@ final readonly class DependencyResolver
     public function resolve(array $requirements, array $locals = []): array
     {
         $abandoned = [];
+        $readmitted = [];
         $dropped = [];
         $metadata = [];
         $constraints = [];
@@ -135,6 +137,12 @@ final readonly class DependencyResolver
 
             unset($dropped[$key]);
 
+            if (isset($abandoned[$key])) {
+                $readmitted[$key] = $version;
+
+                unset($abandoned[$key]);
+            }
+
             if (null !== $version->deprecated) {
                 $this->io->writeError(
                     sprintf(self::DEPRECATED, $version->name, $version->version, $version->deprecated),
@@ -154,7 +162,7 @@ final readonly class DependencyResolver
 
             if (null !== $previous) {
                 $source = "{$previous->name}@{$previous->version}";
-                $abandoned[$source] = $previous;
+                $abandoned[$source] = isset($readmitted[$source]);
 
                 self::retract($source, $constraints, $selected, $dropped);
             }
@@ -385,12 +393,13 @@ final readonly class DependencyResolver
      * @param array<string, PackageMetadata> $metadata Metadata fetched so far, keyed by name.
      * @param array<string, list<Constraint>> $constraints Constraints recorded so far, keyed by name.
      * @param array<string, PackageVersion> $selected Current selections.
-     * @param array<string, PackageVersion> $abandoned Selections replaced by a re-pick, keyed by `name@version`.
+     * @param array<string, bool> $abandoned Selections replaced by a re-pick, keyed by `name@version`, with `true`
+     * when the abandonment is final because the version was already selected again once.
      * @param array<string, string> $locals Versions of the local packages keyed by name.
      *
      * @throws RuntimeException if the specification is unsupported or invalid, the registry fails, an optional
      * requirement rejects the current selection, no version satisfies the constraints, the version found was
-     * abandoned before, or the range rejects the version of a local package.
+     * abandoned for good, or the range rejects the version of a local package.
      */
     private function select(
         Requirement $requirement,
@@ -467,7 +476,7 @@ final readonly class DependencyResolver
             $version = self::highest($package, $required);
         }
 
-        if (null === $version || isset($abandoned["{$name}@{$version->version}"])) {
+        if (null === $version || ($abandoned["{$name}@{$version->version}"] ?? false)) {
             throw new RuntimeException(
                 Message::NATIVE_VERSION_CONFLICT->getMessage($name, self::describe($required)),
             );

@@ -651,6 +651,13 @@ enum Message: string
         . 'its parents, or a filesystem root.';
 
     /**
+     * Error when a local package directory is the native install directory, lies under it, or contains it.
+     *
+     * Format: "The native install directory "%s" overlaps the local package "%s" at "%s"."
+     */
+    case NATIVE_INSTALL_DIR_OVERLAPS_LOCAL = 'The native install directory "%s" overlaps the local package "%s" at "%s".';
+
+    /**
      * Error when a downloaded tarball does not match its integrity hash.
      *
      * Format: "The tarball "%s" failed its integrity check."

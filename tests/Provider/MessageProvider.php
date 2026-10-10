@@ -464,6 +464,11 @@ final class MessageProvider
             'The native install directory "/project" must not be the root package directory, one of its parents, or a '
             . 'filesystem root.',
         ];
+        yield 'NATIVE_INSTALL_DIR_OVERLAPS_LOCAL' => [
+            Message::NATIVE_INSTALL_DIR_OVERLAPS_LOCAL,
+            ['/project/packages', 'foo', '/project/packages/foo'],
+            'The native install directory "/project/packages" overlaps the local package "foo" at "/project/packages/foo".',
+        ];
         yield 'NATIVE_INTEGRITY_MISMATCH' => [
             Message::NATIVE_INTEGRITY_MISMATCH,
             ['https://registry.npmjs.org/bootstrap/-/bootstrap-5.3.8.tgz'],

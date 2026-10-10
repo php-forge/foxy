@@ -301,9 +301,10 @@ keeps the framework's default `@npm` alias can install straight into `vendor/npm
 
 Foxy owns that directory: every entry that the lock does not list is removed on every install, except entries whose
 name starts with a dot (such as `.bin`), so do not point it at a directory that also receives asset-packagist
-packages from Composer. The root package directory, any of its parents, and filesystem roots are rejected; symbolic
-links in the path are resolved before that check where PHP's `realpath()` resolves them, which it does not on
-Windows. Package
+packages from Composer. The root package directory, any of its parents, filesystem roots, and a directory that
+overlaps a local `file:` package in either direction are rejected; symbolic links in the path are resolved before
+that check as far as PHP's `realpath()` resolves them, which is incomplete on Windows, so treat the check as lexical
+there. A symbolic link found inside the directory is removed as a link, never followed. Package
 names read from `package.json`, `foxy.lock`, and the registry must follow npm's name grammar (an optional `@scope/`
 followed by a name of letters, digits, `.`, `_`, and `-`, up to 214 characters); any other name is rejected before a
 path is built from it. Scoped packages keep the npm layout (`vendor/npm-asset/@popperjs/core`), not asset-packagist's

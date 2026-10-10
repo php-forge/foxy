@@ -15,6 +15,7 @@ use PHPUnit\Framework\Attributes\DataProviderExternal;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
+use function array_keys;
 use function base64_encode;
 use function count;
 use function dirname;
@@ -32,6 +33,7 @@ use function symlink;
 use function sys_get_temp_dir;
 use function uniqid;
 
+use const DIRECTORY_SEPARATOR;
 use const JSON_THROW_ON_ERROR;
 use const JSON_UNESCAPED_SLASHES;
 
@@ -71,6 +73,27 @@ final class NativeInstallerTest extends TestCase
             ['' => self::kinds([])],
             $this->lock()['requirements'],
             'Empty maps must yield empty root requirements.',
+        );
+    }
+
+    public function testInstallAcceptsLocalPackagesSharingAPrefixWithInstallDirectory(): void
+    {
+        $this->writeJson(
+            'package.json',
+            ['dependencies' => ['lib' => 'file:./lib', 'lib-modules-src' => 'file:./lib-modules-src']],
+        );
+        $this->writeJson('lib/package.json', ['version' => '1.0.0']);
+        $this->writeJson('lib-modules-src/package.json', ['version' => '1.0.0']);
+
+        $this->installInto("{$this->root}/lib-modules");
+
+        self::assertFileExists(
+            "{$this->root}/lib-modules/lib-modules-src/package.json",
+            'A sibling with a longer name must not count as an overlap.',
+        );
+        self::assertFileExists(
+            "{$this->root}/lib-modules/lib/package.json",
+            'A sibling with a shorter name must not count as an overlap.',
         );
     }
 
@@ -410,6 +433,41 @@ final class NativeInstallerTest extends TestCase
         );
     }
 
+    public function testInstallRemovesSymlinkedScopesWithoutVisitingTheirTargets(): void
+    {
+        $this->writeJson('package.json', ['dependencies' => ['left-pad' => '*']]);
+        $this->writeFile('node_modules/.keep', '');
+        $this->writeFile('external/pkg/package.json', '{}');
+        $this->writeFile('other/index.js', 'other');
+
+        if (
+            !@symlink("{$this->root}/external", "{$this->root}/node_modules/@old")
+            || !@symlink("{$this->root}/other", "{$this->root}/node_modules/@other")
+        ) {
+            self::markTestSkipped('Symbolic links are not available.');
+        }
+
+        $this->install($this->registry());
+
+        self::assertSame(
+            ['  - Installing left-pad (1.3.0): Extracting archive', '  - Removing @old', '  - Removing @other'],
+            $this->output,
+            'Each link must be removed as one entry.',
+        );
+        self::assertFalse(
+            is_link("{$this->root}/node_modules/@old") || is_link("{$this->root}/node_modules/@other"),
+            'The links must be gone.',
+        );
+        self::assertFileExists(
+            "{$this->root}/external/pkg/package.json",
+            'The target of a link must stay intact.',
+        );
+        self::assertFileExists(
+            "{$this->root}/other/index.js",
+            'The target of a link must stay intact.',
+        );
+    }
+
     public function testInstallResolvesAgainWhenLocalVersionChanges(): void
     {
         $registry = $this->registry();
@@ -629,6 +687,46 @@ final class NativeInstallerTest extends TestCase
         );
     }
 
+    public function testInstallSkipsOptionalLocalPackageWithoutManifest(): void
+    {
+        $this->writeJson(
+            'package.json',
+            [
+                'dependencies' => ['left-pad' => '*'],
+                'optionalDependencies' => [self::LOCAL_NAME => 'file:' . self::LOCAL_PATH],
+            ],
+        );
+
+        $io = $this->io();
+
+        $io
+            ->expects(self::once())
+            ->method('writeError')
+            ->with(
+                '<warning>The optional dependency "' . self::LOCAL_NAME . '" (file:' . self::LOCAL_PATH . ') was skipped: '
+                . Message::NATIVE_LOCAL_PACKAGE_MISSING->getMessage($this->localDirectory(), self::LOCAL_NAME)
+                . '</warning>',
+            );
+
+        $this->installer($this->registry(), $io)->install(
+            "{$this->root}/package.json",
+            "{$this->root}/foxy.lock",
+            "{$this->root}/node_modules",
+            false,
+        );
+
+        self::assertSame(
+            ['' => self::kinds(['left-pad' => '*'], [self::LOCAL_NAME => 'file:' . self::LOCAL_PATH])],
+            $this->lock()['requirements'],
+            'The manifest entry must stay in the fingerprint.',
+        );
+        self::assertSame(
+            ['left-pad'],
+            array_keys($this->lock()['packages']),
+            'The missing local package must not be locked.',
+        );
+    }
+
     public function testInstallTreatsMissingManifestAsEmpty(): void
     {
         $this->install($this->registry());
@@ -780,6 +878,71 @@ final class NativeInstallerTest extends TestCase
             ->install("{$this->root}/package.json", "{$this->root}/foxy.lock", "{$this->root}/node_modules", false);
     }
 
+    public function testThrowRuntimeExceptionWhenLocalPackageContainsInstallDirectory(): void
+    {
+        $this->writeJson('package.json', ['dependencies' => ['foo' => 'file:packages/foo']]);
+        $this->writeJson('packages/foo/package.json', ['version' => '1.0.0']);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            Message::NATIVE_INSTALL_DIR_OVERLAPS_LOCAL->getMessage(
+                "{$this->root}/packages/foo/node_modules",
+                'foo',
+                (new Filesystem())->normalizePath("{$this->root}/packages/foo"),
+            ),
+        );
+
+        $this->installInto("{$this->root}/packages/foo/node_modules");
+    }
+
+    public function testThrowRuntimeExceptionWhenLocalPackageLiesInInstallDirectory(): void
+    {
+        $this->writeJson('package.json', ['dependencies' => ['foo' => 'file:packages/foo']]);
+        $this->writeJson('packages/foo/package.json', ['version' => '1.0.0']);
+
+        try {
+            $this->installInto("{$this->root}/packages");
+
+            self::fail('Expected the overlap to be rejected.');
+        } catch (RuntimeException $exception) {
+            self::assertSame(
+                Message::NATIVE_INSTALL_DIR_OVERLAPS_LOCAL->getMessage(
+                    "{$this->root}/packages",
+                    'foo',
+                    (new Filesystem())->normalizePath("{$this->root}/packages/foo"),
+                ),
+                $exception->getMessage(),
+                'The install directory, the package, and its source must be named.',
+            );
+        }
+
+        self::assertFileExists(
+            "{$this->root}/packages/foo/package.json",
+            'Nothing may be removed before the check.',
+        );
+    }
+
+    public function testThrowRuntimeExceptionWhenLocalPackageLiesInSymlinkedInstallDirectory(): void
+    {
+        $this->writeJson('package.json', ['dependencies' => ['foo' => 'file:packages/foo']]);
+        $this->writeJson('packages/foo/package.json', ['version' => '1.0.0']);
+
+        if ('\\' === DIRECTORY_SEPARATOR || !@symlink("{$this->root}/packages", "{$this->root}/modules")) {
+            self::markTestSkipped('PHP does not resolve symbolic links with realpath() on Windows.');
+        }
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            Message::NATIVE_INSTALL_DIR_OVERLAPS_LOCAL->getMessage(
+                "{$this->root}/modules",
+                'foo',
+                (new Filesystem())->normalizePath("{$this->root}/packages/foo"),
+            ),
+        );
+
+        $this->installInto("{$this->root}/modules");
+    }
+
     public function testThrowRuntimeExceptionWhenLockIsMalformed(): void
     {
         $this->writeJson('package.json', ['dependencies' => ['left-pad' => '*']]);
@@ -891,6 +1054,16 @@ final class NativeInstallerTest extends TestCase
         $fs = new Filesystem();
 
         return new NativeInstaller($io, $fs, $registry, new DependencyResolver($registry, $io), new TarballExtractor($fs));
+    }
+
+    private function installInto(string $installDirectory): void
+    {
+        $this->installer($this->registry(), $this->io())->install(
+            "{$this->root}/package.json",
+            "{$this->root}/foxy.lock",
+            $installDirectory,
+            false,
+        );
     }
 
     /**

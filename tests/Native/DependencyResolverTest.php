@@ -281,6 +281,35 @@ final class DependencyResolverTest extends TestCase
         $this->resolver($registry)->resolve([new Requirement('foo', '^1.0', ''), new Requirement('bar', '^1.0', '')]);
     }
 
+    public function testResolveReadmitsAbandonedVersionOnceItsDisplacerIsRetracted(): void
+    {
+        $registry = (new InMemoryRegistry())
+            ->add(self::metadata('a', ['1.0.0' => [], '2.0.0' => ['dependencies' => ['e' => '*']]]))
+            ->add(self::metadata('b', ['1.0.0' => [], '2.0.0' => ['dependencies' => ['a' => '1.0.0']]]))
+            ->add(self::metadata('c', ['1.0.0' => ['dependencies' => ['a' => '^2.0']]]))
+            ->add(self::metadata('d', ['1.0.0' => ['dependencies' => ['b' => '^1.0']]]))
+            ->add(self::metadata('e', ['1.0.0' => []]));
+
+        self::assertEquals(
+            [
+                'a' => self::package('a', '2.0.0'),
+                'b' => self::package('b', '1.0.0'),
+                'c' => self::package('c', '1.0.0'),
+                'd' => self::package('d', '1.0.0'),
+                'e' => self::package('e', '1.0.0'),
+            ],
+            $this->resolver($registry)->resolve(
+                [
+                    new Requirement('a', '*', ''),
+                    new Requirement('b', '*', ''),
+                    new Requirement('d', '*', ''),
+                    new Requirement('c', '*', ''),
+                ],
+            ),
+            'a 2.0.0 must return with its dependency once b 2.0.0 is gone.',
+        );
+    }
+
     public function testResolveRepicksLowerVersionForLaterConstraint(): void
     {
         $this->expectException(RuntimeException::class);
@@ -663,6 +692,26 @@ final class DependencyResolverTest extends TestCase
         );
 
         $this->resolver(new InMemoryRegistry())->resolve([new Requirement('widgets', $spec, '')]);
+    }
+
+    public function testThrowRuntimeExceptionWhenDisplacerOfAbandonedVersionRemains(): void
+    {
+        $registry = (new InMemoryRegistry())
+            ->add(self::metadata('a', ['1.0.0' => [], '2.0.0' => []]))
+            ->add(self::metadata('b', ['1.0.0' => ['dependencies' => ['a' => '1.0.0']]]))
+            ->add(self::metadata('c', ['1.0.0' => ['dependencies' => ['a' => '^2.0']]]));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            Message::NATIVE_VERSION_CONFLICT->getMessage(
+                'a',
+                '"*" from root, "1.0.0" from b@1.0.0, "^2.0" from c@1.0.0',
+            ),
+        );
+
+        $this->resolver($registry)->resolve(
+            [new Requirement('a', '*', ''), new Requirement('b', '*', ''), new Requirement('c', '*', '')],
+        );
     }
 
     public function testThrowRuntimeExceptionWhenDroppedOptionalRootIsRequiredAgain(): void
