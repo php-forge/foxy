@@ -42,6 +42,8 @@ use const JSON_UNESCAPED_SLASHES;
  */
 final class NativeInstallerTest extends TestCase
 {
+    private const string ALPHA_NAME = '@composer-asset/acme--alpha';
+    private const string ALPHA_PATH = './vendor/php-forge/composer-asset/acme/alpha';
     private const string LOCAL_NAME = '@composer-asset/acme--theme';
     private const string LOCAL_PATH = './vendor/php-forge/composer-asset/acme/theme';
     private const array README = [
@@ -66,7 +68,7 @@ final class NativeInstallerTest extends TestCase
         $this->install($this->registry());
 
         self::assertSame(
-            ['' => []],
+            ['' => self::kinds([])],
             $this->lock()['requirements'],
             'Empty maps must yield empty root requirements.',
         );
@@ -122,8 +124,8 @@ final class NativeInstallerTest extends TestCase
         );
         self::assertSame(
             [
-                '' => [self::LOCAL_NAME => 'file:' . self::LOCAL_PATH],
-                self::LOCAL_NAME => ['bootstrap' => '^5.3', 'missing-pkg' => '^1.0'],
+                '' => self::kinds([self::LOCAL_NAME => 'file:' . self::LOCAL_PATH]),
+                self::LOCAL_NAME => self::kinds(['bootstrap' => '^5.3'], ['missing-pkg' => '^1.0']),
             ],
             $this->lock()['requirements'],
             'Requirements must list the root and the local source.',
@@ -208,7 +210,7 @@ final class NativeInstallerTest extends TestCase
         self::assertSame(
             [
                 '_readme' => self::README,
-                'requirements' => ['' => ['bootstrap' => '^5.3', 'left-pad' => '*']],
+                'requirements' => ['' => self::kinds(['bootstrap' => '^5.3', 'left-pad' => '*'])],
                 'packages' => [
                     '@popperjs/core' => $this->lockEntry('@popperjs/core', '2.11.8'),
                     'bootstrap' => $this->lockEntry('bootstrap', '5.3.8'),
@@ -271,8 +273,8 @@ final class NativeInstallerTest extends TestCase
         );
         self::assertSame(
             [
-                '' => [self::LOCAL_NAME => 'file:' . self::LOCAL_PATH],
-                self::LOCAL_NAME => ['bootstrap' => '^5.3', 'missing-pkg' => '^2.0'],
+                '' => self::kinds([self::LOCAL_NAME => 'file:' . self::LOCAL_PATH]),
+                self::LOCAL_NAME => self::kinds([], ['bootstrap' => '^5.3', 'missing-pkg' => '^2.0']),
             ],
             $this->lock()['requirements'],
             'The local requirements must record the optional specifications.',
@@ -302,9 +304,9 @@ final class NativeInstallerTest extends TestCase
             'The remaining requirements must be installed.',
         );
         self::assertSame(
-            ['' => ['bootstrap' => '^5.3', 'left-pad' => '*', 'missing-pkg' => '^1.0']],
+            ['' => self::kinds(['left-pad' => '*'], ['bootstrap' => '^5.3', 'missing-pkg' => '^1.0'])],
             $this->lock()['requirements'],
-            'The root requirements must include the optional map, sorted.',
+            'The optional entries must leave the mandatory map, both sorted.',
         );
     }
 
@@ -467,7 +469,7 @@ final class NativeInstallerTest extends TestCase
             'The new specification must be resolved.',
         );
         self::assertSame(
-            ['' => ['bootstrap' => '^5.3']],
+            ['' => self::kinds([], ['bootstrap' => '^5.3'])],
             $this->lock()['requirements'],
             'The lock file must record the new specification.',
         );
@@ -488,7 +490,7 @@ final class NativeInstallerTest extends TestCase
             'The new specification must be resolved.',
         );
         self::assertSame(
-            ['' => ['bootstrap' => '^5.3']],
+            ['' => self::kinds(['bootstrap' => '^5.3'])],
             $this->lock()['requirements'],
             'The lock file must record the new specification.',
         );
@@ -514,6 +516,72 @@ final class NativeInstallerTest extends TestCase
             $compact,
             file_get_contents("{$this->root}/foxy.lock"),
             'An update must rewrite the lock file.',
+        );
+    }
+
+    public function testInstallResolvesLocalPackageWithoutRegistryRequest(): void
+    {
+        $registry = $this->registry();
+
+        $this->publish($registry, 'widgets', ['1.0.0' => ['dependencies' => [self::LOCAL_NAME => '^1.0']]]);
+        $this->writeJson(
+            'package.json',
+            ['dependencies' => ['widgets' => '^1.0', self::LOCAL_NAME => 'file:' . self::LOCAL_PATH]],
+        );
+        $this->writeLocal(['version' => '1.2.0']);
+        $this->install($registry);
+
+        self::assertSame(
+            ['widgets'],
+            $registry->requested,
+            'The local package must not be fetched.',
+        );
+        self::assertFileExists(
+            "{$this->root}/node_modules/widgets/index.js",
+            'The dependent package must be installed.',
+        );
+    }
+
+    public function testInstallReusesFreshLockWithLocalPackagesOfBothKinds(): void
+    {
+        $registry = $this->registry();
+
+        $this->writeJson(
+            'package.json',
+            [
+                'dependencies' => [self::LOCAL_NAME => 'file:' . self::LOCAL_PATH],
+                'optionalDependencies' => [
+                    'left-pad' => '*',
+                    self::ALPHA_NAME => 'file:' . self::ALPHA_PATH,
+                    'bootstrap' => '^5.3',
+                ],
+            ],
+        );
+        $this->writeLocal(['version' => '1.0.0']);
+        $this->writeJson(
+            self::ALPHA_PATH . '/package.json',
+            ['version' => '2.0.0', 'optionalDependencies' => ['left-pad' => '*', '@popperjs/core' => '^2.11']],
+        );
+        $this->install($registry);
+
+        $requested = $registry->requested;
+        $compact = $this->compactLock();
+
+        $this->install($registry);
+
+        self::assertSame(
+            $requested,
+            $registry->requested,
+            'A fresh lock must not request metadata.',
+        );
+        self::assertStringEqualsFile(
+            "{$this->root}/foxy.lock",
+            $compact,
+            'A fresh lock must not be rewritten.',
+        );
+        self::assertFileExists(
+            "{$this->root}/node_modules/" . self::ALPHA_NAME . '/package.json',
+            'The optional local package must be copied.',
         );
     }
 
@@ -566,7 +634,7 @@ final class NativeInstallerTest extends TestCase
         $this->install($this->registry());
 
         self::assertSame(
-            ['_readme' => self::README, 'requirements' => ['' => []], 'packages' => []],
+            ['_readme' => self::README, 'requirements' => ['' => self::kinds([])], 'packages' => []],
             $this->lock(),
             'The lock file must hold empty requirements.',
         );
@@ -589,7 +657,7 @@ final class NativeInstallerTest extends TestCase
         $this->install($this->registry(), true);
 
         self::assertSame(
-            ['' => ['left-pad' => '*']],
+            ['' => self::kinds(['left-pad' => '*'])],
             $this->lock()['requirements'],
             'The malformed lock must be replaced.',
         );
@@ -725,6 +793,25 @@ final class NativeInstallerTest extends TestCase
         $this->install($this->registry());
     }
 
+    public function testThrowRuntimeExceptionWhenOptionalEntryBecomesMandatory(): void
+    {
+        $registry = $this->registry();
+
+        $this->writeJson(
+            'package.json',
+            ['dependencies' => ['left-pad' => '*'], 'optionalDependencies' => ['missing-pkg' => '^1.0']],
+        );
+        $this->install($registry);
+        $this->writeJson('package.json', ['dependencies' => ['left-pad' => '*', 'missing-pkg' => '^1.0']]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            Message::NATIVE_PACKAGE_NOT_FOUND->getMessage('missing-pkg', 'memory'),
+        );
+
+        $this->install($registry);
+    }
+
     public function testThrowRuntimeExceptionWhenPackageDirectoryCannotBeRemoved(): void
     {
         $this->writeFile('node_modules/stale/index.js', 'stale');
@@ -847,6 +934,19 @@ final class NativeInstallerTest extends TestCase
             );
 
         return $io;
+    }
+
+    /**
+     * Returns the fingerprint of one source as the lock file decodes it.
+     *
+     * @param array<string, string> $dependencies Mandatory specifications.
+     * @param array<string, string> $optionalDependencies Optional specifications.
+     *
+     * @return array{dependencies: array<string, string>, optionalDependencies: array<string, string>}
+     */
+    private static function kinds(array $dependencies, array $optionalDependencies = []): array
+    {
+        return ['dependencies' => $dependencies, 'optionalDependencies' => $optionalDependencies];
     }
 
     /**

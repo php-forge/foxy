@@ -80,11 +80,17 @@ final class LockFileTest extends TestCase
 
         self::assertSame(
             [
-                '' => [self::LOCAL_NAME => 'file:' . self::LOCAL_PATH, 'bootstrap' => '^5.3'],
-                self::LOCAL_NAME => ['@popperjs/core' => '^2.11.8', 'bootstrap' => '^5.3.0'],
+                '' => [
+                    'dependencies' => [self::LOCAL_NAME => 'file:' . self::LOCAL_PATH, 'bootstrap' => '^5.3'],
+                    'optionalDependencies' => [],
+                ],
+                self::LOCAL_NAME => [
+                    'dependencies' => ['@popperjs/core' => '^2.11.8', 'bootstrap' => '^5.3.0'],
+                    'optionalDependencies' => ['fsevents' => '^2.3'],
+                ],
             ],
             $data['requirements'],
-            'Requirements must be read back sorted.',
+            'Requirements must be read back sorted, both kinds per source.',
         );
         self::assertEquals(
             [
@@ -132,12 +138,13 @@ final class LockFileTest extends TestCase
             'Empty top-level maps must be written as objects.',
         );
 
-        $lock->write(['' => []], []);
+        $lock->write(['' => ['dependencies' => [], 'optionalDependencies' => []]], []);
 
         self::assertSame(
-            "{\n" . self::README . "\n    \"requirements\": {\n        \"\": {}\n    },\n    \"packages\": {}\n}\n",
+            "{\n" . self::README . "\n    \"requirements\": {\n        \"\": {\n            \"dependencies\": {},\n"
+            . "            \"optionalDependencies\": {}\n        }\n    },\n    \"packages\": {}\n}\n",
             file_get_contents($this->path),
-            'An empty requirement map must be written as an object.',
+            'Empty requirement maps must be written as objects.',
         );
     }
 
@@ -146,7 +153,7 @@ final class LockFileTest extends TestCase
         $lock = new LockFile($this->path);
 
         $lock->write(
-            ['' => ['9' => '^1.0', '10' => '^2.0']],
+            ['' => ['dependencies' => ['9' => '^1.0', '10' => '^2.0'], 'optionalDependencies' => ['9' => '*', '10' => '*']]],
             [
                 '9' => ResolvedPackage::fromLocal('9', '1.0.0', './nine'),
                 '10' => ResolvedPackage::fromLocal('10', '2.0.0', './ten'),
@@ -161,8 +168,14 @@ final class LockFileTest extends TestCase
                 ],
                 "requirements": {
                     "": {
-                        "10": "^2.0",
-                        "9": "^1.0"
+                        "dependencies": {
+                            "10": "^2.0",
+                            "9": "^1.0"
+                        },
+                        "optionalDependencies": {
+                            "10": "*",
+                            "9": "*"
+                        }
                     }
                 },
                 "packages": {
@@ -198,12 +211,20 @@ final class LockFileTest extends TestCase
                 ],
                 "requirements": {
                     "": {
-                        "@composer-asset/acme--theme": "file:./vendor/php-forge/composer-asset/acme/theme",
-                        "bootstrap": "^5.3"
+                        "dependencies": {
+                            "@composer-asset/acme--theme": "file:./vendor/php-forge/composer-asset/acme/theme",
+                            "bootstrap": "^5.3"
+                        },
+                        "optionalDependencies": {}
                     },
                     "@composer-asset/acme--theme": {
-                        "@popperjs/core": "^2.11.8",
-                        "bootstrap": "^5.3.0"
+                        "dependencies": {
+                            "@popperjs/core": "^2.11.8",
+                            "bootstrap": "^5.3.0"
+                        },
+                        "optionalDependencies": {
+                            "fsevents": "^2.3"
+                        }
                     }
                 },
                 "packages": {
@@ -268,13 +289,19 @@ final class LockFileTest extends TestCase
     }
 
     /**
-     * @return array<string, array<string, string>>
+     * @return array<string, array{dependencies: array<string, string>, optionalDependencies: array<string, string>}>
      */
     private function requirements(): array
     {
         return [
-            self::LOCAL_NAME => ['bootstrap' => '^5.3.0', '@popperjs/core' => '^2.11.8'],
-            '' => ['bootstrap' => '^5.3', self::LOCAL_NAME => 'file:' . self::LOCAL_PATH],
+            self::LOCAL_NAME => [
+                'dependencies' => ['bootstrap' => '^5.3.0', '@popperjs/core' => '^2.11.8'],
+                'optionalDependencies' => ['fsevents' => '^2.3'],
+            ],
+            '' => [
+                'dependencies' => ['bootstrap' => '^5.3', self::LOCAL_NAME => 'file:' . self::LOCAL_PATH],
+                'optionalDependencies' => [],
+            ],
         ];
     }
 }

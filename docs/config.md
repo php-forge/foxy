@@ -268,15 +268,17 @@ Foxy then performs the installation itself, in PHP:
   abandoned version had introduced are withdrawn, and optional dependencies never block a required one. Dist-tags
   such as `latest` or `next` are honored. A conflict that only nested `node_modules` could solve is reported as an
   error that names every constraint and its origin; install such a project with a JavaScript manager instead.
-  Unsatisfiable or missing optional dependencies are skipped with a warning, and a deprecated selection is reported
-  with the registry's deprecation text.
+  Unsatisfiable or missing optional dependencies are skipped with a warning, together with the whole subtree of an
+  optional package whose own dependencies cannot be installed, and a deprecated selection is reported with the
+  registry's deprecation text. A `file:` package keeps the version its manifest declares; a constraint from another
+  package that this version does not satisfy is reported as a conflict.
 - It downloads each tarball from the URL published by the registry, verifies it against the registry's
   `integrity` value (SHA-512, with the legacy SHA-1 `shasum` as a fallback), and extracts it into
   `node_modules/<name>`, stripping the archive's top-level directory like npm does. Tarballs are cached in
   `<cache-files-dir>/foxy/` and are subject to Composer's `cache-files-ttl`, `cache-files-maxsize`, and
   `cache-read-only` settings; every cached tarball is verified again before use.
-- It writes `foxy.lock`, which records the root requirements, the requirements of every local package, and the
-  selected version, tarball URL, and integrity of every installed package. `composer install` with a lock that
+- It writes `foxy.lock`, which records the root requirements and the requirements of every local package (regular
+  and optional ones apart), and the selected version, tarball URL, and integrity of every installed package. `composer install` with a lock that
   matches the current manifests reinstalls exactly those tarballs without a single metadata request;
   `composer update`, or a lock that no longer matches, resolves again and rewrites the lock. Commit `foxy.lock`.
 - It removes entries of the install directory that are not part of the installation (dot-entries such as `.bin`

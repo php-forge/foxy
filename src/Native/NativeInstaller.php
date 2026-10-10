@@ -12,6 +12,7 @@ use Foxy\Exception\{Message, RuntimeException};
 
 use function array_diff_key;
 use function array_is_list;
+use function array_map;
 use function dirname;
 use function file_exists;
 use function in_array;
@@ -35,6 +36,8 @@ use const SORT_STRING;
  * `<install directory>/.foxy-tmp` before being moved into place; `file:` packages are copied from their local
  * directory. Top-level entries of the install directory outside the install set are removed, except dot-entries such
  * as `.bin`.
+ *
+ * @phpstan-import-type Fingerprint from LockFile
  */
 final readonly class NativeInstaller implements NativeInstallerInterface
 {
@@ -86,43 +89,53 @@ final readonly class NativeInstaller implements NativeInstallerInterface
         $manifest = $manifestFile->exists() ? $manifestFile->read() : [];
 
         $optionalSpecs = $this->specs($manifest, 'optionalDependencies', $manifestPath);
-        $rootSpecs = $optionalSpecs
-            + $this->specs($manifest, 'dependencies', $manifestPath)
-            + $this->specs($manifest, 'devDependencies', $manifestPath);
+        $mandatorySpecs = array_diff_key(
+            $this->specs($manifest, 'dependencies', $manifestPath)
+            + $this->specs($manifest, 'devDependencies', $manifestPath),
+            $optionalSpecs,
+        );
 
-        ksort($rootSpecs, SORT_STRING);
+        ksort($mandatorySpecs, SORT_STRING);
+        ksort($optionalSpecs, SORT_STRING);
 
-        $fingerprint = ['' => $rootSpecs];
+        $fingerprint = ['' => ['dependencies' => $mandatorySpecs, 'optionalDependencies' => $optionalSpecs]];
         $requirements = [];
         $locals = [];
 
-        foreach ($rootSpecs as $name => $spec) {
-            $name = (string) $name;
+        foreach ([[$mandatorySpecs, false], [$optionalSpecs, true]] as [$specs, $optional]) {
+            foreach ($specs as $name => $spec) {
+                $name = (string) $name;
 
-            if (!str_starts_with($spec, self::FILE_PROTOCOL)) {
-                $requirements[] = new Requirement($name, $spec, '', isset($optionalSpecs[$name]));
+                if (!str_starts_with($spec, self::FILE_PROTOCOL)) {
+                    $requirements[] = new Requirement($name, $spec, '', $optional);
 
-                continue;
-            }
+                    continue;
+                }
 
-            $path = substr($spec, strlen(self::FILE_PROTOCOL));
-            $local = $this->readLocal($name, $this->localDirectory($manifestPath, $path));
+                $path = substr($spec, strlen(self::FILE_PROTOCOL));
+                $local = $this->readLocal($name, $this->localDirectory($manifestPath, $path));
 
-            $fingerprint[$name] = $local['specs'];
+                $fingerprint[$name] = $local['specs'];
 
-            $locals[$name] = ResolvedPackage::fromLocal($name, $local['version'], $path);
+                $locals[$name] = ResolvedPackage::fromLocal($name, $local['version'], $path);
 
-            foreach ($local['requirements'] as $requirement) {
-                $requirements[] = $requirement;
+                foreach ($local['requirements'] as $requirement) {
+                    $requirements[] = $requirement;
+                }
             }
         }
+
+        ksort($fingerprint, SORT_STRING);
 
         $lock = new LockFile($lockPath);
 
         $packages = $update ? null : $this->lockedPackages($lock, $fingerprint, $locals);
 
         if (null === $packages) {
-            $packages = $locals + $this->resolver->resolve($requirements);
+            $packages = $locals + $this->resolver->resolve(
+                $requirements,
+                array_map(static fn(ResolvedPackage $local): string => $local->version, $locals),
+            );
 
             ksort($packages, SORT_STRING);
 
@@ -224,7 +237,7 @@ final readonly class NativeInstaller implements NativeInstallerInterface
     /**
      * Returns the locked packages when the lock file is fresh, or `null` when it is missing or stale.
      *
-     * @param array<array-key, array<array-key, string>> $fingerprint Current requirements fingerprint.
+     * @param Fingerprint $fingerprint Current requirements fingerprint.
      * @param array<string, ResolvedPackage> $locals Current local packages keyed by name.
      *
      * @throws RuntimeException if the lock file is malformed.
@@ -313,7 +326,11 @@ final readonly class NativeInstaller implements NativeInstallerInterface
      * @throws RuntimeException if the directory has no `package.json`, a dependency map is invalid, or a dependency
      * uses the `file:` protocol.
      *
-     * @return array{version: string, specs: array<array-key, string>, requirements: list<Requirement>}
+     * @return array{
+     *     version: string,
+     *     specs: array{dependencies: array<array-key, string>, optionalDependencies: array<array-key, string>},
+     *     requirements: list<Requirement>,
+     * }
      */
     private function readLocal(string $name, string $directory): array
     {
@@ -358,13 +375,14 @@ final readonly class NativeInstaller implements NativeInstallerInterface
             }
         }
 
-        $specs = $dependencies + $peers + $optionalDependencies;
+        $mandatory = $dependencies + $peers;
 
-        ksort($specs, SORT_STRING);
+        ksort($mandatory, SORT_STRING);
+        ksort($optionalDependencies, SORT_STRING);
 
         return [
             'version' => is_string($version) ? $version : '0.0.0',
-            'specs' => $specs,
+            'specs' => ['dependencies' => $mandatory, 'optionalDependencies' => $optionalDependencies],
             'requirements' => $requirements,
         ];
     }

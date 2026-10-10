@@ -665,6 +665,14 @@ enum Message: string
     case NATIVE_LOCAL_PACKAGE_MISSING = 'The local package "%s" of "%s" has no package.json.';
 
     /**
+     * Error when a requirement rejects the version of a local package.
+     *
+     * Format: "The local package "%s" (%s) does not satisfy %s; install it with npm, pnpm, Yarn, Bun, or Deno."
+     */
+    case NATIVE_LOCAL_VERSION_CONFLICT = 'The local package "%s" (%s) does not satisfy %s; install it with npm, pnpm, '
+        . 'Yarn, Bun, or Deno.';
+
+    /**
      * Error when the native manager lock file is malformed.
      *
      * Format: "The lock file "%s" is malformed; delete it and run the installation again."

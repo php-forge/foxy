@@ -474,6 +474,12 @@ final class MessageProvider
             ['./vendor/acme/theme', '@composer-asset/acme--theme'],
             'The local package "./vendor/acme/theme" of "@composer-asset/acme--theme" has no package.json.',
         ];
+        yield 'NATIVE_LOCAL_VERSION_CONFLICT' => [
+            Message::NATIVE_LOCAL_VERSION_CONFLICT,
+            ['@composer-asset/acme--theme', '1.0.0', '"^2.0" from acme@1.0.0'],
+            'The local package "@composer-asset/acme--theme" (1.0.0) does not satisfy "^2.0" from acme@1.0.0; install it '
+            . 'with npm, pnpm, Yarn, Bun, or Deno.',
+        ];
         yield 'NATIVE_LOCK_INVALID' => [
             Message::NATIVE_LOCK_INVALID,
             ['/project/foxy.lock'],

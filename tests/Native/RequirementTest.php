@@ -8,7 +8,7 @@ use Foxy\Native\Requirement;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Unit tests for {@see Requirement} construction and its optional flag default.
+ * Unit tests for {@see Requirement} construction and the defaults of its optional flag and subtree root.
  */
 final class RequirementTest extends TestCase
 {
@@ -35,6 +35,10 @@ final class RequirementTest extends TestCase
             $requirement->optional,
             'Requirements must be mandatory unless flagged.',
         );
+        self::assertNull(
+            $requirement->optionalRoot,
+            'Requirements must sit outside any optional subtree unless given one.',
+        );
     }
 
     public function testConstructorKeepsOptionalFlag(): void
@@ -49,6 +53,15 @@ final class RequirementTest extends TestCase
         self::assertTrue(
             $requirement->optional,
             'Optional flag must be kept.',
+        );
+    }
+
+    public function testConstructorKeepsOptionalRoot(): void
+    {
+        self::assertSame(
+            'chokidar@3.6.0',
+            (new Requirement('anymatch', '^3.0', 'chokidar@3.6.0', false, 'chokidar@3.6.0'))->optionalRoot,
+            'Optional subtree root must be kept.',
         );
     }
 }

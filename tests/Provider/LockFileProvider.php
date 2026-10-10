@@ -28,13 +28,21 @@ final class LockFileProvider
         yield 'invalid json' => ['{"requirements":'];
         yield 'json list' => ['[1, 2]'];
         yield 'json string' => ['"lock"'];
+        yield 'optional requirement is keyed by a traversal name' => [
+            self::encode(
+                [
+                    'requirements' => ['' => ['dependencies' => [], 'optionalDependencies' => ['../x' => '^1.0']]],
+                    'packages' => [],
+                ],
+            ),
+        ];
         yield 'package has neither resolved nor file' => [
             self::package(['version' => '5.3.8', 'integrity' => self::INTEGRITY]),
         ];
         yield 'package is keyed by a traversal name' => [
             self::encode(
                 [
-                    'requirements' => ['' => ['bootstrap' => '^5.3']],
+                    'requirements' => self::requirements(['bootstrap' => '^5.3']),
                     'packages' => ['../../src' => ['version' => '1.0.0', 'file' => './src']],
                 ],
             ),
@@ -46,13 +54,32 @@ final class LockFileProvider
         yield 'package version is not a string' => [
             self::package(['version' => 5, 'resolved' => self::RESOLVED, 'integrity' => self::INTEGRITY]),
         ];
-        yield 'packages is missing' => [self::encode(['requirements' => ['' => ['bootstrap' => '^5.3']]])];
+        yield 'packages is missing' => [self::encode(['requirements' => self::requirements(['bootstrap' => '^5.3'])])];
         yield 'packages is not an object' => [self::encode(['requirements' => [], 'packages' => 'bootstrap'])];
         yield 'requirement is keyed by a traversal name' => [
-            self::encode(['requirements' => ['' => ['..\\x' => '^1.0']], 'packages' => []]),
+            self::encode(['requirements' => self::requirements(['..\\x' => '^1.0']), 'packages' => []]),
+        ];
+        yield 'requirement kind has an extra map' => [
+            self::encode(
+                [
+                    'requirements' => ['' => ['dependencies' => [], 'optionalDependencies' => [], 'peers' => []]],
+                    'packages' => [],
+                ],
+            ),
+        ];
+        yield 'requirement kind is missing' => [
+            self::encode(['requirements' => ['' => ['dependencies' => []]], 'packages' => []]),
+        ];
+        yield 'requirement kind is not a map' => [
+            self::encode(
+                ['requirements' => ['' => ['dependencies' => [], 'optionalDependencies' => 'x']], 'packages' => []],
+            ),
+        ];
+        yield 'requirement kind is replaced by another key' => [
+            self::encode(['requirements' => ['' => ['dependencies' => [], 'peers' => []]], 'packages' => []]),
         ];
         yield 'requirement spec is not a string' => [
-            self::encode(['requirements' => ['' => ['bootstrap' => 5]], 'packages' => []]),
+            self::encode(['requirements' => self::requirements(['bootstrap' => 5]), 'packages' => []]),
         ];
         yield 'requirement value is not a map' => [
             self::encode(['requirements' => ['' => 'bootstrap'], 'packages' => []]),
@@ -72,12 +99,24 @@ final class LockFileProvider
     private static function package(mixed $entry): string
     {
         return self::encode(
-            ['requirements' => ['' => ['bootstrap' => '^5.3']], 'packages' => ['bootstrap' => $entry]],
+            ['requirements' => self::requirements(['bootstrap' => '^5.3']), 'packages' => ['bootstrap' => $entry]],
         );
     }
 
     private static function registryPackage(string $integrity): string
     {
         return self::package(['version' => '5.3.8', 'resolved' => self::RESOLVED, 'integrity' => $integrity]);
+    }
+
+    /**
+     * Returns a fingerprint with the root's mandatory specifications and no optional ones.
+     *
+     * @param array<string, mixed> $dependencies
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private static function requirements(array $dependencies): array
+    {
+        return ['' => ['dependencies' => $dependencies, 'optionalDependencies' => []]];
     }
 }

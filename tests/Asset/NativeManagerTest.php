@@ -547,11 +547,13 @@ final class NativeManagerTest extends TestCase
 
         chdir($this->oldCwd);
 
+        $fs = new Filesystem();
+
         foreach ($this->links as $link) {
-            unlink($link);
+            $fs->unlink($link);
         }
 
-        (new Filesystem())->removeDirectory($this->cwd);
+        $fs->removeDirectory($this->cwd);
     }
 
     /**
