@@ -105,6 +105,7 @@ final readonly class NativeInstaller implements NativeInstallerInterface
         $fingerprint = ['' => ['dependencies' => $mandatorySpecs, 'optionalDependencies' => $optionalSpecs]];
         $requirements = [];
         $locals = [];
+        $sources = [];
 
         foreach ([[$mandatorySpecs, false], [$optionalSpecs, true]] as [$specs, $optional]) {
             foreach ($specs as $name => $spec) {
@@ -118,6 +119,10 @@ final readonly class NativeInstaller implements NativeInstallerInterface
 
                 $path = substr($spec, strlen(self::FILE_PROTOCOL));
                 $directory = $this->localDirectory($manifestPath, $path);
+
+                if (is_dir($directory)) {
+                    $sources[$name] = $directory;
+                }
 
                 if ($optional && !is_file("{$directory}/package.json")) {
                     $this->io->writeError(
@@ -143,7 +148,7 @@ final readonly class NativeInstaller implements NativeInstallerInterface
 
         ksort($fingerprint, SORT_STRING);
 
-        $this->checkOverlaps($manifestPath, $installDirectory, $locals);
+        $this->checkOverlaps($installDirectory, $sources);
 
         $lock = new LockFile($lockPath);
 
@@ -162,16 +167,17 @@ final readonly class NativeInstaller implements NativeInstallerInterface
      * Checks that no local package directory is the install directory, lies under it, or contains it, since the
      * installer removes and replaces the entries of the install directory.
      *
-     * Both directories are compared after resolving symbolic links as far as PHP's `realpath()` resolves them; the
-     * install directory is created first so it can be resolved.
+     * Every existing `file:` directory of the root manifest is checked, including an optional one skipped for lacking
+     * a `package.json`. Both directories are compared after resolving symbolic links as far as PHP's `realpath()`
+     * resolves them; the install directory is created first so it can be resolved.
      *
-     * @param array<string, LocalPackage> $locals Local packages keyed by name.
+     * @param array<string, string> $sources Existing local package directories keyed by package name.
      *
      * @throws RuntimeException if a local package directory overlaps the install directory.
      */
-    private function checkOverlaps(string $manifestPath, string $installDirectory, array $locals): void
+    private function checkOverlaps(string $installDirectory, array $sources): void
     {
-        if ([] === $locals) {
+        if ([] === $sources) {
             return;
         }
 
@@ -179,8 +185,7 @@ final readonly class NativeInstaller implements NativeInstallerInterface
 
         $install = $this->fs->normalizePath(Platform::realpath($installDirectory)) . '/';
 
-        foreach ($locals as $name => $local) {
-            $directory = $this->localDirectory($manifestPath, $local->path);
+        foreach ($sources as $name => $directory) {
             $source = $this->fs->normalizePath(Platform::realpath($directory)) . '/';
 
             if (str_starts_with($source, $install) || str_starts_with($install, $source)) {
@@ -292,8 +297,8 @@ final readonly class NativeInstaller implements NativeInstallerInterface
     /**
      * Returns the locked packages when the lock file is fresh, or `null` when it is missing or stale.
      *
-     * A local package must be locked at its current version, except that an optional one may be absent: the resolver
-     * dropped it, and adding it to the manifest would have changed the fingerprint.
+     * A local package must be locked at its current version, except that an optional one may be absent or locked as a
+     * registry package: the resolver dropped it, and adding it to the manifest would have changed the fingerprint.
      *
      * @param Fingerprint $fingerprint Current requirements fingerprint.
      * @param array<string, LocalPackage> $locals Current local packages keyed by name.
@@ -317,7 +322,7 @@ final readonly class NativeInstaller implements NativeInstallerInterface
         foreach ($locals as $name => $local) {
             $entry = $locked['packages'][$name] ?? null;
 
-            if (null === $entry && isset($fingerprint['']['optionalDependencies'][$name])) {
+            if (isset($fingerprint['']['optionalDependencies'][$name]) && (null === $entry || !$entry->isLocal())) {
                 continue;
             }
 

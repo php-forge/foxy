@@ -29,6 +29,8 @@ use function json_encode;
 use function mkdir;
 use function rename;
 use function str_replace;
+use function strlen;
+use function substr;
 use function symlink;
 use function sys_get_temp_dir;
 use function uniqid;
@@ -813,6 +815,44 @@ final class NativeInstallerTest extends TestCase
         );
     }
 
+    public function testInstallReusesFreshLockWithOptionalLocalPackageReplacedFromRegistry(): void
+    {
+        $registry = $this->registry();
+
+        $this->publish($registry, 'widgets', ['1.0.0' => ['dependencies' => [self::LOCAL_NAME => '^2.0']]]);
+        $this->publish($registry, self::LOCAL_NAME, ['2.1.0' => []]);
+        $this->writeJson(
+            'package.json',
+            [
+                'dependencies' => ['widgets' => '^1.0'],
+                'optionalDependencies' => [self::LOCAL_NAME => 'file:' . self::LOCAL_PATH],
+            ],
+        );
+        $this->writeLocal(['version' => '1.0.0']);
+        $this->install($registry);
+
+        $requested = $registry->requested;
+        $compact = $this->compactLock();
+
+        $this->install($registry);
+
+        self::assertSame(
+            $requested,
+            $registry->requested,
+            'The registry entry of the dropped local package must not make the lock stale.',
+        );
+        self::assertStringEqualsFile(
+            "{$this->root}/foxy.lock",
+            $compact,
+            'A fresh lock must not be rewritten.',
+        );
+        self::assertStringEqualsFile(
+            "{$this->root}/node_modules/" . self::LOCAL_NAME . '/index.js',
+            self::LOCAL_NAME . '@2.1.0',
+            'The registry version must be installed.',
+        );
+    }
+
     public function testInstallReusesFreshLockWithoutMetadataRequests(): void
     {
         $registry = $this->registry();
@@ -894,6 +934,37 @@ final class NativeInstallerTest extends TestCase
             ['left-pad'],
             array_keys($this->lock()['packages']),
             'The missing local package must not be locked.',
+        );
+    }
+
+    public function testInstallSkipsOptionalLocalSourceMissingInsideInstallDirectory(): void
+    {
+        $this->writeJson(
+            'package.json',
+            ['dependencies' => ['left-pad' => '*'], 'optionalDependencies' => ['foo' => 'file:packages/foo']],
+        );
+
+        $this->installIntoWithOptionalLocalWarning('foo', 'file:packages/foo', "{$this->root}/packages");
+
+        self::assertFileExists(
+            "{$this->root}/packages/left-pad/index.js",
+            'A missing source cannot overlap and the installation must proceed.',
+        );
+    }
+
+    public function testInstallSkipsOptionalLocalSourceWithoutManifestOutsideInstallDirectory(): void
+    {
+        $this->writeJson(
+            'package.json',
+            ['dependencies' => ['left-pad' => '*'], 'optionalDependencies' => ['foo' => 'file:packages/foo']],
+        );
+        $this->writeFile('packages/foo/README.md', 'readme');
+
+        $this->installIntoWithOptionalLocalWarning('foo', 'file:packages/foo', "{$this->root}/node_modules");
+
+        self::assertFileExists(
+            "{$this->root}/node_modules/left-pad/index.js",
+            'The remaining requirements must be installed.',
         );
     }
 
@@ -1177,6 +1248,35 @@ final class NativeInstallerTest extends TestCase
         );
     }
 
+    public function testThrowRuntimeExceptionWhenSkippedOptionalLocalSourceLiesInInstallDirectory(): void
+    {
+        $this->writeJson('package.json', ['optionalDependencies' => ['foo' => 'file:packages/foo']]);
+        $this->writeFile('packages/foo/README.md', 'readme');
+
+        try {
+            $this->installInto("{$this->root}/packages");
+
+            self::fail(
+                'Expected the overlap to be rejected.',
+            );
+        } catch (RuntimeException $exception) {
+            self::assertSame(
+                Message::NATIVE_INSTALL_DIR_OVERLAPS_LOCAL->getMessage(
+                    "{$this->root}/packages",
+                    'foo',
+                    (new Filesystem())->normalizePath("{$this->root}/packages/foo"),
+                ),
+                $exception->getMessage(),
+                'The skipped source must still be checked.',
+            );
+        }
+
+        self::assertFileExists(
+            "{$this->root}/packages/foo/README.md",
+            'Nothing may be removed before the check.',
+        );
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -1229,6 +1329,31 @@ final class NativeInstallerTest extends TestCase
     private function installInto(string $installDirectory): void
     {
         $this->installer($this->registry(), $this->io())->install(
+            "{$this->root}/package.json",
+            "{$this->root}/foxy.lock",
+            $installDirectory,
+            false,
+        );
+    }
+
+    /**
+     * Installs into the directory and expects one skipped-optional warning for a local package without a manifest.
+     */
+    private function installIntoWithOptionalLocalWarning(string $name, string $spec, string $installDirectory): void
+    {
+        $directory = (new Filesystem())->normalizePath("{$this->root}/" . substr($spec, strlen('file:')));
+
+        $io = $this->io();
+
+        $io
+            ->expects(self::once())
+            ->method('writeError')
+            ->with(
+                "<warning>The optional dependency \"{$name}\" ({$spec}) was skipped: "
+                . Message::NATIVE_LOCAL_PACKAGE_MISSING->getMessage($directory, $name) . '</warning>',
+            );
+
+        $this->installer($this->registry(), $io)->install(
             "{$this->root}/package.json",
             "{$this->root}/foxy.lock",
             $installDirectory,
