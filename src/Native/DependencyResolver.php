@@ -464,8 +464,10 @@ final readonly class DependencyResolver
      * already satisfies it.
      *
      * An optional requirement never changes an existing selection. When no version satisfies every constraint of a
-     * mandatory requirement, the version satisfying the mandatory constraints is selected and each optional constraint
-     * it violates is dropped with a warning.
+     * mandatory requirement, the highest version satisfying the requirement and the globally mandatory constraints
+     * (neither optional nor declared inside an optional subtree) is chosen: each optional constraint it violates is
+     * dropped with a warning, and a violated constraint from an optional subtree makes the conflict name that subtree in
+     * `$blockers` instead.
      *
      * @param array<string, PackageMetadata> $metadata Metadata fetched so far, keyed by name.
      * @param array<string, list<Constraint>> $constraints Constraints recorded so far, keyed by name.
@@ -584,7 +586,9 @@ final readonly class DependencyResolver
 
         foreach ($candidates as $candidate) {
             if (!$candidate['optional'] && !$candidate['range']->satisfies($version->version)) {
-                $blockers[] = (string) $candidate['root'];
+                /** @var string $root Every globally mandatory constraint is satisfied, so this one is conditional. */
+                $root = $candidate['root'];
+                $blockers[] = $root;
             }
         }
 

@@ -6,11 +6,11 @@ namespace Foxy\Asset;
 
 use Composer\IO\IOInterface;
 use Composer\Util\{Filesystem, Platform};
+use Foxy\Audit\{AuditParserInterface, AuditProcessResult};
+use Foxy\Audit\Parser\NativeAuditParser;
 use Foxy\Config\Config;
 use Foxy\Exception\{Message, RuntimeException};
-use Foxy\Fallback\FallbackInterface;
-use Foxy\Native\NativeInstallerInterface;
-use Throwable;
+use Foxy\Native\{LockFile, NativeInstallerInterface, NpmRegistryInterface};
 
 use function array_unshift;
 use function basename;
@@ -18,12 +18,15 @@ use function dirname;
 use function implode;
 use function is_dir;
 use function is_string;
+use function ksort;
 use function preg_match;
 use function realpath;
 use function sprintf;
 use function str_starts_with;
 use function strtolower;
 use function trim;
+
+use const SORT_STRING;
 
 /**
  * Provides the `native` asset manager: installs `package.json` dependencies from the npm registry in PHP, recording
@@ -41,16 +44,62 @@ final class NativeManager extends AbstractManifestAssetManager
      * @param Config $config Foxy configuration.
      * @param Filesystem $fs Filesystem used by the manifest handling.
      * @param NativeInstallerInterface $installer Installer that populates the install directory.
-     * @param FallbackInterface|null $fallback Fallback restored when the installation fails, or `null` for none.
+     * @param NpmRegistryInterface $registry Registry that answers the security audit.
      */
     public function __construct(
         IOInterface $io,
         Config $config,
         Filesystem $fs,
         private readonly NativeInstallerInterface $installer,
-        FallbackInterface|null $fallback = null,
+        private readonly NpmRegistryInterface $registry,
     ) {
-        parent::__construct($io, $config, $fs, $fallback);
+        parent::__construct($io, $config, $fs);
+    }
+
+    /**
+     * Runs the security audit of the locked registry packages with one request to the registry's bulk advisories
+     * endpoint.
+     *
+     * Local `file:` packages are skipped, and a lock without registry packages is clean without a request. The exit
+     * code is `1` when the document reports an advisory and `0` otherwise; the error output is always empty.
+     *
+     * @param bool $noDev Whether to exclude development dependencies, which the native manager cannot do.
+     *
+     * @throws RuntimeException if `foxy.lock` is missing or malformed, `$noDev` is `true`, the registry request fails,
+     * or the advisories document is malformed.
+     */
+    public function audit(bool $noDev): AuditProcessResult
+    {
+        if (!$this->hasLockFile()) {
+            throw new RuntimeException(
+                Message::ASSET_MANAGER_LOCK_FILE_MISSING->getMessage($this->getName(), $this->getLockFilePath()),
+            );
+        }
+
+        if ($noDev) {
+            throw new RuntimeException(
+                Message::ASSET_NATIVE_AUDIT_NO_DEV_UNSUPPORTED->getMessage(),
+            );
+        }
+
+        $versions = [];
+
+        foreach ((new LockFile($this->getLockFilePath()))->read()['packages'] as $package) {
+            if (!$package->isLocal()) {
+                $versions[$package->name] = [$package->version];
+            }
+        }
+
+        ksort($versions, SORT_STRING);
+
+        $document = [] === $versions ? '{}' : $this->registry->getAdvisories($versions);
+
+        return new AuditProcessResult([] === $this->getAuditParser()->parse($document) ? 0 : 1, $document, '');
+    }
+
+    public function getAuditParser(): AuditParserInterface
+    {
+        return new NativeAuditParser();
     }
 
     public function getLockPackageName(): string
@@ -69,12 +118,10 @@ final class NativeManager extends AbstractManifestAssetManager
     }
 
     /**
-     * Records `native` as the resolved manager and returns whether `foxy.lock` exists.
+     * Returns whether `foxy.lock` exists; the native manager needs no executable.
      */
     public function isAvailable(): bool
     {
-        $this->config->setResolvedManager($this->getName());
-
         return $this->hasLockFile();
     }
 
@@ -93,12 +140,11 @@ final class NativeManager extends AbstractManifestAssetManager
      * Installs the dependencies, or updates them when updates are allowed by {@see setUpdatable()}, as `composer update`
      * does, even if nothing is installed yet.
      *
-     * Returns `0` without doing anything when `run-asset-manager` is disabled. The fallback is restored when the
-     * installation fails, and the installer exception is rethrown.
+     * Returns `0` without doing anything when `run-asset-manager` is disabled. An installer exception propagates
+     * unchanged.
      *
      * @throws RuntimeException if the `zlib` extension is missing, the configured root package directory does not
-     * exist, the install directory is invalid, the installation fails, or the fallback cannot be restored after a
-     * failure.
+     * exist, the install directory is invalid, or the installation fails.
      */
     public function run(): int
     {
@@ -119,18 +165,12 @@ final class NativeManager extends AbstractManifestAssetManager
             ),
         );
 
-        try {
-            $this->installer->install(
-                $this->getPackageJsonPath(),
-                $this->getLockFilePath(),
-                $installDirectory,
-                $updatable,
-            );
-        } catch (Throwable $exception) {
-            $this->restoreAfterFailure($exception);
-
-            throw $exception;
-        }
+        $this->installer->install(
+            $this->getPackageJsonPath(),
+            $this->getLockFilePath(),
+            $installDirectory,
+            $updatable,
+        );
 
         return 0;
     }

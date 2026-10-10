@@ -10,40 +10,6 @@ use Composer\Package\Loader\ArrayLoader;
 final class PackageUtil
 {
     /**
-     * Convert the package aliases of the locker load data.
-     *
-     * @param array $lockData The lock data of locker.
-     *
-     * @return array The lock data.
-     */
-    public static function convertLockAlias(array $lockData): array
-    {
-        $loadDatawithaliases = $lockData['aliases'] ?? [];
-
-        if ($loadDatawithaliases === []) {
-            return $lockData;
-        }
-
-        $alias = [];
-
-        /**
-         * @var array{
-         *   array{alias: string, alias_normalized: string, version: string, package: string}
-         * } $loadDatawithaliases
-         */
-        foreach ($loadDatawithaliases as $config) {
-            $alias[$config['package']][$config['version']] = [
-                'alias' => $config['alias'],
-                'alias_normalized' => $config['alias_normalized'],
-            ];
-        }
-
-        $lockData['aliases'] = $alias;
-
-        return $lockData;
-    }
-
-    /**
      * Load the packages in the packages section of the locker load data.
      *
      * @param ArrayLoader $loader The package loader of composer.
@@ -75,20 +41,18 @@ final class PackageUtil
     }
 
     /**
-     * Load all packages in the lock data of locker.
+     * Loads the `packages` and `packages-dev` entries of the lock data, leaving every other key unchanged.
      *
-     * @param array $lockData The lock data of locker.
-     * @param bool $convertAliases Whether the aliases should be converted to the legacy lookup map.
+     * @param array $lockData The raw lock data, as read from the lock file.
      *
-     * @return array The lock data.
+     * @return array The lock data with package entries replaced by package instances.
      */
-    public static function loadLockPackages(array $lockData, bool $convertAliases = true): array
+    public static function loadLockPackages(array $lockData): array
     {
         $loader = new ArrayLoader();
 
         $lockData = self::loadLockPackage($loader, $lockData);
-        $lockData = self::loadLockPackage($loader, $lockData, true);
 
-        return $convertAliases ? self::convertLockAlias($lockData) : $lockData;
+        return self::loadLockPackage($loader, $lockData, true);
     }
 }

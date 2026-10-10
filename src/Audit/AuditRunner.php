@@ -14,7 +14,7 @@ use function usort;
 
 final readonly class AuditRunner implements AuditRunnerInterface
 {
-    public function __construct(private AssetManagerInterface&AuditableAssetManagerInterface $manager) {}
+    public function __construct(private AssetManagerInterface $manager) {}
 
     public function audit(AuditRequest $request): AuditReport
     {
@@ -34,7 +34,7 @@ final readonly class AuditRunner implements AuditRunnerInterface
         }
 
         try {
-            $findings = AuditParserFactory::create($manager)->parse($result->output);
+            $findings = $this->manager->getAuditParser()->parse($result->output);
         } catch (Throwable $exception) {
             $message = $exception->getMessage();
 

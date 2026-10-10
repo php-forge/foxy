@@ -11,7 +11,6 @@ use Composer\Util\{Filesystem, ProcessExecutor};
 use Foxy\Asset\{AbstractAssetManager, AssetManagerInterface, AssetPackageInterface};
 use Foxy\Config\Config;
 use Foxy\Exception\{Message, RuntimeException};
-use Foxy\Fallback\FallbackInterface;
 use Foxy\Tests\Fixtures\Util\{ProcessExecutorMock, ThrowingProcessExecutorMock};
 use Foxy\Tests\Provider\AssetManagerProvider;
 use PHPUnit\Framework\Attributes\{DataProviderExternal, RequiresOperatingSystemFamily};
@@ -36,7 +35,6 @@ abstract class AssetManager extends TestCase
     protected Config|null $config = null;
     protected string|null $cwd = '';
     protected ProcessExecutorMock|ThrowingProcessExecutorMock|null $executor = null;
-    protected FallbackInterface|MockObject|null $fallback = null;
     protected Filesystem|MockObject|null $fs = null;
     protected IOInterface|MockObject|null $io = null;
     protected AssetManagerInterface|null $manager = null;
@@ -460,12 +458,6 @@ abstract class AssetManager extends TestCase
             );
         }
 
-        if (0 === $expectedRes) {
-            $this->fallback->expects(self::never())->method('restore');
-        } else {
-            $this->fallback->expects(self::once())->method('restore');
-        }
-
         $this->io
             ->expects(self::once())
             ->method('write')
@@ -496,87 +488,6 @@ abstract class AssetManager extends TestCase
         );
     }
 
-    public function testRunPreservesExecutorFailureWhenFallbackThrows(): void
-    {
-        $this->executor = new ThrowingProcessExecutorMock($this->io, $this->getValidVersion());
-        $this->config = new Config([], ['run-asset-manager' => true]);
-
-        $this->fallback
-            ->expects(self::once())
-            ->method('restore')
-            ->willThrowException(new RuntimeException('Fallback failed.'));
-
-        $this->manager = $this->getManager();
-
-        try {
-            $this->manager->run();
-
-            self::fail(
-                'Expected fallback restoration to fail.',
-            );
-        } catch (RuntimeException $exception) {
-            self::assertSame(
-                Message::ASSET_MANAGER_FALLBACK_RESTORE_FAILED->getMessage('Fallback failed.'),
-                $exception->getMessage(),
-                'Fallback failure must be reported.',
-            );
-            self::assertSame(
-                'Process execution failed.',
-                $exception->getPrevious()?->getMessage(),
-                'The original process failure must be preserved.',
-            );
-        }
-    }
-
-    public function testRunPreservesExitStatusWhenFallbackThrows(): void
-    {
-        $exitStatus = 7;
-
-        $this->config = new Config([], ['run-asset-manager' => true]);
-
-        $this->fallback
-            ->expects(self::once())
-            ->method('restore')
-            ->willThrowException(new RuntimeException('Fallback failed.'));
-
-        $this->actionForTestRunForInstallCommand('install');
-        $this->executor->addExpectedValues($exitStatus, 'ASSET MANAGER OUTPUT');
-
-        $this->manager = $this->getManager();
-
-        try {
-            $this->manager->run();
-
-            self::fail(
-                'Expected fallback restoration to fail.',
-            );
-        } catch (RuntimeException $exception) {
-            self::assertSame(
-                Message::ASSET_MANAGER_FALLBACK_RESTORE_FAILED->getMessage('Fallback failed.'),
-                $exception->getMessage(),
-                'Fallback failure must be reported.',
-            );
-
-            $previous = $exception->getPrevious();
-
-            self::assertInstanceOf(
-                RuntimeException::class,
-                $previous,
-                'The exit status must be attached to a runtime exception.',
-            );
-            self::assertSame(
-                $exitStatus,
-                $previous->getCode(),
-                'The original exit status must be preserved.',
-            );
-            self::assertSame(
-                Message::ASSET_MANAGER_EXITED_WITH_STATUS->getMessage($exitStatus),
-                $previous->getMessage(),
-                'Previous exception must carry the exit status.',
-            );
-        }
-    }
-
     public function testRunPreservesWorkingDirectoryWhenExecutorThrows(): void
     {
         $rootPackageDir = $this->cwd . DIRECTORY_SEPARATOR . 'root-package';
@@ -590,10 +501,6 @@ abstract class AssetManager extends TestCase
             [],
             ['run-asset-manager' => true, 'root-package-json-dir' => $rootPackageDir],
         );
-
-        $this->fallback
-            ->expects(self::once())
-            ->method('restore');
 
         $this->manager = $this->getManager();
 
@@ -626,9 +533,6 @@ abstract class AssetManager extends TestCase
         $this->io
             ->expects(self::never())
             ->method('write');
-        $this->fallback
-            ->expects(self::never())
-            ->method('restore');
         $this->executor->addExpectedValues(0, $this->getUnsupportedVersion());
 
         $this->expectException(RuntimeException::class);
@@ -657,10 +561,6 @@ abstract class AssetManager extends TestCase
             $this->config = new Config([], ['run-asset-manager' => true, 'manager-timeout' => $managerTimeout]);
 
             $this->manager = $this->getManager();
-
-            $this->fallback
-                ->expects(self::once())
-                ->method('restore');
 
             try {
                 $this->manager->run();
@@ -1072,7 +972,6 @@ abstract class AssetManager extends TestCase
         $this->executor = new ProcessExecutorMock($this->io);
         $this->fs = $this->createMock(Filesystem::class);
         $this->sfs = new \Symfony\Component\Filesystem\Filesystem();
-        $this->fallback = $this->createMock(FallbackInterface::class);
         $this->manager = $this->getManager();
         $this->oldCwd = getcwd();
         $this->cwd = sys_get_temp_dir() . DIRECTORY_SEPARATOR . uniqid('foxy_asset_manager_test_', true);
@@ -1093,7 +992,6 @@ abstract class AssetManager extends TestCase
         $this->executor = null;
         $this->fs = null;
         $this->sfs = null;
-        $this->fallback = null;
         $this->manager = null;
         $this->oldCwd = null;
         $this->cwd = null;

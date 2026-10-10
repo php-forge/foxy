@@ -217,6 +217,9 @@ final readonly class NativeInstaller implements NativeInstallerInterface
     /**
      * Installs the packages into the install directory and removes the entries outside the install set.
      *
+     * The tarballs of the registry packages are first prefetched in parallel into the registry's cache; each package is
+     * then fetched, verified, and extracted in turn, so a failed prefetch surfaces as the error of its own fetch.
+     *
      * A symbolic link or a file standing in for the `@scope` directory of a package is removed first, so the package is
      * never written into the link target and a stale file cannot abort the installation.
      *
@@ -232,6 +235,17 @@ final readonly class NativeInstaller implements NativeInstallerInterface
         $this->fs->ensureDirectoryExists($temporary);
 
         $installed = [];
+        $downloads = [];
+
+        foreach ($packages as $package) {
+            if (!$package->isLocal()) {
+                $downloads[] = $package;
+            }
+        }
+
+        if ([] !== $downloads) {
+            $this->registry->prefetchTarballs($downloads, $temporary);
+        }
 
         foreach ($packages as $package) {
             $target = "{$installDirectory}/{$package->name}";

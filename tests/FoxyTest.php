@@ -6,13 +6,13 @@ namespace Foxy\Tests;
 
 use Composer\{Cache, Composer, Config};
 use Composer\DependencyResolver\Operation\{InstallOperation, OperationInterface};
-use Composer\Installer\{InstallationManager, PackageEvent, PackageEvents};
+use Composer\Installer\{InstallationManager, InstallerEvents, PackageEvent, PackageEvents};
 use Composer\IO\IOInterface;
 use Composer\Package\{Package, RootPackageInterface};
 use Composer\Repository\RepositoryManager;
 use Composer\Script\{Event, ScriptEvents};
-use Composer\Util\{Filesystem, ProcessExecutor};
-use Foxy\Asset\{AbstractAssetManager, AssetManagerInterface, DenoManager, NativeManager, NpmManager};
+use Composer\Util\{Filesystem, HttpDownloader, Loop, ProcessExecutor};
+use Foxy\Asset\{AssetManagerFinder, AssetManagerInterface, DenoManager, NativeManager, NpmManager};
 use Foxy\Config\Config as FoxyConfig;
 use Foxy\Exception\{Message, RuntimeException};
 use Foxy\Fallback\AssetFallback;
@@ -21,7 +21,6 @@ use Foxy\Native\NpmRegistry;
 use Foxy\Solver\SolverInterface;
 use Foxy\Tests\Fixtures\Asset\StubAssetManager;
 use Foxy\Tests\Provider\FoxyProvider;
-use Foxy\Util\ComposerUtil;
 use PHPUnit\Framework\Attributes\DataProviderExternal;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -80,10 +79,22 @@ final class FoxyTest extends TestCase
             $this->getObjectProperty($composerFallback, 'snapshotSaved'),
             'Composer snapshot must be saved.',
         );
+        $solver = $this->invokeFoxyMethod($foxy, 'getSolver');
+
+        self::assertSame(
+            $solver,
+            $this->invokeFoxyMethod($foxy, 'getSolver'),
+            'Solver must be built once.',
+        );
         self::assertSame(
             $assetFallback,
-            (new ReflectionClass(AbstractAssetManager::class))->getProperty('fallback')->getValue($assetManager),
-            'Manager and plugin must share the asset fallback.',
+            $this->getObjectProperty($solver, 'assetFallback'),
+            'Solver and plugin must share the asset fallback.',
+        );
+        self::assertSame(
+            $assetManager,
+            $this->getObjectProperty($solver, 'assetManager'),
+            'Solver and plugin must share the asset manager.',
         );
     }
 
@@ -100,6 +111,8 @@ final class FoxyTest extends TestCase
         $foxy = new Foxy();
 
         $foxy->activate($this->composer, $this->io);
+
+        $this->resolveAssetManager($foxy);
 
         $foxyReflection = new ReflectionClass($foxy);
 
@@ -157,6 +170,35 @@ final class FoxyTest extends TestCase
     }
 
     /**
+     * @throws ParsingException
+     */
+    public function testActivateDoesNotResolveManagerWhenEnabled(): void
+    {
+        $this->package
+            ->method('getConfig')
+            ->willReturn(['foxy' => ['manager' => 'invalid_manager']]);
+
+        $foxy = new Foxy();
+
+        $foxy->activate($this->composer, $this->io);
+
+        $reflection = new ReflectionClass($foxy);
+
+        self::assertFalse(
+            $reflection->getProperty('assetManager')->isInitialized($foxy),
+            'Manager must stay unresolved after activation.',
+        );
+        self::assertFalse(
+            $reflection->getProperty('assetFallback')->isInitialized($foxy),
+            'Asset fallback must not be built before the manager.',
+        );
+        self::assertFalse(
+            $reflection->getProperty('solver')->isInitialized($foxy),
+            'Solver must not be built before the manager.',
+        );
+    }
+
+    /**
      * @throws ParsingException|ReflectionException
      */
     #[DataProviderExternal(FoxyProvider::class, 'cacheReadOnlyValues')]
@@ -210,6 +252,8 @@ final class FoxyTest extends TestCase
         $foxy = new Foxy();
 
         $foxy->activate($this->composer, $this->io);
+
+        $this->resolveAssetManager($foxy);
 
         self::assertInstanceOf(
             NpmManager::class,
@@ -367,6 +411,8 @@ final class FoxyTest extends TestCase
 
         $foxy->activate($this->composer, $this->io);
 
+        $this->resolveAssetManager($foxy);
+
         self::assertInstanceOf(
             DenoManager::class,
             $this->getFoxyProperty($foxy, 'assetManager'),
@@ -387,6 +433,8 @@ final class FoxyTest extends TestCase
 
         $foxy->activate($this->composer, $this->io);
 
+        $this->resolveAssetManager($foxy);
+
         self::assertInstanceOf(
             NativeManager::class,
             $this->getFoxyProperty($foxy, 'assetManager'),
@@ -396,6 +444,36 @@ final class FoxyTest extends TestCase
             getcwd() . DIRECTORY_SEPARATOR . 'package.json',
             $this->getObjectProperty($this->getFoxyProperty($foxy, 'assetFallback'), 'path'),
             'The fallback must target the root manifest.',
+        );
+    }
+
+    /**
+     * @throws ParsingException|ReflectionException
+     */
+    public function testActivateSharesComposerHttpDownloaderWithNativeRegistry(): void
+    {
+        $httpDownloader = $this->createMock(HttpDownloader::class);
+        $loop = $this->createMock(Loop::class);
+
+        $loop
+            ->expects(self::once())
+            ->method('getHttpDownloader')
+            ->willReturn($httpDownloader);
+        $this->composer
+            ->method('getLoop')
+            ->willReturn($loop);
+        $this->package
+            ->method('getConfig')
+            ->willReturn(['foxy' => ['manager' => 'native', 'run-asset-manager' => false]]);
+
+        $foxy = new Foxy();
+
+        $foxy->activate($this->composer, $this->io);
+
+        self::assertSame(
+            $httpDownloader,
+            $this->getObjectProperty($this->getNativeRegistry($foxy), 'httpDownloader'),
+            'Registry must use the downloader of the Composer loop.',
         );
     }
 
@@ -414,11 +492,19 @@ final class FoxyTest extends TestCase
         $foxy->activate($this->composer, $this->io);
         $foxy->init();
 
-        $assetManager = (new ReflectionClass($foxy))->getProperty('assetManager');
+        $reflection = new ReflectionClass($foxy);
 
         self::assertFalse(
-            $assetManager->isInitialized($foxy),
+            $reflection->getProperty('assetManager')->isInitialized($foxy),
             'Uninitialized manager must remain undiscovered.',
+        );
+        self::assertFalse(
+            $reflection->getProperty('assetManagerFinder')->isInitialized($foxy),
+            'Disabled plugin must not build the manager finder.',
+        );
+        self::assertFalse(
+            $reflection->getProperty('composerFallback')->isInitialized($foxy),
+            'Disabled plugin must not build the Composer fallback.',
         );
     }
 
@@ -444,6 +530,8 @@ final class FoxyTest extends TestCase
 
             $foxy->activate($this->composer, $this->io);
 
+            $this->resolveAssetManager($foxy);
+
             $assetFallbackProperty = $foxyReflection->getProperty('assetFallback');
             $assetFallback = $assetFallbackProperty->getValue($foxy);
 
@@ -461,26 +549,6 @@ final class FoxyTest extends TestCase
         }
     }
 
-    /**
-     * @throws ParsingException
-     */
-    public function testActivateWithInvalidManager(): void
-    {
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage(
-            Message::ASSET_MANAGER_UNKNOWN->getMessage('invalid_manager'),
-        );
-
-        $this->package
-            ->expects(self::any())
-            ->method('getConfig')
-            ->willReturn(['foxy' => ['manager' => 'invalid_manager']]);
-
-        $foxy = new Foxy();
-
-        $foxy->activate($this->composer, $this->io);
-    }
-
     public function testAutomaticManagerDiscoveryDoesNotProbeBinariesWhenExecutionIsDisabled(): void
     {
         $config = new FoxyConfig(
@@ -496,21 +564,26 @@ final class FoxyTest extends TestCase
             ->expects(self::never())
             ->method('execute');
 
+        $fs = $this->createMock(Filesystem::class);
         $foxy = new Foxy();
         $reflection = new ReflectionClass($foxy);
 
-        $reflection
-            ->getProperty('config')
-            ->setValue($foxy, $config);
-
-        $manager = $reflection->getMethod('getAssetManager')->invoke(
+        $reflection->getProperty('config')->setValue($foxy, $config);
+        $reflection->getProperty('io')->setValue($foxy, $this->io);
+        $reflection->getProperty('fs')->setValue($foxy, $fs);
+        $reflection->getProperty('assetManagerFinder')->setValue(
             $foxy,
-            $this->composer,
-            $this->io,
-            $config,
-            $executor,
-            $this->createMock(Filesystem::class),
+            $reflection->getMethod('createAssetManagerFinder')->invoke(
+                $foxy,
+                $this->composer,
+                $this->io,
+                $config,
+                $executor,
+                $fs,
+            ),
         );
+
+        $manager = $this->resolveAssetManager($foxy);
 
         self::assertInstanceOf(
             NpmManager::class,
@@ -563,11 +636,39 @@ final class FoxyTest extends TestCase
         $this->expectNotToPerformAssertions();
     }
 
+    /**
+     * @throws ParsingException
+     */
+    public function testGetAssetManagerResolvesOnce(): void
+    {
+        $this->package
+            ->method('getConfig')
+            ->willReturn(['foxy' => ['manager' => 'npm', 'run-asset-manager' => false]]);
+
+        $foxy = new Foxy();
+
+        $foxy->activate($this->composer, $this->io);
+
+        $manager = $this->resolveAssetManager($foxy);
+        $assetFallback = $this->getFoxyProperty($foxy, 'assetFallback');
+
+        self::assertSame(
+            $manager,
+            $this->resolveAssetManager($foxy),
+            'Second call must return the memoized manager.',
+        );
+        self::assertSame(
+            $assetFallback,
+            $this->getFoxyProperty($foxy, 'assetFallback'),
+            'Second call must keep the asset fallback.',
+        );
+    }
+
     public function testGetSubscribedEvents(): void
     {
         self::assertSame(
             [
-                ComposerUtil::getInitEventName() => [['init', 100]],
+                InstallerEvents::PRE_OPERATIONS_EXEC => [['init', 100]],
                 PackageEvents::POST_PACKAGE_INSTALL => [['initOnInstall', 100]],
                 ScriptEvents::POST_INSTALL_CMD => [['solveAssets', 100]],
                 ScriptEvents::POST_UPDATE_CMD => [['solveAssets', 100]],
@@ -591,13 +692,13 @@ final class FoxyTest extends TestCase
 
         $foxy->activate($this->composer, $this->io);
 
-        $assetManager = $this->createMock(AssetManagerInterface::class);
+        $assetManager = $this->createNpmManagerMock();
 
         $assetManager
             ->expects($expectedValidation ? self::once() : self::never())
             ->method('validate');
 
-        (new ReflectionClass($foxy))->getProperty('assetManager')->setValue($foxy, $assetManager);
+        $this->injectAssetManagerFinder($foxy, $assetManager);
 
         $foxy->init();
     }
@@ -615,13 +716,13 @@ final class FoxyTest extends TestCase
 
         $foxy->activate($this->composer, $this->io);
 
-        $assetManager = $this->createMock(AssetManagerInterface::class);
+        $assetManager = $this->createNpmManagerMock();
 
         $assetManager
             ->expects(self::once())
             ->method('validate');
 
-        (new ReflectionClass($foxy))->getProperty('assetManager')->setValue($foxy, $assetManager);
+        $this->injectAssetManagerFinder($foxy, $assetManager);
 
         $foxy->init();
         $foxy->init();
@@ -630,23 +731,6 @@ final class FoxyTest extends TestCase
             $this->getFoxyProperty($foxy, 'initialized'),
             'Flag must stay set after the second call.',
         );
-    }
-
-    /**
-     * @throws ParsingException
-     */
-    public function testIntegerOneEnablesPlugin(): void
-    {
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage(
-            Message::ASSET_MANAGER_UNKNOWN->getMessage('invalid_manager'),
-        );
-
-        $this->package
-            ->method('getConfig')
-            ->willReturn(['foxy' => ['enabled' => 1, 'manager' => 'invalid_manager']]);
-
-        (new Foxy())->activate($this->composer, $this->io);
     }
 
     #[DataProviderExternal(FoxyProvider::class, 'solveEvents')]
@@ -694,6 +778,49 @@ final class FoxyTest extends TestCase
         $foxy->activate($this->composer, $this->io);
         $foxy->setSolver($solver);
         $foxy->solveAssets(new Event('solve_event_install', $this->composer, $this->io));
+    }
+
+    /**
+     * @throws ParsingException
+     */
+    public function testThrowRuntimeExceptionWhenInitFindsUnknownManager(): void
+    {
+        $this->package
+            ->expects(self::any())
+            ->method('getConfig')
+            ->willReturn(['foxy' => ['manager' => 'invalid_manager']]);
+
+        $foxy = new Foxy();
+
+        $foxy->activate($this->composer, $this->io);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            Message::ASSET_MANAGER_UNKNOWN->getMessage('invalid_manager'),
+        );
+
+        $foxy->init();
+    }
+
+    /**
+     * @throws ParsingException
+     */
+    public function testThrowRuntimeExceptionWhenIntegerOneEnabledPluginFindsUnknownManager(): void
+    {
+        $this->package
+            ->method('getConfig')
+            ->willReturn(['foxy' => ['enabled' => 1, 'manager' => 'invalid_manager']]);
+
+        $foxy = new Foxy();
+
+        $foxy->activate($this->composer, $this->io);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            Message::ASSET_MANAGER_UNKNOWN->getMessage('invalid_manager'),
+        );
+
+        $foxy->init();
     }
 
     public function testUninstall(): void
@@ -750,6 +877,20 @@ final class FoxyTest extends TestCase
         ;
     }
 
+    /**
+     * Returns an asset manager mock named `npm` that has no lock file.
+     */
+    private function createNpmManagerMock(): AssetManagerInterface&MockObject
+    {
+        $assetManager = $this->createMock(AssetManagerInterface::class);
+
+        $assetManager->method('getName')->willReturn('npm');
+        $assetManager->method('getPackageName')->willReturn('package.json');
+        $assetManager->method('hasLockFile')->willReturn(false);
+
+        return $assetManager;
+    }
+
     private function getFoxyProperty(Foxy $foxy, string $name): mixed
     {
         return (new ReflectionClass($foxy))->getProperty($name)->getValue($foxy);
@@ -762,7 +903,7 @@ final class FoxyTest extends TestCase
      */
     private function getNativeRegistry(Foxy $foxy): NpmRegistry
     {
-        $manager = $this->getFoxyProperty($foxy, 'assetManager');
+        $manager = $this->resolveAssetManager($foxy);
 
         self::assertInstanceOf(
             NativeManager::class,
@@ -784,5 +925,31 @@ final class FoxyTest extends TestCase
     private function getObjectProperty(object $object, string $name): mixed
     {
         return (new ReflectionClass($object))->getProperty($name)->getValue($object);
+    }
+
+    /**
+     * Replaces the finder built by activation with one that holds only the given manager.
+     */
+    private function injectAssetManagerFinder(Foxy $foxy, AssetManagerInterface $assetManager): void
+    {
+        (new ReflectionClass($foxy))
+            ->getProperty('assetManagerFinder')
+            ->setValue($foxy, new AssetManagerFinder([$assetManager]));
+    }
+
+    /**
+     * Invokes a private method of the plugin.
+     */
+    private function invokeFoxyMethod(Foxy $foxy, string $name): mixed
+    {
+        return (new ReflectionClass($foxy))->getMethod($name)->invoke($foxy);
+    }
+
+    /**
+     * Resolves the asset manager through the plugin's private memoizing accessor.
+     */
+    private function resolveAssetManager(Foxy $foxy): AssetManagerInterface
+    {
+        return $this->invokeFoxyMethod($foxy, 'getAssetManager');
     }
 }

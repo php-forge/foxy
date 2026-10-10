@@ -7,14 +7,16 @@ namespace Foxy\Asset;
 use Composer\IO\IOInterface;
 use Composer\Semver\{Semver, VersionParser};
 use Composer\Util\{Filesystem, Platform, ProcessExecutor};
+use Foxy\Audit\AuditProcessResult;
 use Foxy\Config\Config;
 use Foxy\Converter\{SemverConverter, VersionConverterInterface};
 use Foxy\Exception\{Message, RuntimeException};
-use Foxy\Fallback\FallbackInterface;
-use Throwable;
 use UnexpectedValueException;
 
+use function array_key_exists;
+use function getenv;
 use function is_string;
+use function putenv;
 use function sprintf;
 use function trim;
 
@@ -27,33 +29,51 @@ abstract class AbstractAssetManager extends AbstractManifestAssetManager
         Config $config,
         protected ProcessExecutor $executor,
         Filesystem $fs,
-        FallbackInterface|null $fallback = null,
         protected VersionConverterInterface|null $versionConverter = null,
     ) {
-        parent::__construct($io, $config, $fs, $fallback);
+        parent::__construct($io, $config, $fs);
 
         $this->versionConverter ??= new SemverConverter();
     }
 
     /**
-     * Get the command to install the asset dependencies.
+     * Get the command to audit the asset dependencies.
      */
-    abstract protected function getInstallCommand(): string;
+    abstract protected function getAuditCommand(bool $noDev): string;
 
-    /**
-     * Get the command to update the asset dependencies.
-     */
-    abstract protected function getUpdateCommand(): string;
+    public function audit(bool $noDev): AuditProcessResult
+    {
+        if (!$this->hasLockFile()) {
+            throw new RuntimeException(
+                Message::ASSET_MANAGER_LOCK_FILE_MISSING->getMessage($this->getName(), $this->getLockFilePath()),
+            );
+        }
 
-    /**
-     * Get the command to retrieve the version.
-     */
-    abstract protected function getVersionCommand(): string;
+        $this->validateAuditConfiguration($noDev);
+        $this->validate();
+
+        return $this->withManagerTimeout(
+            function () use ($noDev): AuditProcessResult {
+                $environment = $this->overrideEnvironment($this->getAuditEnvironment());
+
+                try {
+                    $output = '';
+                    $result = $this->executor->execute(
+                        $this->getAuditCommand($noDev),
+                        $output,
+                        $this->getManagerWorkingDirectory(),
+                    );
+
+                    return new AuditProcessResult($result, (string) $output, $this->executor->getErrorOutput());
+                } finally {
+                    $this->restoreEnvironment($environment);
+                }
+            },
+        );
+    }
 
     public function isAvailable(): bool
     {
-        $this->config->setResolvedManager($this->getName());
-
         return null !== $this->getVersion();
     }
 
@@ -72,36 +92,16 @@ abstract class AbstractAssetManager extends AbstractManifestAssetManager
 
         $this->io->write($info);
 
-        $res = $this->withManagerTimeout(
-            function () use ($updatable, $managerWorkingDirectory): int {
-                try {
-                    $cmd = $updatable ? $this->getUpdateCommand() : $this->getInstallCommand();
-
-                    return $this->executeManagerCommand($cmd, $managerWorkingDirectory);
-                } catch (Throwable $exception) {
-                    $this->restoreAfterFailure($exception);
-
-                    throw $exception;
-                }
-            },
+        return $this->withManagerTimeout(
+            fn(): int => $this->executeManagerCommand(
+                $updatable ? $this->getUpdateCommand() : $this->getInstallCommand(),
+                $managerWorkingDirectory,
+            ),
         );
-
-        if (0 !== $res && null !== $this->fallback) {
-            $this->restoreAfterFailure(
-                new RuntimeException(
-                    Message::ASSET_MANAGER_EXITED_WITH_STATUS->getMessage($res),
-                    $res,
-                ),
-            );
-        }
-
-        return $res;
     }
 
     public function validate(): void
     {
-        $this->config->setResolvedManager($this->getName());
-
         $version = $this->getVersion();
 
         if (null === $version) {
@@ -133,7 +133,7 @@ abstract class AbstractAssetManager extends AbstractManifestAssetManager
         }
 
         /** @var string|null $constraintVersion */
-        $constraintVersion = $this->config->get('manager-version');
+        $constraintVersion = $this->getManagerConfig()->get('manager-version');
 
         if (
             is_string($constraintVersion)
@@ -155,8 +155,8 @@ abstract class AbstractAssetManager extends AbstractManifestAssetManager
      */
     protected function buildCommand(string $defaultBin, string $action, array|string $command): string
     {
-        $gOptions = trim((string) $this->config->get('manager-options', ''));
-        $options = trim((string) $this->config->get("manager-{$action}-options", ''));
+        $gOptions = trim((string) $this->getManagerConfig()->get('manager-options', ''));
+        $options = trim((string) $this->getManagerConfig()->get("manager-{$action}-options", ''));
 
         return $this->buildUnconfiguredCommand($defaultBin, $command)
             . ($gOptions === '' ? '' : " {$gOptions}")
@@ -171,6 +171,42 @@ abstract class AbstractAssetManager extends AbstractManifestAssetManager
     protected function buildUnconfiguredCommand(string $defaultBin, array|string $command): string
     {
         return sprintf('%s %s', $this->getManagerBinary($defaultBin), implode(' ', (array) $command));
+    }
+
+    /**
+     * Get environment overrides required for a complete audit.
+     *
+     * @return array<string, string>
+     */
+    protected function getAuditEnvironment(): array
+    {
+        return [];
+    }
+
+    /**
+     * Returns the executable used when `manager-bin` is not configured; defaults to the manager name.
+     */
+    protected function getDefaultBinary(): string
+    {
+        return $this->getName();
+    }
+
+    /**
+     * Returns the command that installs the asset dependencies, followed by the `manager-options` and
+     * `manager-install-options` values.
+     */
+    protected function getInstallCommand(): string
+    {
+        return $this->buildCommand($this->getDefaultBinary(), 'install', 'install');
+    }
+
+    /**
+     * Returns the command that updates the asset dependencies, followed by the `manager-options` and
+     * `manager-update-options` values.
+     */
+    protected function getUpdateCommand(): string
+    {
+        return $this->buildCommand($this->getDefaultBinary(), 'update', 'update');
     }
 
     protected function getVersion(): string|null
@@ -193,12 +229,25 @@ abstract class AbstractAssetManager extends AbstractManifestAssetManager
     }
 
     /**
+     * Returns the command that prints the manager version, without the install and update options.
+     */
+    protected function getVersionCommand(): string
+    {
+        return $this->buildUnconfiguredCommand($this->getDefaultBinary(), '--version');
+    }
+
+    /**
      * Normalizes the trimmed output of the version command before it is converted.
      */
     protected function normalizeVersionOutput(string $output): string
     {
         return $output;
     }
+
+    /**
+     * Validate manager configuration that can change the audit scope.
+     */
+    protected function validateAuditConfiguration(bool $noDev): void {}
 
     /**
      * Runs the callback with the process timeout set to the `manager-timeout` option and restores the previous timeout
@@ -215,7 +264,7 @@ abstract class AbstractAssetManager extends AbstractManifestAssetManager
         $timeout = ProcessExecutor::getTimeout();
 
         /** @var int $managerTimeout */
-        $managerTimeout = $this->config->get('manager-timeout', PHP_INT_MAX);
+        $managerTimeout = $this->getManagerConfig()->get('manager-timeout', PHP_INT_MAX);
 
         ProcessExecutor::setTimeout($managerTimeout);
 
@@ -247,8 +296,69 @@ abstract class AbstractAssetManager extends AbstractManifestAssetManager
     private function getManagerBinary(string $defaultBin): string
     {
         /** @var string $bin */
-        $bin = $this->config->get('manager-bin', $defaultBin);
+        $bin = $this->getManagerConfig()->get('manager-bin', $defaultBin);
 
         return Platform::isWindows() ? str_replace('/', '\\', $bin) : $bin;
+    }
+
+    /**
+     * @param array<string, string> $environment
+     *
+     * @return array<string, array{
+     *     process: string|false,
+     *     envExists: bool,
+     *     env: mixed,
+     *     serverExists: bool,
+     *     server: mixed,
+     * }>
+     */
+    private function overrideEnvironment(array $environment): array
+    {
+        $state = [];
+
+        foreach ($environment as $name => $value) {
+            $state[$name] = [
+                'process' => getenv($name),
+                'envExists' => array_key_exists($name, $_ENV),
+                'env' => $_ENV[$name] ?? null,
+                'serverExists' => array_key_exists($name, $_SERVER),
+                'server' => $_SERVER[$name] ?? null,
+            ];
+
+            putenv("{$name}={$value}");
+
+            $_ENV[$name] = $value;
+            $_SERVER[$name] = $value;
+        }
+
+        return $state;
+    }
+
+    /**
+     * @param array<string, array{
+     *     process: string|false,
+     *     envExists: bool,
+     *     env: mixed,
+     *     serverExists: bool,
+     *     server: mixed,
+     * }> $state
+     */
+    private function restoreEnvironment(array $state): void
+    {
+        foreach ($state as $name => $values) {
+            putenv(false === $values['process'] ? $name : "{$name}=" . $values['process']);
+
+            if ($values['envExists']) {
+                $_ENV[$name] = $values['env'];
+            } else {
+                unset($_ENV[$name]);
+            }
+
+            if ($values['serverExists']) {
+                $_SERVER[$name] = $values['server'];
+            } else {
+                unset($_SERVER[$name]);
+            }
+        }
     }
 }

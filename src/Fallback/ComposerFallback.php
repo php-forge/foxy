@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 namespace Foxy\Fallback;
 
+use Composer\Autoload\AutoloadGenerator;
 use Composer\{Composer, Factory};
+use Composer\EventDispatcher\EventDispatcher;
 use Composer\Filter\PlatformRequirementFilter\PlatformRequirementFilterFactory;
 use Composer\Installer;
 use Composer\IO\IOInterface;
+use Composer\Json\JsonFile;
 use Composer\Util\Filesystem;
 use Exception;
 use Foxy\Config\Config;
 use Foxy\Exception\{Message, RuntimeException};
-use Foxy\Util\{ConsoleUtil, LockerUtil, PackageUtil};
+use Foxy\Util\{ConsoleUtil, PackageUtil};
 use Symfony\Component\Console\Input\InputInterface;
 use Throwable;
 
@@ -90,18 +93,13 @@ final class ComposerFallback implements FallbackInterface
 
         $this->vendorDirExisted = null !== $this->vendorDir && file_exists($this->vendorDir);
 
-        $im = $this->composer->getInstallationManager();
-
-        $composerFile = Factory::getComposerFile();
-        $locker = LockerUtil::getLocker($this->io, $im, $composerFile);
-
-        $lockFile = $locker->getJsonFile();
+        $lockFile = new JsonFile(Factory::getLockFile(Factory::getComposerFile()), null, $this->io);
 
         $this->lockFile = $lockFile->getPath();
         $this->lockFileExisted = $lockFile->exists();
 
         if ($this->lockFileExisted) {
-            $this->lock = $locker->getLockData();
+            $this->lock = $lockFile->read();
         }
 
         $this->snapshotSaved = true;
@@ -109,14 +107,38 @@ final class ComposerFallback implements FallbackInterface
         return $this;
     }
 
+    /**
+     * Creates the rollback installer over a private, subscriber-free event dispatcher with scripts disabled.
+     *
+     * Plugin listeners, Foxy's own included, and project scripts registered on the shared dispatcher never see the
+     * rollback; the private autoload generator keeps `pre-autoload-dump` and `post-autoload-dump` off it as well.
+     */
+    private function createInstaller(): Installer
+    {
+        $dispatcher = (new EventDispatcher($this->composer, $this->io))->setRunScripts(false);
+
+        return new Installer(
+            $this->io,
+            $this->composer->getConfig(),
+            // @phpstan-ignore argument.type (root packages all extend BasePackage, as Installer::create() assumes)
+            $this->composer->getPackage(),
+            $this->composer->getDownloadManager(),
+            $this->composer->getRepositoryManager(),
+            $this->composer->getLocker(),
+            $this->composer->getInstallationManager(),
+            $dispatcher,
+            new AutoloadGenerator($dispatcher, $this->io),
+        );
+    }
+
     private function getHydratedLock(): array
     {
-        return $this->hydratedLock ??= PackageUtil::loadLockPackages($this->lock, false);
+        return $this->hydratedLock ??= PackageUtil::loadLockPackages($this->lock);
     }
 
     private function getInstaller(): Installer
     {
-        return $this->installer ?? Installer::create($this->io, $this->composer);
+        return $this->installer ?? $this->createInstaller();
     }
 
     private function isEnabled(): bool
@@ -223,8 +245,7 @@ final class ComposerFallback implements FallbackInterface
             ->setDumpAutoloader($dumpAutoloader)
             ->setOptimizeAutoloader($optimize)
             ->setClassMapAuthoritative($authoritative)
-            ->setApcuAutoloader($apcu)
-            ->setRunScripts(false);
+            ->setApcuAutoloader($apcu);
 
         $ignorePlatformReqs = false;
 

@@ -6,10 +6,12 @@ namespace Foxy\Tests\Asset;
 
 use Composer\Util\Platform;
 use Foxy\Asset\BunManager;
+use Foxy\Audit\Parser\BunAuditParser;
 use Foxy\Config\Config;
 use Foxy\Exception\{Message, RuntimeException};
 use Foxy\Tests\Provider\BunAssetManagerProvider;
 use PHPUnit\Framework\Attributes\{DataProviderExternal, PreserveGlobalState, RunInSeparateProcess};
+use Stringable;
 use Xepozz\InternalMocker\MockerState;
 
 use function array_key_exists;
@@ -673,8 +675,8 @@ final class BunAssetManagerTest extends AuditableAssetManager
         putenv("XDG_CONFIG_HOME={$processConfig}");
         unset($_ENV['XDG_CONFIG_HOME']);
 
-        $_ENV['xdg_config_home'] = new class ($environmentConfig) implements \Stringable {
-            public function __construct(private readonly string $value) {}
+        $_ENV['xdg_config_home'] = new readonly class ($environmentConfig) implements Stringable {
+            public function __construct(private string $value) {}
 
             public function __toString(): string
             {
@@ -810,7 +812,7 @@ final class BunAssetManagerTest extends AuditableAssetManager
 
     protected function getManager(): BunManager
     {
-        return new BunManager($this->io, $this->config, $this->executor, $this->fs, $this->fallback);
+        return new BunManager($this->io, $this->config, $this->executor, $this->fs);
     }
 
     protected function getUnsupportedVersion(): string
@@ -823,6 +825,11 @@ final class BunAssetManagerTest extends AuditableAssetManager
         $binary = Platform::isWindows() ? 'bun.exe' : 'bun';
 
         return $binary . ' audit --json' . ($noDev ? ' --prod' : '');
+    }
+
+    protected function getValidAuditParserClass(): string
+    {
+        return BunAuditParser::class;
     }
 
     protected function getValidInstallCommand(): string

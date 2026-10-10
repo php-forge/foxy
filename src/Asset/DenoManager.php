@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Foxy\Asset;
 
 use Composer\Util\Platform;
+use Foxy\Audit\AuditParserInterface;
+use Foxy\Audit\Parser\DenoAuditParser;
 use Foxy\Exception\{Message, RuntimeException};
 
 use function array_diff;
@@ -15,9 +17,14 @@ use function preg_match;
 use function str_starts_with;
 use function substr;
 
-final class DenoManager extends AbstractAuditableAssetManager
+final class DenoManager extends AbstractAssetManager
 {
     private const array AUDIT_ENVIRONMENT = ['NO_COLOR' => '1'];
+
+    public function getAuditParser(): AuditParserInterface
+    {
+        return new DenoAuditParser();
+    }
 
     public function getLockPackageName(): string
     {
@@ -91,7 +98,7 @@ final class DenoManager extends AbstractAuditableAssetManager
 
     protected function getAuditCommand(bool $noDev): string
     {
-        return $this->buildUnconfiguredCommand($this->getBinary(), ['audit', '--level=low']);
+        return $this->buildUnconfiguredCommand($this->getDefaultBinary(), ['audit', '--level=low']);
     }
 
     protected function getAuditEnvironment(): array
@@ -99,21 +106,19 @@ final class DenoManager extends AbstractAuditableAssetManager
         return self::AUDIT_ENVIRONMENT;
     }
 
-    protected function getInstallCommand(): string
+    /**
+     * Returns the platform-specific Deno binary name.
+     */
+    protected function getDefaultBinary(): string
     {
-        return $this->buildCommand($this->getBinary(), 'install', 'install');
+        return Platform::isWindows() ? 'deno.exe' : 'deno';
     }
 
     protected function getUpdateCommand(): string
     {
-        return $this->buildCommand($this->getBinary(), 'update', ['update', '--lockfile-only', '--recursive'])
+        return $this->buildCommand($this->getDefaultBinary(), 'update', ['update', '--lockfile-only', '--recursive'])
             . ' && '
             . $this->getInstallCommand();
-    }
-
-    protected function getVersionCommand(): string
-    {
-        return $this->buildUnconfiguredCommand($this->getBinary(), '--version');
     }
 
     protected function normalizeVersionOutput(string $output): string
@@ -128,14 +133,6 @@ final class DenoManager extends AbstractAuditableAssetManager
                 Message::ASSET_DENO_AUDIT_NO_DEV_UNSUPPORTED->getMessage(),
             );
         }
-    }
-
-    /**
-     * Returns the platform-specific Deno binary name.
-     */
-    private function getBinary(): string
-    {
-        return Platform::isWindows() ? 'deno.exe' : 'deno';
     }
 
     /**

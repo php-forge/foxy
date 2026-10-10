@@ -6,6 +6,8 @@ namespace Foxy\Tests\Asset;
 
 use Composer\Util\ProcessExecutor;
 use Foxy\Asset\YarnManager;
+use Foxy\Audit\Parser\YarnAuditParser;
+use RuntimeException;
 
 use function array_key_exists;
 use function file_put_contents;
@@ -85,7 +87,7 @@ final class YarnAssetManagerTest extends AuditableAssetManager
                 ->method('getErrorOutput')
                 ->willReturn('');
 
-            $manager = new YarnManager($this->io, $this->config, $executor, $this->fs, $this->fallback);
+            $manager = new YarnManager($this->io, $this->config, $executor, $this->fs);
 
             $manager->audit(false);
 
@@ -168,13 +170,13 @@ final class YarnAssetManagerTest extends AuditableAssetManager
                             );
                         }
 
-                        throw new \RuntimeException(
+                        throw new RuntimeException(
                             'Audit execution failed.',
                         );
                     },
                 );
 
-            $manager = new YarnManager($this->io, $this->config, $executor, $this->fs, $this->fallback);
+            $manager = new YarnManager($this->io, $this->config, $executor, $this->fs);
 
             try {
                 $manager->audit(false);
@@ -182,7 +184,7 @@ final class YarnAssetManagerTest extends AuditableAssetManager
                 self::fail(
                     'Expected the audit process to fail.',
                 );
-            } catch (\RuntimeException $exception) {
+            } catch (RuntimeException $exception) {
                 self::assertSame(
                     'Audit execution failed.',
                     $exception->getMessage(),
@@ -247,7 +249,7 @@ final class YarnAssetManagerTest extends AuditableAssetManager
 
     protected function getManager(): YarnManager
     {
-        return new YarnManager($this->io, $this->config, $this->executor, $this->fs, $this->fallback);
+        return new YarnManager($this->io, $this->config, $this->executor, $this->fs);
     }
 
     protected function getUnsupportedVersion(): string
@@ -260,6 +262,11 @@ final class YarnAssetManagerTest extends AuditableAssetManager
         $command = 'yarn npm audit --all --recursive --json --no-deprecations --severity info';
 
         return $command . ($noDev ? ' --environment production' : '');
+    }
+
+    protected function getValidAuditParserClass(): string
+    {
+        return YarnAuditParser::class;
     }
 
     protected function getValidInstallCommand(): string

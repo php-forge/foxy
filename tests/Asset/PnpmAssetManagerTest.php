@@ -6,6 +6,7 @@ namespace Foxy\Tests\Asset;
 
 use Composer\Util\ProcessExecutor;
 use Foxy\Asset\PnpmManager;
+use Foxy\Audit\Parser\PnpmAuditParser;
 use Foxy\Config\Config;
 
 use function file_get_contents;
@@ -57,7 +58,6 @@ final class PnpmAssetManagerTest extends AuditableAssetManager
             $this->config,
             new ProcessExecutor($this->io),
             $this->fs,
-            $this->fallback,
         );
 
         $result = $manager->audit(false);
@@ -80,7 +80,7 @@ final class PnpmAssetManagerTest extends AuditableAssetManager
 
     protected function getManager(): PnpmManager
     {
-        return new PnpmManager($this->io, $this->config, $this->executor, $this->fs, $this->fallback);
+        return new PnpmManager($this->io, $this->config, $this->executor, $this->fs);
     }
 
     protected function getUnsupportedVersion(): string
@@ -99,6 +99,11 @@ final class PnpmAssetManagerTest extends AuditableAssetManager
         return $command
             . ' --ignore-registry-errors=false --ignore-unfixable=false '
             . ProcessExecutor::escape('--config.auditConfig={ignoreGhsas:[]}');
+    }
+
+    protected function getValidAuditParserClass(): string
+    {
+        return PnpmAuditParser::class;
     }
 
     protected function getValidInstallCommand(): string

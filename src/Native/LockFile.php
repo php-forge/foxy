@@ -8,6 +8,7 @@ use Composer\Json\JsonFile as ComposerJsonFile;
 use Foxy\Exception\{Message, RuntimeException};
 use Foxy\Json\JsonFile;
 use Seld\JsonLint\ParsingException;
+use stdClass;
 
 use function count;
 use function is_array;
@@ -206,7 +207,7 @@ final readonly class LockFile
      *
      * @param array<array-key, string> $specs
      */
-    private static function sorted(array $specs): object
+    private static function sorted(array $specs): stdClass
     {
         ksort($specs, SORT_STRING);
 

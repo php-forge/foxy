@@ -4,25 +4,30 @@ declare(strict_types=1);
 
 namespace Foxy\Tests\Fallback;
 
+use Composer\Autoload\AutoloadGenerator;
 use Composer\Composer;
+use Composer\Downloader\DownloadManager;
+use Composer\EventDispatcher\{Event, EventDispatcher};
 use Composer\Filter\PlatformRequirementFilter\PlatformRequirementFilterInterface;
 use Composer\Installer;
 use Composer\Installer\InstallationManager;
 use Composer\IO\IOInterface;
-use Composer\Package\PackageInterface;
+use Composer\Json\JsonFile;
+use Composer\Package\{Locker, PackageInterface, RootPackage};
 use Composer\Repository\RepositoryManager;
+use Composer\Script\ScriptEvents;
 use Composer\Util\Filesystem;
 use Exception;
 use Foxy\Config\Config;
 use Foxy\Exception\{Message, RuntimeException};
 use Foxy\Fallback\ComposerFallback;
 use Foxy\Tests\Provider\ComposerFallbackProvider;
-use Foxy\Util\LockerUtil;
 use JsonException;
 use PHPUnit\Framework\Attributes\DataProviderExternal;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
+use ReflectionMethod;
 use Symfony\Component\Console\Input\InputInterface;
 
 use function chdir;
@@ -49,6 +54,91 @@ final class ComposerFallbackTest extends TestCase
     private IOInterface|MockObject|null $io = null;
     private string|null $oldCwd = '';
     private \Symfony\Component\Filesystem\Filesystem|null $sfs = null;
+
+    public function testCreatesRollbackInstallerOverPrivateScriptFreeDispatcher(): void
+    {
+        $sharedDispatcher = $this->createMock(EventDispatcher::class);
+
+        $sharedDispatcher
+            ->expects(self::never())
+            ->method('setRunScripts');
+
+        $sharedAutoloadGenerator = $this->createMock(AutoloadGenerator::class);
+        $locker = $this->createMock(Locker::class);
+
+        $this->composer
+            ->method('getConfig')
+            ->willReturn(new \Composer\Config(false));
+        $this->composer
+            ->method('getPackage')
+            ->willReturn(new RootPackage('foo/root', '1.0.0.0', '1.0.0'));
+        $this->composer
+            ->method('getDownloadManager')
+            ->willReturn($this->createMock(DownloadManager::class));
+        $this->composer
+            ->method('getRepositoryManager')
+            ->willReturn($this->createMock(RepositoryManager::class));
+        $this->composer
+            ->method('getLocker')
+            ->willReturn($locker);
+        $this->composer
+            ->method('getInstallationManager')
+            ->willReturn($this->createMock(InstallationManager::class));
+        $this->composer
+            ->method('getEventDispatcher')
+            ->willReturn($sharedDispatcher);
+        $this->composer
+            ->method('getAutoloadGenerator')
+            ->willReturn($sharedAutoloadGenerator);
+
+        $composerFallback = new ComposerFallback($this->composer, $this->io, $this->config, $this->input);
+
+        $installer = (new ReflectionMethod($composerFallback, 'getInstaller'))->invoke($composerFallback);
+
+        self::assertInstanceOf(
+            Installer::class,
+            $installer,
+            'A real installer must be built when none is injected.',
+        );
+
+        $installerReflection = new ReflectionClass(Installer::class);
+        $dispatcher = $installerReflection->getProperty('eventDispatcher')->getValue($installer);
+        $autoloadGenerator = $installerReflection->getProperty('autoloadGenerator')->getValue($installer);
+
+        self::assertInstanceOf(
+            EventDispatcher::class,
+            $dispatcher,
+            'Installer must carry an event dispatcher.',
+        );
+        self::assertNotSame(
+            $sharedDispatcher,
+            $dispatcher,
+            'Event dispatcher must be private, not the shared one.',
+        );
+        self::assertFalse(
+            (new ReflectionClass(EventDispatcher::class))->getProperty('runScripts')->getValue($dispatcher),
+            'Private dispatcher must have scripts disabled.',
+        );
+        self::assertFalse(
+            $dispatcher->hasEventListeners(new Event(ScriptEvents::POST_UPDATE_CMD)),
+            'Private dispatcher must have no listeners.',
+        );
+        self::assertNotSame(
+            $sharedAutoloadGenerator,
+            $autoloadGenerator,
+            'Autoload generator must be private, not the shared one.',
+        );
+        self::assertSame(
+            $dispatcher,
+            (new ReflectionClass(AutoloadGenerator::class))->getProperty('eventDispatcher')->getValue($autoloadGenerator),
+            'Autoload generator must dispatch on the private dispatcher.',
+        );
+        self::assertSame(
+            $locker,
+            $installerReflection->getProperty('locker')->getValue($installer),
+            'Locker must be the shared Composer locker.',
+        );
+    }
 
     public function testFailedSubsequentSaveInvalidatesPreviousSnapshot(): void
     {
@@ -79,12 +169,6 @@ final class ComposerFallbackTest extends TestCase
                 },
             );
 
-        $installationManager = $this->createMock(InstallationManager::class);
-
-        $this->composer
-            ->expects(self::once())
-            ->method('getInstallationManager')
-            ->willReturn($installationManager);
         $this->composer
             ->expects(self::never())
             ->method('getLocker');
@@ -221,9 +305,6 @@ final class ComposerFallbackTest extends TestCase
         $this->fs
             ->expects(self::never())
             ->method('remove');
-        $this->installer
-            ->expects(self::never())
-            ->method('setRunScripts');
         $this->installer
             ->expects(self::never())
             ->method('run');
@@ -410,9 +491,6 @@ final class ComposerFallbackTest extends TestCase
             );
         $this->installer
             ->expects(self::never())
-            ->method('setRunScripts');
-        $this->installer
-            ->expects(self::never())
             ->method('run');
 
         $this->composerFallback->restore();
@@ -524,9 +602,6 @@ final class ComposerFallbackTest extends TestCase
             );
         $this->installer
             ->expects(self::never())
-            ->method('setRunScripts');
-        $this->installer
-            ->expects(self::never())
             ->method('run');
 
         $this->composerFallback->restore();
@@ -565,9 +640,6 @@ final class ComposerFallbackTest extends TestCase
             ->willReturn(false);
         $this->installer
             ->expects(self::never())
-            ->method('setRunScripts');
-        $this->installer
-            ->expects(self::never())
             ->method('run');
 
         $this->expectException(RuntimeException::class);
@@ -593,9 +665,6 @@ final class ComposerFallbackTest extends TestCase
             ->method('remove')
             ->with($vendorDir)
             ->willReturn(false);
-        $this->installer
-            ->expects(self::never())
-            ->method('setRunScripts');
         $this->installer
             ->expects(self::never())
             ->method('run');
@@ -794,9 +863,6 @@ final class ComposerFallbackTest extends TestCase
             ->willThrowException($failure);
         $this->installer
             ->expects(self::never())
-            ->method('setRunScripts');
-        $this->installer
-            ->expects(self::never())
             ->method('run');
 
         try {
@@ -835,13 +901,6 @@ final class ComposerFallbackTest extends TestCase
             ->expects(self::any())
             ->method('getRepositoryManager')
             ->willReturn($rm);
-
-        $im = $this->createMock(InstallationManager::class);
-
-        $this->composer
-            ->expects(self::any())
-            ->method('getInstallationManager')
-            ->willReturn($im);
 
         $config = $this->createMock(\Composer\Config::class);
 
@@ -952,9 +1011,6 @@ final class ComposerFallbackTest extends TestCase
         $this->composer
             ->expects(self::never())
             ->method('getConfig');
-        $this->composer
-            ->expects(self::never())
-            ->method('getInstallationManager');
 
         self::assertSame(
             $composerFallback,
@@ -977,7 +1033,7 @@ final class ComposerFallbackTest extends TestCase
         $this->installer = $this
             ->getMockBuilder(Installer::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(['run', 'setRunScripts'])
+            ->onlyMethods(['run'])
             ->getMock();
         $this->sfs = new \Symfony\Component\Filesystem\Filesystem();
         $this->sfs->mkdir($this->cwd);
@@ -1017,11 +1073,6 @@ final class ComposerFallbackTest extends TestCase
     {
         $this->installer
             ->expects(self::exactly($times))
-            ->method('setRunScripts')
-            ->with(false)
-            ->willReturnSelf();
-        $this->installer
-            ->expects(self::exactly($times))
             ->method('run')
             ->willReturn($result);
     }
@@ -1036,13 +1087,6 @@ final class ComposerFallbackTest extends TestCase
         $vendorDir = $this->cwd . '/vendor';
 
         file_put_contents($this->cwd . '/composer.json', '{}');
-
-        $installationManager = $this->createMock(InstallationManager::class);
-
-        $this->composer
-            ->expects(self::once())
-            ->method('getInstallationManager')
-            ->willReturn($installationManager);
 
         $config = $this->createMock(\Composer\Config::class);
 
@@ -1108,17 +1152,16 @@ final class ComposerFallbackTest extends TestCase
             ->method('getRepositoryManager')
             ->willReturn($repositoryManager);
 
-        $installationManager = $this->createMock(InstallationManager::class);
-
-        $this->composer
-            ->expects(self::any())
-            ->method('getInstallationManager')
-            ->willReturn($installationManager);
         $this->io
             ->expects(self::exactly($restoreCount))
             ->method('write');
 
-        $locker = LockerUtil::getLocker($this->io, $installationManager, $composerFile);
+        $locker = new Locker(
+            $this->io,
+            new JsonFile($lockFile, null, $this->io),
+            $this->createMock(InstallationManager::class),
+            $composerContent,
+        );
 
         $this->composer
             ->expects(self::atLeastOnce())

@@ -8,6 +8,7 @@ use Foxy\Audit\{AuditNormalizer, Severity};
 use Foxy\Exception\{Message, RuntimeException};
 use JsonException;
 use stdClass;
+use Throwable;
 
 use function array_map;
 use function get_object_vars;
@@ -252,7 +253,7 @@ abstract class AbstractAuditParser
         return $this->uniqueStrings($value);
     }
 
-    final protected function malformed(string $reason, \Throwable|null $previous = null): RuntimeException
+    final protected function malformed(string $reason, Throwable|null $previous = null): RuntimeException
     {
         return new RuntimeException(
             Message::AUDIT_OUTPUT_MALFORMED->getMessage($this->getManagerName(), $reason),

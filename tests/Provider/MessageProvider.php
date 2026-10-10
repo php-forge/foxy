@@ -95,17 +95,6 @@ final class MessageProvider
             ['npm'],
             'The "npm" binary must be installed.',
         ];
-        yield 'ASSET_MANAGER_EXITED_WITH_STATUS' => [
-            Message::ASSET_MANAGER_EXITED_WITH_STATUS,
-            [7],
-            'The asset manager exited with status code 7.',
-        ];
-        yield 'ASSET_MANAGER_FALLBACK_RESTORE_FAILED' => [
-            Message::ASSET_MANAGER_FALLBACK_RESTORE_FAILED,
-            ['Unable to write fallback asset file "/project/package.json".'],
-            'The asset manager failed and its fallback could not be restored: Unable to write fallback asset file '
-            . '"/project/package.json".',
-        ];
         yield 'ASSET_MANAGER_LOCKED_UNAVAILABLE' => [
             Message::ASSET_MANAGER_LOCKED_UNAVAILABLE,
             ['pnpm'],
@@ -131,6 +120,12 @@ final class MessageProvider
             ['gulp'],
             'The asset manager "gulp" doesn\'t exist.',
         ];
+        yield 'ASSET_NATIVE_AUDIT_NO_DEV_UNSUPPORTED' => [
+            Message::ASSET_NATIVE_AUDIT_NO_DEV_UNSUPPORTED,
+            [],
+            'The native audit cannot guarantee the requested dependency scope because the native manager installs '
+            . 'development dependencies together with the others.',
+        ];
         yield 'ASSET_NPM_WORKSPACE_GRAPH_UNENUMERABLE' => [
             Message::ASSET_NPM_WORKSPACE_GRAPH_UNENUMERABLE,
             [],
@@ -152,8 +147,8 @@ final class MessageProvider
             ['yarn', '1.22.19', '>=2.0.0'],
             'The installed yarn version "1.22.19" doesn\'t match the supported version constraint ">=2.0.0".',
         ];
-        yield 'AUDIT_BUN_PACKAGE_ADVISORIES_REQUIRED' => [
-            Message::AUDIT_BUN_PACKAGE_ADVISORIES_REQUIRED,
+        yield 'AUDIT_BULK_PACKAGE_ADVISORIES_REQUIRED' => [
+            Message::AUDIT_BULK_PACKAGE_ADVISORIES_REQUIRED,
             [],
             'each package must contain a list of advisories',
         ];
@@ -172,6 +167,11 @@ final class MessageProvider
             Message::AUDIT_COMMAND_FAILED_WITH_DIAGNOSTICS,
             ['pnpm', 1, 'ERR_PNPM_AUDIT_BAD_RESPONSE'],
             'The pnpm audit command failed with status code 1. ERR_PNPM_AUDIT_BAD_RESPONSE',
+        ];
+        yield 'AUDIT_CVE_RESOLUTION_MISSING' => [
+            Message::AUDIT_CVE_RESOLUTION_MISSING,
+            ['GHSA-aaaa-bbbb-cccc'],
+            'The CVE resolver returned no result for "GHSA-aaaa-bbbb-cccc".',
         ];
         yield 'AUDIT_DENO_ADVISORY_ACTIONS_MISMATCH' => [
             Message::AUDIT_DENO_ADVISORY_ACTIONS_MISMATCH,
@@ -292,11 +292,6 @@ final class MessageProvider
             Message::AUDIT_OUTPUT_MALFORMED,
             ['npm', 'invalid JSON'],
             'The npm audit output is malformed: invalid JSON.',
-        ];
-        yield 'AUDIT_PARSER_UNSUPPORTED_MANAGER' => [
-            Message::AUDIT_PARSER_UNSUPPORTED_MANAGER,
-            ['deno'],
-            'The asset manager "deno" does not provide a supported audit report.',
         ];
         yield 'AUDIT_PNPM_FINDINGS_EMPTY' => [
             Message::AUDIT_PNPM_FINDINGS_EMPTY,
@@ -442,11 +437,6 @@ final class MessageProvider
             Message::FOXY_AUDIT_DISABLED,
             [],
             'Foxy is disabled; frontend dependencies cannot be audited.',
-        ];
-        yield 'FOXY_AUDIT_UNSUPPORTED_MANAGER' => [
-            Message::FOXY_AUDIT_UNSUPPORTED_MANAGER,
-            [],
-            'The selected asset manager does not support security audits.',
         ];
         yield 'JSON_FILE_UNREADABLE' => [
             Message::JSON_FILE_UNREADABLE,
@@ -642,6 +632,12 @@ final class MessageProvider
             Message::SOLVER_ASSET_DIR_UNMANAGED,
             ['/project/vendor/foxy/composer-asset'],
             'The Composer asset directory "/project/vendor/foxy/composer-asset" is not marked as managed by Foxy.',
+        ];
+        yield 'SOLVER_ASSET_FALLBACK_RESTORE_FAILED' => [
+            Message::SOLVER_ASSET_FALLBACK_RESTORE_FAILED,
+            ['Unable to write fallback asset file "/project/package.json".'],
+            'The asset manager failed and its fallback could not be restored: Unable to write fallback asset file '
+            . '"/project/package.json".',
         ];
         yield 'SOLVER_ASSET_MANAGER_FAILED' => [
             Message::SOLVER_ASSET_MANAGER_FAILED,

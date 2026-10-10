@@ -6,6 +6,8 @@ namespace Foxy\Asset;
 
 use Composer\Pcre\Preg;
 use Composer\Util\Platform;
+use Foxy\Audit\AuditParserInterface;
+use Foxy\Audit\Parser\BunAuditParser;
 use Foxy\Exception\{Message, RuntimeException};
 use Generator;
 use Stringable;
@@ -36,8 +38,13 @@ use function trim;
 
 use const DIRECTORY_SEPARATOR;
 
-final class BunManager extends AbstractAuditableAssetManager
+final class BunManager extends AbstractAssetManager
 {
+    public function getAuditParser(): AuditParserInterface
+    {
+        return new BunAuditParser();
+    }
+
     public function getLockPackageName(): string
     {
         return 'bun.lock';
@@ -66,22 +73,15 @@ final class BunManager extends AbstractAuditableAssetManager
             $command[] = '--prod';
         }
 
-        return $this->buildUnconfiguredCommand($this->getBinary(), $command);
+        return $this->buildUnconfiguredCommand($this->getDefaultBinary(), $command);
     }
 
-    protected function getInstallCommand(): string
+    /**
+     * Returns the platform-specific Bun binary name.
+     */
+    protected function getDefaultBinary(): string
     {
-        return $this->buildCommand($this->getBinary(), 'install', 'install');
-    }
-
-    protected function getUpdateCommand(): string
-    {
-        return $this->buildCommand($this->getBinary(), 'update', 'update');
-    }
-
-    protected function getVersionCommand(): string
-    {
-        return $this->buildUnconfiguredCommand($this->getBinary(), '--version');
+        return Platform::isWindows() ? 'bun.exe' : 'bun';
     }
 
     protected function validateAuditConfiguration(bool $noDev): void
@@ -135,14 +135,6 @@ final class BunManager extends AbstractAuditableAssetManager
         }
 
         return null;
-    }
-
-    /**
-     * Returns the platform-specific Bun binary name.
-     */
-    private function getBinary(): string
-    {
-        return Platform::isWindows() ? 'bun.exe' : 'bun';
     }
 
     /**

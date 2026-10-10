@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Foxy\Asset;
 
 use Composer\Package\RootPackageInterface;
+use Foxy\Audit\{AuditParserInterface, AuditProcessResult};
 use Foxy\Exception\RuntimeException;
-use Foxy\Fallback\FallbackInterface;
 
 interface AssetManagerInterface
 {
@@ -17,6 +17,20 @@ interface AssetManagerInterface
      * @param array $dependencies The asset local dependencies
      */
     public function addDependencies(RootPackageInterface $rootPackage, array $dependencies): AssetPackageInterface;
+
+    /**
+     * Runs the security audit of the locked dependencies.
+     *
+     * @param bool $noDev Whether to exclude development dependencies; managers that cannot exclude them throw.
+     *
+     * @throws RuntimeException if the lock file is missing, the manager cannot honor `$noDev`, or the audit cannot run.
+     */
+    public function audit(bool $noDev): AuditProcessResult;
+
+    /**
+     * Returns the parser of this manager's audit report.
+     */
+    public function getAuditParser(): AuditParserInterface;
 
     /**
      * Get the filename of the lock file.
@@ -62,11 +76,6 @@ interface AssetManagerInterface
      * Run the asset manager to install/update the asset dependencies.
      */
     public function run(): int;
-
-    /**
-     * @param FallbackInterface $fallback The fallback
-     */
-    public function setFallback(FallbackInterface $fallback): self;
 
     /**
      * Define if the asset manager can be use the update command.

@@ -12,7 +12,7 @@ namespace Foxy\Tests\Provider;
 final class AssetPackageProvider
 {
     /**
-     * @return iterable<int, array{array<string, bool|string>, array<string, string>, string}>
+     * @return iterable<int, array{array<string, bool|string>, array<string, bool|string>, string}>
      */
     public static function requiredKeys(): iterable
     {
@@ -29,6 +29,11 @@ final class AssetPackageProvider
         yield [
             ['name' => '@foo/bar', 'private' => true],
             ['name' => '@foo/bar'],
+            'proprietary',
+        ];
+        yield [
+            ['name' => '@foo/bar', 'private' => false],
+            ['name' => '@foo/bar', 'private' => false],
             'proprietary',
         ];
     }

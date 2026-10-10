@@ -4,68 +4,16 @@ declare(strict_types=1);
 
 namespace Foxy\Tests\Util;
 
-use Composer\Package\CompletePackage;
+use Composer\Package\{AliasPackage, CompletePackage};
 use Composer\Package\Loader\ArrayLoader;
 use Foxy\Util\PackageUtil;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Unit tests for {@see PackageUtil} lock package hydration.
+ */
 final class PackageUtilTest extends TestCase
 {
-    public function testConvertLockAlias(): void
-    {
-        $lockData = [
-            'content-hash' => 'HASH_VALUE',
-            'aliases' => [
-                [
-                    'alias' => '1.0.0',
-                    'alias_normalized'
-                    => '1.0.0.0',
-                    'version' => 'dev-feature/1.0-test',
-                    'package' => 'foo/bar',
-                ],
-                [
-                    'alias' => '2.2.0',
-                    'alias_normalized' => '2.2.0.0',
-                    'version' => 'dev-feature/2.2-test',
-                    'package' => 'foo/baz',
-                ],
-            ],
-        ];
-
-        $expectedAliases = [
-            'foo/bar' => [
-                'dev-feature/1.0-test' => [
-                    'alias' => '1.0.0',
-                    'alias_normalized' => '1.0.0.0',
-                ],
-            ],
-            'foo/baz' => [
-                'dev-feature/2.2-test' => [
-                    'alias' => '2.2.0',
-                    'alias_normalized' => '2.2.0.0',
-                ],
-            ],
-        ];
-
-        $convertedAliases = PackageUtil::convertLockAlias($lockData);
-
-        self::assertArrayHasKey(
-            'aliases',
-            $convertedAliases,
-            'The converted aliases array does not contain the expected key.',
-        );
-        self::assertSame(
-            'HASH_VALUE',
-            $convertedAliases['content-hash'],
-            'The content hash does not match the expected value.',
-        );
-        self::assertEquals(
-            $expectedAliases,
-            $convertedAliases['aliases'],
-            'The converted aliases do not match the expected ones.',
-        );
-    }
-
     public function testLoadLockPackageLoadsOnlyRequestedSection(): void
     {
         $lockData = [
@@ -136,7 +84,7 @@ final class PackageUtilTest extends TestCase
         );
     }
 
-    public function testLoadLockPackagesCanPreserveRawAliases(): void
+    public function testLoadLockPackagesPreservesRawAliases(): void
     {
         $aliases = [
             [
@@ -153,7 +101,7 @@ final class PackageUtilTest extends TestCase
             'aliases' => $aliases,
         ];
 
-        $lockDataLoaded = PackageUtil::loadLockPackages($lockData, false);
+        $lockDataLoaded = PackageUtil::loadLockPackages($lockData);
 
         self::assertInstanceOf(
             CompletePackage::class,
@@ -167,42 +115,43 @@ final class PackageUtilTest extends TestCase
         );
     }
 
-    public function testLoadLockPackagesConvertsAliasesByDefault(): void
-    {
-        $lockData = [
-            'packages' => [
-                ['name' => 'foo/bar', 'version' => 'dev-feature'],
-            ],
-            'aliases' => [
-                [
-                    'package' => 'foo/bar',
-                    'version' => 'dev-feature',
-                    'alias' => '1.0.x-dev',
-                    'alias_normalized' => '1.0.9999999.9999999-dev',
-                ],
-            ],
-        ];
-
-        $loaded = PackageUtil::loadLockPackages($lockData);
-
-        self::assertSame(
-            [
-                'dev-feature' => [
-                    'alias' => '1.0.x-dev',
-                    'alias_normalized' => '1.0.9999999.9999999-dev',
-                ],
-            ],
-            $loaded['aliases']['foo/bar'],
-            'The loaded aliases for the package "foo/bar" do not match the expected ones.',
-        );
-    }
-
     public function testLoadLockPackagesWithoutPackages(): void
     {
         self::assertSame(
             [],
             PackageUtil::loadLockPackages([]),
             'The loaded lock data for an empty input does not match the expected empty array.',
+        );
+    }
+
+    public function testLoadLockPackageUnwrapsBranchAliasPackage(): void
+    {
+        $lockData = [
+            'packages' => [
+                [
+                    'name' => 'foo/bar',
+                    'version' => 'dev-main',
+                    'extra' => ['branch-alias' => ['dev-main' => '1.0.x-dev']],
+                ],
+            ],
+        ];
+
+        $loaded = PackageUtil::loadLockPackage(new ArrayLoader(), $lockData);
+
+        self::assertInstanceOf(
+            CompletePackage::class,
+            $loaded['packages'][0],
+            'The loaded package should be the aliased package.',
+        );
+        self::assertNotInstanceOf(
+            AliasPackage::class,
+            $loaded['packages'][0],
+            'The branch alias wrapper should be removed.',
+        );
+        self::assertSame(
+            'dev-main',
+            $loaded['packages'][0]->getPrettyVersion(),
+            'The loaded package should keep the locked version.',
         );
     }
 }

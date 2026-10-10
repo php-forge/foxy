@@ -5,7 +5,15 @@ declare(strict_types=1);
 namespace Foxy\Tests\Audit;
 
 use Foxy\Asset\AssetManagerInterface;
-use Foxy\Audit\{AuditProcessResult, AuditRequest, AuditRunner, AuditableAssetManagerInterface, CveStatus, Severity};
+use Foxy\Audit\{AuditParserInterface, AuditProcessResult, AuditRequest, AuditRunner, CveStatus, Severity};
+use Foxy\Audit\Parser\{
+    BunAuditParser,
+    DenoAuditParser,
+    NativeAuditParser,
+    NpmAuditParser,
+    PnpmAuditParser,
+    YarnAuditParser,
+};
 use Foxy\Exception\{Message, RuntimeException};
 use Foxy\Tests\Provider\AuditRunnerProvider;
 use PHPUnit\Framework\Attributes\DataProviderExternal;
@@ -97,6 +105,24 @@ final class AuditRunnerTest extends TestCase
             Severity::HIGH,
             $report->findings[1]->severity,
             'The less severe advisory should follow',
+        );
+    }
+
+    public function testRunnerAcceptsNativeDocumentWithExitOne(): void
+    {
+        $manager = $this->manager('native', new AuditProcessResult(1, self::fixture('bun-populated.json'), ''));
+
+        $report = (new AuditRunner($manager))->audit(new AuditRequest());
+
+        self::assertSame(
+            'native',
+            $report->manager,
+            'The report manager should match the expected value',
+        );
+        self::assertCount(
+            2,
+            $report->findings,
+            'The native document should yield one finding per advisory',
         );
     }
 
@@ -351,14 +377,8 @@ final class AuditRunnerTest extends TestCase
         string $name,
         AuditProcessResult $result,
         bool $expectedNoDev = false,
-    ): AssetManagerInterface&AuditableAssetManagerInterface&MockObject {
-        /** @var AssetManagerInterface&AuditableAssetManagerInterface&MockObject $manager */
-        $manager = $this->createMockForIntersectionOfInterfaces(
-            [
-                AssetManagerInterface::class,
-                AuditableAssetManagerInterface::class,
-            ],
-        );
+    ): AssetManagerInterface&MockObject {
+        $manager = $this->createMock(AssetManagerInterface::class);
 
         $manager
             ->expects(self::once())
@@ -369,7 +389,23 @@ final class AuditRunnerTest extends TestCase
             ->method('audit')
             ->with($expectedNoDev)
             ->willReturn($result);
+        $manager
+            ->method('getAuditParser')
+            ->willReturn(self::parser($name));
 
         return $manager;
+    }
+
+    private static function parser(string $name): AuditParserInterface
+    {
+        return match ($name) {
+            'bun' => new BunAuditParser(),
+            'deno' => new DenoAuditParser(),
+            'native' => new NativeAuditParser(),
+            'npm' => new NpmAuditParser(),
+            'pnpm' => new PnpmAuditParser(),
+            'yarn' => new YarnAuditParser(),
+            default => self::fail("No parser is registered for the {$name} manager."),
+        };
     }
 }

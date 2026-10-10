@@ -30,8 +30,8 @@ package version only when the embedded package does not declare its own version.
 | `native`    | No frontend manager; PHP with the `zlib` extension                             |
 
 The frontend manager requirements apply to automatic manager execution and explicit security audits. Manifest-only
-Composer processing does not require a manager binary, but `composer foxy:audit` does. The `native` manager needs no
-binary at all; see [Native manager](config.md#native-manager).
+Composer processing does not require a manager binary, but `composer foxy:audit` does with a binary manager. The
+`native` manager needs no binary at all, not even to audit; see [Native manager](config.md#native-manager).
 
 ## Installation
 
@@ -39,7 +39,7 @@ Composer plugins execute code during Composer operations. Authorize Foxy explici
 
 ```bash
 composer config allow-plugins.php-forge/foxy true
-composer require php-forge/foxy:^0.3
+composer require php-forge/foxy:^0.4
 ```
 
 The plugin is installed in the configured Composer vendor directory, normally `vendor/php-forge/foxy`.
@@ -56,7 +56,7 @@ During automatic Composer processing, `run-asset-manager=false` makes Foxy selec
 the manifest adapter without probing executables. An explicit `composer foxy:audit` still probes and runs the selected
 manager.
 
-Commit the selected manager's native lockfile and use the same explicit manager in local development and CI.
+Commit the selected manager's own lockfile and use the same explicit manager in local development and CI.
 
 ## Next steps
 

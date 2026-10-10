@@ -7,7 +7,7 @@ namespace Foxy\Native;
 use Foxy\Exception\RuntimeException;
 
 /**
- * Provides access to an npm registry: package metadata and verified tarballs.
+ * Provides access to an npm registry: package metadata, verified tarballs, and security advisories.
  */
 interface NpmRegistryInterface
 {
@@ -22,6 +22,15 @@ interface NpmRegistryInterface
     public function fetchTarball(ResolvedPackage $package, string $directory): string;
 
     /**
+     * Returns the registry's bulk advisories document for the given versions, as the registry wrote it.
+     *
+     * @param array<string, non-empty-list<string>> $versions Locked versions keyed by package name.
+     *
+     * @throws RuntimeException if the request fails.
+     */
+    public function getAdvisories(array $versions): string;
+
+    /**
      * Returns the abbreviated metadata of a package.
      *
      * @param string $name Package name, scoped names included (`@scope/name`).
@@ -29,4 +38,16 @@ interface NpmRegistryInterface
      * @throws RuntimeException if the package is unknown, the request fails, or the metadata is malformed.
      */
     public function getMetadata(string $name): PackageMetadata;
+
+    /**
+     * Downloads the tarballs missing from the cache in parallel, verifying each before it is cached.
+     *
+     * The prefetch is best-effort: a tarball that fails to download or to verify is left out of the cache, and the
+     * later {@see fetchTarball()} downloads it again and reports the error. Each download lands in the given
+     * directory until it is verified, never in a shared temporary directory.
+     *
+     * @param list<ResolvedPackage> $packages Registry packages whose tarballs are wanted.
+     * @param string $directory Existing directory that holds each tarball while it is verified.
+     */
+    public function prefetchTarballs(array $packages, string $directory): void;
 }

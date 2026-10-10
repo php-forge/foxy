@@ -29,7 +29,7 @@
         "composer/pcre": "^3.3",
         "composer/semver": "^3.4",
         "seld/jsonlint": "^1.12",
-        "symfony/console": "^7.4"
+        "symfony/console": "^7.4 || ^8.0"
     },
     "require-dev": {
         "infection/infection": "^0.35",

@@ -5,8 +5,15 @@ declare(strict_types=1);
 namespace Foxy\Tests\Audit;
 
 use Closure;
-use Foxy\Audit\{AuditParserFactory, AuditParserInterface, CveStatus};
-use Foxy\Audit\Parser\{BunAuditParser, DenoAuditParser, NpmAuditParser, PnpmAuditParser, YarnAuditParser};
+use Foxy\Audit\{AuditParserInterface, CveStatus};
+use Foxy\Audit\Parser\{
+    BunAuditParser,
+    DenoAuditParser,
+    NativeAuditParser,
+    NpmAuditParser,
+    PnpmAuditParser,
+    YarnAuditParser,
+};
 use Foxy\Audit\Severity;
 use Foxy\Exception\{Message, RuntimeException};
 use Foxy\Tests\Provider\AuditParserProvider;
@@ -20,7 +27,7 @@ use function str_repeat;
 use const JSON_THROW_ON_ERROR;
 
 /**
- * Unit tests for {@see AuditParserFactory} and the npm, pnpm, Yarn, Bun, and Deno audit report parsers.
+ * Unit tests for the npm, pnpm, Yarn, Bun, Deno, and native audit report parsers.
  *
  * {@see AuditParserProvider} for test case data providers.
  */
@@ -147,6 +154,72 @@ final class AuditParserTest extends TestCase
         );
     }
 
+    public function testNativeParserReadsRawBulkAdvisoriesDocument(): void
+    {
+        $findings = (new NativeAuditParser())->parse(self::fixture('bun-populated.json'));
+
+        self::assertCount(
+            2,
+            $findings,
+            'The document should yield one finding per advisory',
+        );
+        self::assertSame(
+            'lodash',
+            $findings[0]->package,
+            'The package should match the document key',
+        );
+        self::assertSame(
+            Severity::HIGH,
+            $findings[0]->severity,
+            'The severity should match the expected value',
+        );
+        self::assertSame(
+            'GHSA-35jh-r3h4-6jhm',
+            $findings[0]->advisoryId,
+            'The GitHub advisory ID should be extracted from the advisory URL',
+        );
+        self::assertSame(
+            '1106913',
+            $findings[0]->sourceId,
+            'The integer advisory ID should become the string source ID',
+        );
+        self::assertSame(
+            'Command Injection in lodash',
+            $findings[0]->title,
+            'The title should match the expected value',
+        );
+        self::assertSame(
+            '<4.17.21',
+            $findings[0]->vulnerableVersions,
+            'The vulnerable range should come from `vulnerable_versions`',
+        );
+        self::assertSame(
+            'https://github.com/advisories/GHSA-35jh-r3h4-6jhm',
+            $findings[0]->url,
+            'The URL should match the expected value',
+        );
+        self::assertSame(
+            [],
+            $findings[0]->affectedVersions,
+            'The affected versions should be empty because the document does not provide them',
+        );
+        self::assertSame(
+            [],
+            $findings[0]->dependencyPaths,
+            'The dependency paths should be empty because the document does not provide them',
+        );
+        self::assertSame(
+            '1107000',
+            $findings[1]->advisoryId,
+            'The advisory ID should fall back to the source ID for a non-GitHub URL',
+        );
+        self::assertSame(
+            'Vulnerability found',
+            $findings[1]->title,
+            'The missing title should fall back to the default title',
+        );
+    }
+
     public function testNpmParserAcceptsNumericPackageKeyAndObjectFixAvailability(): void
     {
         $data = json_decode(self::fixture('npm-populated.json'), true, 512, JSON_THROW_ON_ERROR);
@@ -245,35 +318,6 @@ final class AuditParserTest extends TestCase
         );
     }
 
-    public function testParserFactoryCreatesEverySupportedParser(): void
-    {
-        self::assertInstanceOf(
-            NpmAuditParser::class,
-            AuditParserFactory::create('npm'),
-            'The `npm` manager should resolve to the npm parser',
-        );
-        self::assertInstanceOf(
-            PnpmAuditParser::class,
-            AuditParserFactory::create('pnpm'),
-            'The `pnpm` manager should resolve to the pnpm parser',
-        );
-        self::assertInstanceOf(
-            YarnAuditParser::class,
-            AuditParserFactory::create('yarn'),
-            'The `yarn` manager should resolve to the Yarn parser',
-        );
-        self::assertInstanceOf(
-            BunAuditParser::class,
-            AuditParserFactory::create('bun'),
-            'The `bun` manager should resolve to the Bun parser',
-        );
-        self::assertInstanceOf(
-            DenoAuditParser::class,
-            AuditParserFactory::create('deno'),
-            'The `deno` manager should resolve to the Deno parser',
-        );
-    }
-
     public function testParsersReadCleanReports(): void
     {
         self::assertSame(
@@ -300,6 +344,11 @@ final class AuditParserTest extends TestCase
             [],
             (new DenoAuditParser())->parse(self::fixture('deno-clean.txt')),
             'The clean Deno report should not contain any finding',
+        );
+        self::assertSame(
+            [],
+            (new NativeAuditParser())->parse(self::fixture('bun-clean.json')),
+            'The clean native report should not contain any finding',
         );
     }
 
@@ -477,16 +526,6 @@ final class AuditParserTest extends TestCase
         );
 
         $parser->parse($output);
-    }
-
-    public function testThrowRuntimeExceptionForUnsupportedManager(): void
-    {
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage(
-            Message::AUDIT_PARSER_UNSUPPORTED_MANAGER->getMessage('legacy'),
-        );
-
-        AuditParserFactory::create('legacy');
     }
 
     public function testThrowRuntimeExceptionWhenNpmMetadataCountsMismatchEntries(): void

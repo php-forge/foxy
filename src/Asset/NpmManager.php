@@ -6,6 +6,8 @@ namespace Foxy\Asset;
 
 use Composer\Json\JsonFile;
 use Composer\Util\ProcessExecutor;
+use Foxy\Audit\AuditParserInterface;
+use Foxy\Audit\Parser\NpmAuditParser;
 use Foxy\Exception\{Message, RuntimeException};
 
 use function array_is_list;
@@ -16,8 +18,13 @@ use function str_contains;
 use function str_replace;
 use function trim;
 
-final class NpmManager extends AbstractAuditableAssetManager
+final class NpmManager extends AbstractAssetManager
 {
+    public function getAuditParser(): AuditParserInterface
+    {
+        return new NpmAuditParser();
+    }
+
     public function getLockPackageName(): string
     {
         return 'package-lock.json';
@@ -64,22 +71,7 @@ final class NpmManager extends AbstractAuditableAssetManager
 
         $command = [...$command, $noDev ? '--omit=dev' : '--include=dev', '--include=optional', '--include=peer'];
 
-        return $this->buildUnconfiguredCommand('npm', $command);
-    }
-
-    protected function getInstallCommand(): string
-    {
-        return $this->buildCommand('npm', 'install', 'install');
-    }
-
-    protected function getUpdateCommand(): string
-    {
-        return $this->buildCommand('npm', 'update', 'update');
-    }
-
-    protected function getVersionCommand(): string
-    {
-        return $this->buildUnconfiguredCommand('npm', '--version');
+        return $this->buildUnconfiguredCommand($this->getDefaultBinary(), $command);
     }
 
     /**

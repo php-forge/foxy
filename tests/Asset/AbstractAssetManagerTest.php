@@ -9,13 +9,14 @@ use Composer\Package\RootPackageInterface;
 use Composer\Util\{Filesystem, ProcessExecutor};
 use Foxy\Config\Config;
 use Foxy\Converter\VersionConverterInterface;
-use Foxy\Fallback\FallbackInterface;
-use Foxy\Tests\Fixtures\Asset\InspectableAssetManager;
+use Foxy\Exception\Message;
+use Foxy\Tests\Fixtures\Asset\{CustomBinaryAssetManager, InspectableAssetManager};
 use Foxy\Tests\Fixtures\Util\ProcessExecutorMock;
 use Foxy\Tests\Provider\AbstractAssetManagerProvider;
 use PHPUnit\Framework\Attributes\{DataProviderExternal, PreserveGlobalState, RunInSeparateProcess};
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use Seld\JsonLint\ParsingException;
 use Symfony\Component\Filesystem\Filesystem as SymfonyFilesystem;
 use Xepozz\InternalMocker\MockerState;
@@ -41,7 +42,6 @@ final class AbstractAssetManagerTest extends TestCase
     private Config|null $config = null;
     private string|null $cwd = null;
     private ProcessExecutorMock|null $executor = null;
-    private FallbackInterface|MockObject|null $fallback = null;
     private Filesystem|MockObject|null $fs = null;
     private IOInterface|MockObject|null $io = null;
     private string|null $oldCwd = null;
@@ -86,35 +86,6 @@ final class AbstractAssetManagerTest extends TestCase
             $manager->getHandledDependencies(),
             'The default hook must not handle dependencies.',
         );
-    }
-
-    public function testAddDependenciesPropagatesFailureWithoutFallback(): void
-    {
-        file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'package.json', 'invalid json');
-
-        $manager = new InspectableAssetManager(
-            $this->io,
-            $this->config,
-            $this->executor,
-            $this->fs,
-        );
-
-        $this->expectException(ParsingException::class);
-
-        $manager->addDependencies($this->rootPackage, []);
-    }
-
-    public function testAddDependenciesRestoresFallbackAfterFailure(): void
-    {
-        file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'package.json', 'invalid json');
-
-        $this->fallback
-            ->expects(self::once())
-            ->method('restore');
-
-        $this->expectException(ParsingException::class);
-
-        $this->createManager()->addDependencies($this->rootPackage, []);
     }
 
     public function testAuditCapturesStandardAndErrorOutputWithoutStreaming(): void
@@ -165,7 +136,7 @@ final class AbstractAssetManagerTest extends TestCase
             ->expects(self::never())
             ->method('writeErrorRaw');
 
-        $manager = new InspectableAssetManager($this->io, $this->config, $executor, $this->fs, $this->fallback);
+        $manager = new InspectableAssetManager($this->io, $this->config, $executor, $this->fs);
 
         $result = $manager->audit(true);
 
@@ -252,7 +223,6 @@ final class AbstractAssetManagerTest extends TestCase
                 $this->config,
                 $executor,
                 $this->fs,
-                $this->fallback,
             );
 
             $manager->setAuditEnvironmentForTest([$name => 'audit-value']);
@@ -318,11 +288,9 @@ final class AbstractAssetManagerTest extends TestCase
 
                     $observedTimeout = ProcessExecutor::getTimeout();
 
-                    throw new \RuntimeException('Audit execution failed.');
+                    throw new RuntimeException('Audit execution failed.');
                 },
             );
-        $this->fallback->expects(self::never())->method('restore');
-
         try {
             ProcessExecutor::setTimeout($expectedTimeout);
 
@@ -331,7 +299,6 @@ final class AbstractAssetManagerTest extends TestCase
                 $this->config,
                 $executor,
                 $this->fs,
-                $this->fallback,
             );
 
             try {
@@ -340,7 +307,7 @@ final class AbstractAssetManagerTest extends TestCase
                 self::fail(
                     'Expected the audit process to fail.',
                 );
-            } catch (\RuntimeException $exception) {
+            } catch (RuntimeException $exception) {
                 self::assertSame(
                     'Audit execution failed.',
                     $exception->getMessage(),
@@ -394,6 +361,35 @@ final class AbstractAssetManagerTest extends TestCase
             str_replace('/', DIRECTORY_SEPARATOR, 'custom/bin') . ' install --global --local',
             $this->createManager()->buildCommandForTest('inspectable', 'install', 'install'),
             'Options must be trimmed and ordered.',
+        );
+    }
+
+    public function testDefaultCommandsUseDefaultBinary(): void
+    {
+        $this->config = new Config(
+            [
+                'manager-options' => '--global',
+                'manager-install-options' => '--frozen',
+                'manager-update-options' => '--latest',
+            ],
+        );
+
+        $manager = new CustomBinaryAssetManager($this->io, $this->config, $this->executor, $this->fs);
+
+        self::assertSame(
+            'custom-bin install --global --frozen',
+            $manager->getInstallCommandForTest(),
+            'Install command must start with the default binary and append install options.',
+        );
+        self::assertSame(
+            'custom-bin update --global --latest',
+            $manager->getUpdateCommandForTest(),
+            'Update command must start with the default binary and append update options.',
+        );
+        self::assertSame(
+            'custom-bin --version',
+            $manager->getVersionCommandForTest(),
+            'Version command must use the default binary without options.',
         );
     }
 
@@ -462,18 +458,84 @@ final class AbstractAssetManagerTest extends TestCase
 
         $this->executor->addExpectedValues(0, '42.0.0');
 
-        self::assertNull(
-            $this->config->get('manager-version'),
-            'Manager-specific configuration must not alter the global version.',
-        );
+        $manager = $this->createManager();
+
         self::assertTrue(
-            $this->createManager()->isAvailable(),
+            $manager->isAvailable(),
             'The manager must accept its configured version constraint.',
         );
-        self::assertSame(
-            '>=42.0.0',
+        self::assertNull(
             $this->config->get('manager-version'),
-            'The manager-specific version must be resolved.',
+            'Probing must not scope the shared configuration.',
+        );
+
+        $manager->validate();
+    }
+
+    public function testManagerBinOverridesDefaultBinary(): void
+    {
+        $this->config = new Config(['manager-bin' => ['custom' => 'configured-bin']]);
+
+        $manager = new CustomBinaryAssetManager($this->io, $this->config, $this->executor, $this->fs);
+
+        self::assertSame(
+            'configured-bin install',
+            $manager->getInstallCommandForTest(),
+            'Configured binary must replace the default in the install command.',
+        );
+        self::assertSame(
+            'configured-bin update',
+            $manager->getUpdateCommandForTest(),
+            'Configured binary must replace the default in the update command.',
+        );
+        self::assertSame(
+            'configured-bin --version',
+            $manager->getVersionCommandForTest(),
+            'Configured binary must replace the default in the version command.',
+        );
+    }
+
+    public function testManagersSharingConfigurationReadTheirOwnEntries(): void
+    {
+        $this->config = new Config(['manager-bin' => ['custom' => 'bin-b', 'inspectable' => 'bin-a']]);
+
+        for ($i = 0; $i < 4; $i++) {
+            $this->executor->addExpectedValues(0, '1.0.0');
+        }
+
+        $inspectable = $this->createManager();
+
+        $custom = new CustomBinaryAssetManager($this->io, $this->config, $this->executor, $this->fs);
+
+        $inspectable->isAvailable();
+        $custom->isAvailable();
+
+        self::assertSame(
+            'bin-a install',
+            $inspectable->buildCommandForTest('inspectable', 'install', 'install'),
+            'First manager must keep its own entry after the second probe.',
+        );
+
+        $custom = new CustomBinaryAssetManager($this->io, $this->config, $this->executor, $this->fs);
+        $inspectable = $this->createManager();
+
+        $custom->isAvailable();
+        $inspectable->isAvailable();
+
+        self::assertSame(
+            'bin-b install',
+            $custom->getInstallCommandForTest(),
+            'Second manager must keep its own entry after the first probe.',
+        );
+        self::assertSame(
+            ['bin-a --version', 'bin-b --version', 'bin-b --version', 'bin-a --version'],
+            [
+                $this->executor->getExecutedCommand(0),
+                $this->executor->getExecutedCommand(1),
+                $this->executor->getExecutedCommand(2),
+                $this->executor->getExecutedCommand(3),
+            ],
+            'Each probe must run its own configured binary.',
         );
     }
 
@@ -704,13 +766,43 @@ final class AbstractAssetManagerTest extends TestCase
             ->method('writeErrorRaw')
             ->with('error output', false);
 
-        $manager = new InspectableAssetManager($this->io, $this->config, $executor, $this->fs, $this->fallback);
+        $manager = new InspectableAssetManager($this->io, $this->config, $executor, $this->fs);
 
         self::assertSame(
             0,
             $manager->run(),
             'Successful execution must return a zero exit code.',
         );
+    }
+
+    public function testThrowParsingExceptionWhenPackageJsonIsInvalid(): void
+    {
+        file_put_contents($this->cwd . DIRECTORY_SEPARATOR . 'package.json', 'invalid json');
+
+        $manager = new InspectableAssetManager(
+            $this->io,
+            $this->config,
+            $this->executor,
+            $this->fs,
+        );
+
+        $this->expectException(ParsingException::class);
+
+        $manager->addDependencies($this->rootPackage, []);
+    }
+
+    public function testThrowRuntimeExceptionWhenManagerSpecificVersionConstraintIsNotSatisfied(): void
+    {
+        $this->config = new Config([], ['manager-version' => ['inspectable' => '>=42.0.0']]);
+
+        $this->executor->addExpectedValues(0, '41.0.0');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            Message::ASSET_VERSION_CONSTRAINT_MISMATCH->getMessage('inspectable', '41.0.0', '>=42.0.0'),
+        );
+
+        $this->createManager()->validate();
     }
 
     public function testVersionCommandUsesConfiguredRootDirectory(): void
@@ -739,7 +831,7 @@ final class AbstractAssetManagerTest extends TestCase
                 },
             );
 
-        $manager = new InspectableAssetManager($this->io, $this->config, $executor, $this->fs, $this->fallback);
+        $manager = new InspectableAssetManager($this->io, $this->config, $executor, $this->fs);
 
         $manager->validate();
 
@@ -803,7 +895,6 @@ final class AbstractAssetManagerTest extends TestCase
         $this->io = $this->createMock(IOInterface::class);
         $this->executor = new ProcessExecutorMock($this->io);
         $this->fs = $this->createMock(Filesystem::class);
-        $this->fallback = $this->createMock(FallbackInterface::class);
         $this->rootPackage = $this->createMock(RootPackageInterface::class);
         $this->rootPackage->method('getLicense')->willReturn([]);
         $this->sfs = new SymfonyFilesystem();
@@ -824,7 +915,6 @@ final class AbstractAssetManagerTest extends TestCase
         $this->config = null;
         $this->cwd = null;
         $this->executor = null;
-        $this->fallback = null;
         $this->fs = null;
         $this->io = null;
         $this->oldCwd = null;
@@ -840,7 +930,6 @@ final class AbstractAssetManagerTest extends TestCase
             $this->config,
             $this->executor,
             $this->fs,
-            $this->fallback,
             $versionConverter,
         );
     }

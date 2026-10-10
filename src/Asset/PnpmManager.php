@@ -5,9 +5,16 @@ declare(strict_types=1);
 namespace Foxy\Asset;
 
 use Composer\Util\ProcessExecutor;
+use Foxy\Audit\AuditParserInterface;
+use Foxy\Audit\Parser\PnpmAuditParser;
 
-final class PnpmManager extends AbstractAuditableAssetManager
+final class PnpmManager extends AbstractAssetManager
 {
+    public function getAuditParser(): AuditParserInterface
+    {
+        return new PnpmAuditParser();
+    }
+
     public function getLockPackageName(): string
     {
         return 'pnpm-lock.yaml';
@@ -44,21 +51,6 @@ final class PnpmManager extends AbstractAuditableAssetManager
             ProcessExecutor::escape('--config.auditConfig={ignoreGhsas:[]}'),
         ];
 
-        return $this->buildUnconfiguredCommand('pnpm', $command);
-    }
-
-    protected function getInstallCommand(): string
-    {
-        return $this->buildCommand('pnpm', 'install', 'install');
-    }
-
-    protected function getUpdateCommand(): string
-    {
-        return $this->buildCommand('pnpm', 'update', 'update');
-    }
-
-    protected function getVersionCommand(): string
-    {
-        return $this->buildUnconfiguredCommand('pnpm', '--version');
+        return $this->buildUnconfiguredCommand($this->getDefaultBinary(), $command);
     }
 }

@@ -43,7 +43,9 @@ The path passed to `addAsset()` may identify a package definition file, which Fo
 
 `PostSolveEvent` exposes the common getters and `getRunResult()`, which returns the frontend manager process exit code.
 The event is dispatched before Foxy attempts to restore captured Composer lock and vendor state after a non-zero
-result. It is not dispatched when manager execution throws before returning a result.
+result; by then `package.json` has already been restored when `fallback-asset` is enabled. It is not dispatched when
+manager execution throws before returning a result. An exception thrown by a listener restores Composer state only, not
+`package.json`.
 
 ## Subscriber example
 

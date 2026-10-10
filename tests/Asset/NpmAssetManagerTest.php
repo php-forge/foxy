@@ -7,6 +7,7 @@ namespace Foxy\Tests\Asset;
 use Composer\Package\RootPackageInterface;
 use Composer\Util\ProcessExecutor;
 use Foxy\Asset\NpmManager;
+use Foxy\Audit\Parser\NpmAuditParser;
 use Foxy\Config\Config;
 use Foxy\Exception\{Message, RuntimeException};
 use Foxy\Tests\Provider\NpmAssetManagerProvider;
@@ -198,7 +199,7 @@ final class NpmAssetManagerTest extends AuditableAssetManager
         try {
             ProcessExecutor::setTimeout(42);
 
-            $manager = new NpmManager($this->io, $this->config, $executor, $this->fs, $this->fallback);
+            $manager = new NpmManager($this->io, $this->config, $executor, $this->fs);
 
             self::assertSame(
                 0,
@@ -222,7 +223,7 @@ final class NpmAssetManagerTest extends AuditableAssetManager
 
     protected function getManager(): NpmManager
     {
-        return new NpmManager($this->io, $this->config, $this->executor, $this->fs, $this->fallback);
+        return new NpmManager($this->io, $this->config, $this->executor, $this->fs);
     }
 
     protected function getUnsupportedVersion(): string
@@ -237,6 +238,11 @@ final class NpmAssetManagerTest extends AuditableAssetManager
         return $command . ($noDev
             ? ' --omit=dev --include=optional --include=peer'
             : ' --include=dev --include=optional --include=peer');
+    }
+
+    protected function getValidAuditParserClass(): string
+    {
+        return NpmAuditParser::class;
     }
 
     protected function getValidInstallCommand(): string

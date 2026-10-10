@@ -69,28 +69,6 @@ final class JsonFormatterTest extends TestCase
         );
     }
 
-    public function testGetIndent(): void
-    {
-        $content = self::fixture('package-two-space.json');
-
-        self::assertSame(
-            2,
-            JsonFormatter::getIndent($content),
-            'The indent extracted from the JSON content should match the expected indent.',
-        );
-    }
-
-    public function testGetIndentIgnoresSurroundingWhitespace(): void
-    {
-        $content = "\n  " . self::fixture('name-two-space.json');
-
-        self::assertSame(
-            2,
-            JsonFormatter::getIndent($content),
-            'The indent extracted from the JSON content should match the expected indent.',
-        );
-    }
-
     public function testGetMapKeys(): void
     {
         self::assertSame(

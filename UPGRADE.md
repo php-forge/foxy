@@ -1,5 +1,100 @@
 # Upgrading Foxy
 
+## Upgrading from 0.3.x to 0.4.x
+
+Foxy 0.4 makes every manager auditable, resolves the frontend manager on first use, moves the asset rollback into the
+solver, and removes utilities that Composer `^2.10` made redundant. Projects that only configure Foxy through
+`composer.json` need no change beyond the constraint; authors of custom managers, audit parsers, or CVE resolvers must
+follow the sections below.
+
+### Composer constraint
+
+```bash
+composer require php-forge/foxy:^0.4 --with-all-dependencies
+```
+
+`symfony/console` `^8.0` is accepted beside `^7.4`; PHP 8.3 projects keep resolving `7.4`.
+
+### Every manager audits
+
+`Foxy\Audit\AuditableAssetManagerInterface` and `Foxy\Asset\AbstractAuditableAssetManager` were removed.
+`AssetManagerInterface` now declares `audit(bool $noDev): AuditProcessResult` and
+`getAuditParser(): AuditParserInterface`, and `AbstractAssetManager` carries the process-based implementation that the
+former base class held (`getAuditCommand()`, `getAuditEnvironment()`, `validateAuditConfiguration()`). Custom managers
+that extended `AbstractAuditableAssetManager` extend `AbstractAssetManager` instead and add `getAuditParser()`; direct
+`AssetManagerInterface` implementations must add both methods, throwing a `RuntimeException` from `audit()` when they
+cannot audit. `Foxy\Audit\AuditParserFactory` was removed: the runner asks the manager for its parser.
+`Foxy\Audit\Parser\BunAuditParser` now extends the new `AbstractBulkAdvisoryParser`, shared with the native manager's
+`NativeAuditParser`; the message case `Message::AUDIT_BUN_PACKAGE_ADVISORIES_REQUIRED` is now
+`AUDIT_BULK_PACKAGE_ADVISORIES_REQUIRED`, and `AUDIT_PARSER_UNSUPPORTED_MANAGER` and `FOXY_AUDIT_UNSUPPORTED_MANAGER`
+were removed.
+
+The `native` manager now supports `composer foxy:audit` through the registry's bulk advisories endpoint; `--no-dev`
+is rejected for it, as for Deno, because the native manager installs development dependencies together with the
+others. `Foxy\Asset\NativeManager` takes the `NpmRegistryInterface` as its last constructor argument, and
+`NpmRegistryInterface` gained `getAdvisories(array $versions): string` and
+`prefetchTarballs(array $packages, string $directory): void`;
+custom registries must implement both. The registry now uses the HTTP downloader of Composer's loop, so the
+parallel downloads need no configuration.
+
+### CVE lookups resolve in batches
+
+`Foxy\Audit\CveResolverInterface::resolve(string): CveResolution` was replaced by
+`resolveMany(array $ghsaIds): array`, which returns a `CveResolution` or a `Throwable` per identifier.
+`GitHubAdvisoryCveResolver` issues its requests concurrently through Composer's HTTP downloader and therefore needs the
+async-enabled downloader (`Composer::getLoop()->getHttpDownloader()`), which `composer foxy:audit` already uses.
+`CveEnricher` keeps its constructor and `enrich()` signature.
+
+### Manager selection timing
+
+Foxy no longer probes manager executables when Composer loads the plugin. The manager is resolved when the first
+install, update, or `composer foxy:audit` needs it, so Composer commands that do none of these (`about`, `show`,
+`validate`, ...) never run `<manager> --version`. Selection errors (an unknown `manager`, several native lockfiles, a
+lockfile whose executable is missing, or no manager at all) are reported by the first command that needs the manager
+instead of by every Composer command; `composer foxy:audit` reports them with exit status `2`.
+
+### Manager-scoped configuration
+
+`Foxy\Config\Config::setResolvedManager()` was removed. Probing or validating a manager no longer changes the shared
+`Config`; `Config::forManager(string $manager): static` returns a copy whose `manager-*` map entries resolve for that
+manager, and `AbstractManifestAssetManager::getManagerConfig()` (protected) gives each manager its own view, built
+on every call.
+Custom managers that called `setResolvedManager()` remove the call and read `manager-*` keys through
+`getManagerConfig()`.
+
+### Default commands in `AbstractAssetManager`
+
+`getInstallCommand()`, `getUpdateCommand()`, and `getVersionCommand()` are no longer abstract. They default to
+`<binary> install`, `<binary> update`, and `<binary> --version`, where the binary comes from the new protected
+`getDefaultBinary(): string` hook, which returns `getName()`. Custom managers whose executable differs from their name
+override `getDefaultBinary()`; managers that implement the three methods keep working unchanged.
+
+### Asset rollback belongs to the solver
+
+`AssetManagerInterface::setFallback()` was removed, together with the fallback constructor argument, the protected
+`$fallback` property, and `restoreAfterFailure()` of `AbstractAssetManager`; its constructor is now
+`(IOInterface $io, Config $config, ProcessExecutor $executor, Filesystem $fs, VersionConverterInterface|null
+$versionConverter = null)`, so a custom manager that passed a fallback must drop that argument.
+`Foxy\Solver\Solver` takes the asset fallback as its last constructor argument and restores the manifest when the
+dependency merge or the manager run throws or returns a non-zero code, before the `foxy.post-solve` event, as the
+managers did; a listener of that event that throws no longer triggers an asset restore, only the Composer one.
+
+### Composer rollback events
+
+The rollback `Installer` is now built with a private event dispatcher that has no listeners and runs no scripts, so
+command and autoload events of the rollback never reach the project's scripts or other plugins. Package events
+(`pre-package-install`, `post-package-update`, ...) are still dispatched by Composer's shared installation manager
+during a rollback, so root scripts and plugin listeners bound to those events run; projects that must not run them
+during a rollback should guard those scripts.
+
+### Removed utilities
+
+`Foxy\Util\LockerUtil` was removed; the Composer fallback reads the lock through `Composer\Factory::getLockFile()`.
+`Foxy\Util\ComposerUtil::getInitEventName()` was removed; use `Composer\Installer\InstallerEvents::PRE_OPERATIONS_EXEC`.
+`Foxy\Util\PackageUtil::convertLockAlias()` and the `$convertAliases` parameter of `loadLockPackages()` were removed.
+`Foxy\Json\JsonFile::getIndent()`, `Foxy\Json\JsonFormatter::getIndent()`, and the constant
+`JsonFormatter::INDENT_REGEX` were removed.
+
 ## Upgrading from 0.2.x to 0.3.x
 
 Foxy 0.3 raises the runtime baseline and aligns its documented integration target with the PHP 8.3 development line.

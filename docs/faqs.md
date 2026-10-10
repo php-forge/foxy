@@ -41,7 +41,9 @@ Set `config.foxy.manager` to `bun`, `deno`, `native`, `npm`, `pnpm`, or `yarn` f
 omitted and manager execution is enabled, Foxy first looks for one recognized lockfile and then for an available
 manager executable. With execution disabled, it uses a single recognized lockfile or npm as the manifest adapter
 without probing binaries. Multiple recognized lockfiles require explicit selection in either mode. The `native`
-manager is selected only explicitly or through its `foxy.lock` file, never by availability.
+manager is selected only explicitly or through its `foxy.lock` file, never by availability. The choice is made when the
+first install, update, or audit needs a manager, so other Composer commands neither probe executables nor report
+selection errors.
 
 Explicit selection and a committed lockfile are recommended for CI.
 
@@ -50,20 +52,21 @@ Explicit selection and a committed lockfile are recommended for CI.
 Yes. Set `config.foxy.manager` to `native`. Foxy reads the merged `package.json`, resolves every dependency against
 the npm registry with one version per package, downloads and verifies the tarballs, extracts them into `node_modules`,
 and records the result in `foxy.lock`. PHP with the `zlib` extension is the only requirement. The native manager does
-not run lifecycle scripts, does not create `bin` links, and does not support `composer foxy:audit`. See
-[Native manager](config.md#native-manager) for the complete scope.
+not run lifecycle scripts and does not create `bin` links. See [Native manager](config.md#native-manager) for the
+complete scope.
 
 ## How can frontend dependencies be checked for known CVEs?
 
-Run `composer foxy:audit`. Foxy audits the dependency graph from the selected manager's native lockfile. The default
+Run `composer foxy:audit`. Foxy audits the dependency graph from the selected manager's own lockfile. The default
 table, plain, and JSON formats identify the affected package, advisory, severity, vulnerable range, and available CVE
 identifiers. Use `--format=summary` for compact counts in CI or `--format=json` for a versioned machine-readable
 document.
 
-The native registry response commonly contains a GHSA but no CVE. Foxy resolves that relationship through GitHub's
-public advisory API unless `--no-cve` or `--format=summary` is supplied. A lookup failure is shown as unavailable
-without hiding the native security finding. See [Security auditing](usage.md#security-auditing) for options and exit
-statuses.
+The registry's audit response commonly contains a GHSA but no CVE. Foxy resolves that relationship through GitHub's
+public advisory API unless `--no-cve` or `--format=summary` is supplied. The lookups run concurrently through
+Composer's HTTP downloader (at most 12 at once; `COMPOSER_MAX_PARALLEL_HTTP` changes the limit), and a `github-oauth`
+token in Composer's `auth.json` applies to them. A lookup failure marks only its own advisory as unavailable without
+hiding the security finding itself. See [Security auditing](usage.md#security-auditing) for options and exit statuses.
 
 ## Why is a dependency's package.json not detected?
 
@@ -81,8 +84,8 @@ during Composer install and update operations.
 
 When the manager throws or returns any non-zero status, Foxy reports the error and, by default, restores the previous
 project `package.json`, Composer lock data, and installed Composer dependencies. The original manager error is rethrown
-when restoration succeeds. If Composer restoration also fails, the rollback error retains the original error as its
-previous exception.
+when restoration succeeds. If a restoration also fails, the rollback error retains the original error as its previous
+exception.
 
 Set `fallback-asset` or `fallback-composer` to `false` only when retaining partial state is intentional. A Composer
 rollback installer failure is reported as a `RuntimeException` rather than being hidden.

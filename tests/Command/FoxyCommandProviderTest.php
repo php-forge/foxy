@@ -59,7 +59,7 @@ final class FoxyCommandProviderTest extends TestCase
     }
 
     #[DataProviderExternal(FoxyCommandProviderProvider::class, 'invalidArguments')]
-    public function testRejectsInvalidCapabilityArgument(string $argument): void
+    public function testThrowRuntimeExceptionForInvalidCapabilityArgument(string $argument): void
     {
         $arguments = [
             'composer' => $this->createMock(Composer::class),
@@ -77,7 +77,7 @@ final class FoxyCommandProviderTest extends TestCase
         new FoxyCommandProvider($arguments);
     }
 
-    public function testRejectsMissingCapabilityArguments(): void
+    public function testThrowRuntimeExceptionWhenCapabilityArgumentsAreMissing(): void
     {
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(

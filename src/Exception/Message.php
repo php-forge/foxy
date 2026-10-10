@@ -130,20 +130,6 @@ enum Message: string
     case ASSET_MANAGER_BINARY_NOT_INSTALLED = 'The "%s" binary must be installed.';
 
     /**
-     * Error when the asset manager exits with a non-zero status code.
-     *
-     * Format: "The asset manager exited with status code %d."
-     */
-    case ASSET_MANAGER_EXITED_WITH_STATUS = 'The asset manager exited with status code %d.';
-
-    /**
-     * Error when restoring the fallback after an asset manager failure also fails.
-     *
-     * Format: "The asset manager failed and its fallback could not be restored: %s"
-     */
-    case ASSET_MANAGER_FALLBACK_RESTORE_FAILED = 'The asset manager failed and its fallback could not be restored: %s';
-
-    /**
      * Error when an audit is requested without the manager lock file.
      *
      * Format: "The %s lock file "%s" was not found."
@@ -180,6 +166,15 @@ enum Message: string
     case ASSET_MANAGER_UNKNOWN = 'The asset manager "%s" doesn\'t exist.';
 
     /**
+     * Error when a production-only audit is requested for the native manager.
+     *
+     * Format: "The native audit cannot guarantee the requested dependency scope because the native manager installs
+     *         development dependencies together with the others."
+     */
+    case ASSET_NATIVE_AUDIT_NO_DEV_UNSUPPORTED = 'The native audit cannot guarantee the requested dependency scope '
+        . 'because the native manager installs development dependencies together with the others.';
+
+    /**
      * Error when the npm workspace graph cannot be enumerated.
      *
      * Format: "The npm workspace graph could not be enumerated from package-lock.json. Regenerate the lock file with a
@@ -212,11 +207,11 @@ enum Message: string
         . 'constraint "%s".';
 
     /**
-     * Bun parser detail when a package lacks an advisory list.
+     * Bulk advisory parser detail when a package lacks an advisory list.
      *
      * Format: "each package must contain a list of advisories"
      */
-    case AUDIT_BUN_PACKAGE_ADVISORIES_REQUIRED = 'each package must contain a list of advisories';
+    case AUDIT_BULK_PACKAGE_ADVISORIES_REQUIRED = 'each package must contain a list of advisories';
 
     /**
      * Error when Bun reports diagnostics that may indicate a partial report.
@@ -239,6 +234,13 @@ enum Message: string
      * Format: "The %s audit command failed with status code %d. %s"
      */
     case AUDIT_COMMAND_FAILED_WITH_DIAGNOSTICS = 'The %s audit command failed with status code %d. %s';
+
+    /**
+     * Error when a CVE resolver answers a batch without one of the requested advisories.
+     *
+     * Format: "The CVE resolver returned no result for "%s"."
+     */
+    case AUDIT_CVE_RESOLUTION_MISSING = 'The CVE resolver returned no result for "%s".';
 
     /**
      * Deno parser detail when advisory actions do not match the patched versions.
@@ -408,13 +410,6 @@ enum Message: string
      * Format: "The %s audit output is malformed: %s."
      */
     case AUDIT_OUTPUT_MALFORMED = 'The %s audit output is malformed: %s.';
-
-    /**
-     * Error when no audit parser exists for the asset manager.
-     *
-     * Format: "The asset manager "%s" does not provide a supported audit report."
-     */
-    case AUDIT_PARSER_UNSUPPORTED_MANAGER = 'The asset manager "%s" does not provide a supported audit report.';
 
     /**
      * pnpm parser detail when an advisory has no findings.
@@ -619,13 +614,6 @@ enum Message: string
      * Format: "Foxy is disabled; frontend dependencies cannot be audited."
      */
     case FOXY_AUDIT_DISABLED = 'Foxy is disabled; frontend dependencies cannot be audited.';
-
-    /**
-     * Error when the asset manager does not support audits.
-     *
-     * Format: "The selected asset manager does not support security audits."
-     */
-    case FOXY_AUDIT_UNSUPPORTED_MANAGER = 'The selected asset manager does not support security audits.';
 
     /**
      * Error when a JSON file cannot be read.
@@ -896,6 +884,13 @@ enum Message: string
      * Format: "The Composer asset directory "%s" is not marked as managed by Foxy."
      */
     case SOLVER_ASSET_DIR_UNMANAGED = 'The Composer asset directory "%s" is not marked as managed by Foxy.';
+
+    /**
+     * Error when restoring the asset fallback after an asset manager failure also fails.
+     *
+     * Format: "The asset manager failed and its fallback could not be restored: %s"
+     */
+    case SOLVER_ASSET_FALLBACK_RESTORE_FAILED = 'The asset manager failed and its fallback could not be restored: %s';
 
     /**
      * Error when the asset manager ends with a non-zero code.
