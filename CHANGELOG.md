@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 0.4.0 Under development
+## 0.3.1 Under development
 
 - refactor: deduplicate internals, centralize exception messages in `Foxy\Exception\Message`, and normalize their wording.
 - feat: add the `native` asset manager that installs frontend dependencies from the npm registry in PHP, without a JavaScript manager.

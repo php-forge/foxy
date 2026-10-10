@@ -12,9 +12,14 @@ use Foxy\Fallback\FallbackInterface;
 use Foxy\Native\NativeInstallerInterface;
 use Throwable;
 
+use function array_unshift;
+use function basename;
+use function dirname;
+use function implode;
 use function is_dir;
 use function is_string;
 use function preg_match;
+use function realpath;
 use function sprintf;
 use function str_starts_with;
 use function strtolower;
@@ -29,6 +34,8 @@ use function trim;
  */
 final class NativeManager extends AbstractManifestAssetManager
 {
+    private const string FILESYSTEM_ROOT = '{^(?:[A-Za-z]:)?/?$}';
+
     /**
      * @param IOInterface $io Output for the progress line.
      * @param Config $config Foxy configuration.
@@ -75,7 +82,7 @@ final class NativeManager extends AbstractManifestAssetManager
      * Returns whether the install directory and `package.json` exist.
      *
      * @throws RuntimeException if the configured install directory is the root package directory, one of its parents,
-     * or a filesystem root.
+     * or a filesystem root, or if a symbolic link in it or in the root package directory cannot be resolved.
      */
     public function isInstalled(): bool
     {
@@ -83,8 +90,8 @@ final class NativeManager extends AbstractManifestAssetManager
     }
 
     /**
-     * Installs the dependencies, or updates them when the install directory and `package.json` exist and updates are
-     * allowed.
+     * Installs the dependencies, or updates them when updates are allowed by {@see setUpdatable()}, as `composer update`
+     * does, even if nothing is installed yet.
      *
      * Returns `0` without doing anything when `run-asset-manager` is disabled. The fallback is restored when the
      * installation fails, and the installer exception is rethrown.
@@ -103,7 +110,7 @@ final class NativeManager extends AbstractManifestAssetManager
         $this->getManagerWorkingDirectory();
 
         $installDirectory = $this->getInstallDirectory();
-        $updatable = $this->isUpdatable();
+        $updatable = $this->updatable;
 
         $this->io->write(
             sprintf(
@@ -143,6 +150,38 @@ final class NativeManager extends AbstractManifestAssetManager
     }
 
     /**
+     * Returns a normalized absolute path with the symbolic links of its longest existing prefix resolved and the
+     * missing suffix appended.
+     *
+     * @throws RuntimeException if the existing prefix cannot be resolved, such as a dangling symbolic link.
+     */
+    private function canonicalPath(string $path): string
+    {
+        $suffix = [];
+        $existingPath = $path;
+
+        while (!file_exists($existingPath) && !is_link($existingPath)) {
+            $parent = $this->fs->normalizePath(dirname($existingPath));
+
+            if ($parent === $existingPath) {
+                break;
+            }
+
+            array_unshift($suffix, basename($existingPath));
+
+            $existingPath = $parent;
+        }
+
+        $resolvedPath = realpath($existingPath);
+
+        if (false === $resolvedPath) {
+            throw new RuntimeException(Message::SOLVER_PATH_RESOLVE_FAILED->getMessage($path));
+        }
+
+        return $this->fs->normalizePath($resolvedPath . '/' . implode('/', $suffix));
+    }
+
+    /**
      * Returns a normalized path in the form used for comparisons: lowercased on Windows, where paths are
      * case-insensitive, and unchanged elsewhere.
      */
@@ -156,10 +195,12 @@ final class NativeManager extends AbstractManifestAssetManager
      *
      * The `native-install-dir` value defaults to `node_modules` when it is not a string or is blank; a relative value
      * is resolved against the root package directory. Normalization also drops trailing slashes and backslashes. The
-     * comparison with the root package directory ignores letter case on Windows.
+     * checks compare the canonical forms of both directories, with symbolic links resolved, and ignore letter case on
+     * Windows; the returned path keeps its symbolic links.
      *
      * @throws RuntimeException if the directory is the root package directory, one of its parents, or a filesystem
-     * root, since the installer removes every entry of the directory outside the install set.
+     * root, since the installer removes every entry of the directory outside the install set, or if a symbolic link in
+     * either directory cannot be resolved.
      */
     private function getInstallDirectory(): string
     {
@@ -173,10 +214,12 @@ final class NativeManager extends AbstractManifestAssetManager
         $path = $this->fs->normalizePath(
             $this->fs->isAbsolutePath($directory) ? $directory : $this->getRootPackagePath($directory),
         );
-        $comparablePath = $this->comparablePath($path);
-        $root = $this->comparablePath($this->fs->normalizePath($this->getRootPackageDir()));
+        $canonicalPath = $this->canonicalPath($path);
+        $comparablePath = $this->comparablePath($canonicalPath);
+        $root = $this->comparablePath($this->canonicalPath($this->fs->normalizePath($this->getRootPackageDir())));
 
-        if (1 === preg_match('{^(?:[A-Za-z]:)?/?$}', $comparablePath)
+        if (1 === preg_match(self::FILESYSTEM_ROOT, $path)
+            || 1 === preg_match(self::FILESYSTEM_ROOT, $canonicalPath)
             || str_starts_with("{$root}/", "{$comparablePath}/")
         ) {
             throw new RuntimeException(Message::NATIVE_INSTALL_DIR_INVALID->getMessage($path));

@@ -18,6 +18,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Xepozz\InternalMocker\MockerState;
 
+use function basename;
 use function chdir;
 use function define;
 use function defined;
@@ -28,6 +29,7 @@ use function getcwd;
 use function mkdir;
 use function str_replace;
 use function strtr;
+use function symlink;
 use function sys_get_temp_dir;
 use function uniqid;
 use function unlink;
@@ -42,11 +44,17 @@ use const DIRECTORY_SEPARATOR;
 final class NativeManagerTest extends TestCase
 {
     private const string INSTALLING = '<info>Installing frontend dependencies with the native manager</info>';
+    private const string UPDATING = '<info>Updating frontend dependencies with the native manager</info>';
 
     private string $cwd = '';
     private FallbackInterface&MockObject $fallback;
     private NativeInstallerInterface&MockObject $installer;
     private IOInterface&MockObject $io;
+
+    /**
+     * @var list<string> Symbolic links created by the test, removed before the temporary directory.
+     */
+    private array $links = [];
     private string $oldCwd = '';
 
     public function testAddDependenciesWritesManifest(): void
@@ -165,7 +173,7 @@ final class NativeManagerTest extends TestCase
                 $root . DIRECTORY_SEPARATOR . 'package.json',
                 $root . DIRECTORY_SEPARATOR . 'foxy.lock',
                 (new Filesystem())->normalizePath("{$this->cwd}/APP"),
-                false,
+                true,
             );
 
         self::assertSame(
@@ -219,7 +227,7 @@ final class NativeManagerTest extends TestCase
                 $root . DIRECTORY_SEPARATOR . 'package.json',
                 $root . DIRECTORY_SEPARATOR . 'foxy.lock',
                 (new Filesystem())->normalizePath(str_replace('{cwd}', $this->cwd, $expected)),
-                false,
+                true,
             );
 
         $this->manager(
@@ -231,7 +239,7 @@ final class NativeManagerTest extends TestCase
     {
         mkdir("{$this->cwd}/web");
 
-        $this->expectInstall($this->cwd . DIRECTORY_SEPARATOR . 'web', false, self::INSTALLING);
+        $this->expectInstall($this->cwd . DIRECTORY_SEPARATOR . 'web', true, self::UPDATING);
 
         self::assertSame(
             0,
@@ -240,14 +248,17 @@ final class NativeManagerTest extends TestCase
         );
     }
 
-    public function testRunInstallsIntoCurrentDirectory(): void
+    public function testRunInstallsThroughSymlinkedInstallDirectory(): void
     {
-        $this->expectInstall($this->cwd, false, self::INSTALLING);
+        mkdir("{$this->cwd}/shared");
+
+        $this->link("{$this->cwd}/shared", "{$this->cwd}/node_modules");
+        $this->expectInstall($this->cwd, true, self::UPDATING);
 
         self::assertSame(
             0,
             $this->manager(['run-asset-manager' => true])->run(),
-            'A successful run must exit with `0`.',
+            'The link path, not its target, must reach the installer.',
         );
     }
 
@@ -296,17 +307,48 @@ final class NativeManagerTest extends TestCase
     {
         $this->markInstalled();
 
-        $this->expectInstall(
-            $this->cwd,
-            true,
-            '<info>Updating frontend dependencies with the native manager</info>',
-        );
+        $this->expectInstall($this->cwd, true, self::UPDATING);
 
         self::assertSame(
             0,
             $this->manager(['run-asset-manager' => true])->run(),
             'A successful run must exit with `0`.',
         );
+    }
+
+    public function testRunUpdatesWithoutInstallDirectoryWhenUpdatable(): void
+    {
+        $this->expectInstall($this->cwd, true, self::UPDATING);
+
+        self::assertSame(
+            0,
+            $this->manager(['run-asset-manager' => true])->run(),
+            'A successful run must exit with `0`.',
+        );
+    }
+
+    #[DataProviderExternal(NativeManagerProvider::class, 'protectedLinkTargets')]
+    public function testThrowRuntimeExceptionForInstallDirectoryResolvingToProtectedDirectory(
+        string $link,
+        string $target,
+        string $value,
+    ): void {
+        $placeholders = ['{basename}' => basename($this->cwd), '{cwd}' => $this->cwd, '{parent}' => dirname($this->cwd)];
+
+        $this->link(strtr($target, $placeholders), "{$this->cwd}/{$link}");
+
+        $this->installer
+            ->expects(self::never())
+            ->method('install');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            Message::NATIVE_INSTALL_DIR_INVALID->getMessage(
+                (new Filesystem())->normalizePath($this->cwd . DIRECTORY_SEPARATOR . strtr($value, $placeholders)),
+            ),
+        );
+
+        $this->manager(['run-asset-manager' => true, 'native-install-dir' => strtr($value, $placeholders)])->run();
     }
 
     #[DataProviderExternal(NativeManagerProvider::class, 'invalidInstallDirectories')]
@@ -361,6 +403,24 @@ final class NativeManagerTest extends TestCase
         }
     }
 
+    public function testThrowRuntimeExceptionWhenInstallDirectoryIsDanglingSymlink(): void
+    {
+        $this->link("{$this->cwd}/missing", "{$this->cwd}/node_modules");
+
+        $this->installer
+            ->expects(self::never())
+            ->method('install');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            Message::SOLVER_PATH_RESOLVE_FAILED->getMessage(
+                (new Filesystem())->normalizePath("{$this->cwd}/node_modules"),
+            ),
+        );
+
+        $this->manager(['run-asset-manager' => true])->run();
+    }
+
     #[RunInSeparateProcess]
     #[PreserveGlobalState(false)]
     public function testThrowRuntimeExceptionWhenInstallDirectoryIsRootPackageDirInOtherCaseOnWindows(): void
@@ -382,6 +442,26 @@ final class NativeManagerTest extends TestCase
 
         $this->manager(
             ['run-asset-manager' => true, 'native-install-dir' => "{$this->cwd}/APP", 'root-package-json-dir' => 'app'],
+        )->run();
+    }
+
+    public function testThrowRuntimeExceptionWhenInstallDirectoryIsSymlinkedRootPackageDir(): void
+    {
+        mkdir("{$this->cwd}/app");
+
+        $this->link("{$this->cwd}/app", "{$this->cwd}/web");
+
+        $this->installer
+            ->expects(self::never())
+            ->method('install');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            Message::NATIVE_INSTALL_DIR_INVALID->getMessage((new Filesystem())->normalizePath("{$this->cwd}/app")),
+        );
+
+        $this->manager(
+            ['run-asset-manager' => true, 'native-install-dir' => "{$this->cwd}/app", 'root-package-json-dir' => 'web'],
         )->run();
     }
 
@@ -463,6 +543,10 @@ final class NativeManagerTest extends TestCase
 
         chdir($this->oldCwd);
 
+        foreach ($this->links as $link) {
+            unlink($link);
+        }
+
         (new Filesystem())->removeDirectory($this->cwd);
     }
 
@@ -486,6 +570,18 @@ final class NativeManagerTest extends TestCase
             ->expects(self::once())
             ->method('write')
             ->with($line);
+    }
+
+    /**
+     * Creates a symbolic link, or skips the test when the platform refuses it.
+     */
+    private function link(string $target, string $link): void
+    {
+        if (!@symlink($target, $link)) {
+            self::markTestSkipped('Symbolic links are not available.');
+        }
+
+        $this->links[] = $link;
     }
 
     /**

@@ -7,7 +7,7 @@ Authorize and require the plugin in the application:
 ```json
 {
   "require": {
-    "php-forge/foxy": "^0.4"
+    "php-forge/foxy": "^0.3"
   },
   "config": {
     "allow-plugins": {
@@ -139,7 +139,7 @@ Use a runtime dependency when every consumer of the library must process its fro
 ```json
 {
   "require": {
-    "php-forge/foxy": "^0.4"
+    "php-forge/foxy": "^0.3"
   }
 }
 ```
@@ -151,7 +151,7 @@ Use a development dependency when Foxy is optional for library development:
 ```json
 {
   "require-dev": {
-    "php-forge/foxy": "^0.4"
+    "php-forge/foxy": "^0.3"
   }
 }
 ```

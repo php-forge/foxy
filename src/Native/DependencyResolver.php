@@ -9,6 +9,7 @@ use Composer\Semver\Semver;
 use Foxy\Exception\{Message, RuntimeException};
 
 use function array_map;
+use function array_pop;
 use function array_shift;
 use function implode;
 use function in_array;
@@ -23,10 +24,16 @@ use const SORT_STRING;
 /**
  * Resolves npm requirements into one version per package (flat `node_modules`) against an npm registry.
  *
- * Constraints accumulate monotonically: the highest version satisfying every constraint recorded for a name is
- * selected, and a later constraint the selection violates triggers a re-pick of a lower version. Dependencies,
- * non-optional peer dependencies, and optional dependencies are followed; unsatisfiable optional dependencies are
- * skipped with a warning. Packages no longer reachable from the requirements are dropped from the result.
+ * Each constraint is recorded with the requirement that declared it. The highest version satisfying every constraint
+ * of a name is selected; a later constraint the selection violates triggers a re-pick, which abandons the previous
+ * version and retracts the constraints it declared, cascading to every selection left without constraints, which is
+ * dropped until something requires it again. A selection is never upgraded because its constraints loosened, and
+ * re-selecting an abandoned version is reported as a version conflict, so resolution always ends. Dependencies,
+ * non-optional peer dependencies, and optional dependencies are followed; an optional constraint never blocks a
+ * mandatory one: it is dropped with a warning instead, and an unsatisfiable optional dependency is skipped with a
+ * warning. Packages no longer reachable from the requirements are dropped from the result.
+ *
+ * @phpstan-type Constraint array{range: NpmRange, source: string, optional: bool}
  */
 final readonly class DependencyResolver
 {
@@ -45,12 +52,14 @@ final readonly class DependencyResolver
      * @param list<Requirement> $requirements Registry requirements; `file:` entries never reach the resolver.
      *
      * @throws RuntimeException if a mandatory requirement uses an unsupported protocol, an invalid range, has no
-     * version satisfying every constraint, or the registry fails.
+     * version satisfying its mandatory constraints, would return to an abandoned version, or the registry fails.
      *
      * @return array<string, ResolvedPackage> Selected packages keyed and sorted by name.
      */
     public function resolve(array $requirements): array
     {
+        $abandoned = [];
+        $dropped = [];
         $metadata = [];
         $constraints = [];
         $selected = [];
@@ -59,8 +68,12 @@ final readonly class DependencyResolver
         while ([] !== $queue) {
             $requirement = array_shift($queue);
 
+            if (isset($abandoned[$requirement->source]) || isset($dropped[$requirement->source])) {
+                continue;
+            }
+
             try {
-                $version = $this->select($requirement, $metadata, $constraints, $selected);
+                $version = $this->select($requirement, $metadata, $constraints, $selected, $abandoned);
             } catch (RuntimeException $exception) {
                 if (!$requirement->optional) {
                     throw $exception;
@@ -77,7 +90,10 @@ final readonly class DependencyResolver
                 continue;
             }
 
+            $previous = $selected[$requirement->name] ?? null;
             $selected[$requirement->name] = $version;
+
+            unset($dropped["{$version->name}@{$version->version}"]);
 
             if (null !== $version->deprecated) {
                 $this->io->writeError(
@@ -87,6 +103,13 @@ final readonly class DependencyResolver
 
             foreach (self::requirementsOf($version) as $dependency) {
                 $queue[] = $dependency;
+            }
+
+            if (null !== $previous) {
+                $source = "{$previous->name}@{$previous->version}";
+                $abandoned[$source] = $previous;
+
+                self::retract($source, $constraints, $selected, $dropped);
             }
         }
 
@@ -104,7 +127,7 @@ final readonly class DependencyResolver
     /**
      * Returns the constraint list of a version conflict, such as `"^5.0" from root, "^4.0" from acme@1.0.0`.
      *
-     * @param list<array{range: NpmRange, source: string}> $constraints
+     * @param list<Constraint> $constraints
      */
     private static function describe(array $constraints): string
     {
@@ -124,7 +147,7 @@ final readonly class DependencyResolver
     /**
      * Returns the highest version satisfying every range, or `null` when none does.
      *
-     * @param list<array{range: NpmRange, source: string}> $constraints
+     * @param list<Constraint> $constraints
      */
     private static function highest(PackageMetadata $metadata, array $constraints): PackageVersion|null
     {
@@ -220,21 +243,64 @@ final readonly class DependencyResolver
     }
 
     /**
+     * Removes the constraints declared by a replaced selection and, depth-first, those of every selection left without
+     * constraints, which is unselected and recorded as dropped.
+     *
+     * @param string $source Replaced selection (`name@version`) whose constraints are retracted.
+     * @param array<string, list<Constraint>> $constraints Constraints keyed by package name.
+     * @param array<string, PackageVersion> $selected Current selections.
+     * @param array<string, PackageVersion> $dropped Selections no longer required, keyed by `name@version`.
+     */
+    private static function retract(string $source, array &$constraints, array &$selected, array &$dropped): void
+    {
+        $sources = [$source];
+
+        while ([] !== $sources) {
+            $retracted = array_pop($sources);
+
+            foreach ($constraints as $name => $list) {
+                $kept = [];
+
+                foreach ($list as $constraint) {
+                    if ($constraint['source'] !== $retracted) {
+                        $kept[] = $constraint;
+                    }
+                }
+
+                $constraints[$name] = $kept;
+
+                if ([] === $kept && isset($selected[$name])) {
+                    $key = "{$name}@{$selected[$name]->version}";
+                    $dropped[$key] = $selected[$name];
+                    $sources[] = $key;
+
+                    unset($selected[$name]);
+                }
+            }
+        }
+    }
+
+    /**
      * Records the requirement's constraint and returns the version to select, or `null` when the current selection
      * already satisfies it.
      *
-     * @param array<string, PackageMetadata> $metadata Metadata fetched so far, keyed by name.
-     * @param array<string, list<array{range: NpmRange, source: string}>> $constraints Constraints recorded so far.
-     * @param array<string, PackageVersion> $selected Current selections.
+     * When no version satisfies every constraint of a mandatory requirement, the version satisfying the mandatory
+     * constraints is selected and each optional constraint it violates is dropped with a warning.
      *
-     * @throws RuntimeException if the specification is unsupported or invalid, the registry fails, or no version
-     * satisfies every constraint.
+     * @param array<string, PackageMetadata> $metadata Metadata fetched so far, keyed by name.
+     * @param array<string, list<Constraint>> $constraints Constraints recorded so far, keyed by name.
+     * @param array<string, PackageVersion> $selected Current selections.
+     * @param array<string, PackageVersion> $abandoned Selections replaced by a re-pick, keyed by `name@version`.
+     *
+     * @throws RuntimeException if the specification is unsupported or invalid, the registry fails, no version
+     * satisfies the constraints, or the version found was abandoned before.
      */
     private function select(
         Requirement $requirement,
         array &$metadata,
         array &$constraints,
         array $selected,
+        array $abandoned,
     ): PackageVersion|null {
         $name = $requirement->name;
         $spec = $requirement->spec;
@@ -249,7 +315,7 @@ final readonly class DependencyResolver
 
         $range = NpmRange::parse($package->getDistTag($spec) ?? $spec, $name);
 
-        $constraint = ['range' => $range, 'source' => $requirement->source];
+        $constraint = ['range' => $range, 'source' => $requirement->source, 'optional' => $requirement->optional];
         $current = $selected[$name] ?? null;
 
         if (null !== $current && $range->satisfies($current->version)) {
@@ -259,15 +325,48 @@ final readonly class DependencyResolver
         }
 
         $candidates = [...$constraints[$name] ?? [], $constraint];
+        $required = $candidates;
+
         $version = self::highest($package, $candidates);
 
-        if (null === $version) {
+        if (null === $version && !$requirement->optional) {
+            $required = [];
+
+            foreach ($candidates as $candidate) {
+                if (!$candidate['optional']) {
+                    $required[] = $candidate;
+                }
+            }
+
+            $version = self::highest($package, $required);
+        }
+
+        if (null === $version || isset($abandoned["{$name}@{$version->version}"])) {
             throw new RuntimeException(
-                Message::NATIVE_VERSION_CONFLICT->getMessage($name, self::describe($candidates)),
+                Message::NATIVE_VERSION_CONFLICT->getMessage($name, self::describe($required)),
             );
         }
 
-        $constraints[$name] = $candidates;
+        $kept = [];
+
+        foreach ($candidates as $candidate) {
+            if ($candidate['range']->satisfies($version->version)) {
+                $kept[] = $candidate;
+
+                continue;
+            }
+
+            $this->io->writeError(
+                sprintf(
+                    self::OPTIONAL_SKIPPED,
+                    $name,
+                    $candidate['range'],
+                    Message::NATIVE_VERSION_CONFLICT->getMessage($name, self::describe($candidates)),
+                ),
+            );
+        }
+
+        $constraints[$name] = $kept;
 
         return $version;
     }

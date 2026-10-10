@@ -263,10 +263,12 @@ Foxy then performs the installation itself, in PHP:
 - It resolves every other dependency against the registry with asset-packagist semantics: a flat `node_modules`
   with one version per package. Constraints from the root manifest, the local packages, and the transitive
   `dependencies`, `peerDependencies`, and `optionalDependencies` are intersected per package name, and the highest
-  satisfying version wins. Dist-tags such as `latest` or `next` are honored. A conflict that only nested
-  `node_modules` could solve is reported as an error that names every constraint and its origin; install such a
-  project with a JavaScript manager instead. Unsatisfiable or missing optional dependencies are skipped with a
-  warning, and a deprecated selection is reported with the registry's deprecation text.
+  satisfying version wins. When a later constraint forces a package to a lower version, the constraints that its
+  abandoned version had introduced are withdrawn, and optional dependencies never block a required one. Dist-tags
+  such as `latest` or `next` are honored. A conflict that only nested `node_modules` could solve is reported as an
+  error that names every constraint and its origin; install such a project with a JavaScript manager instead.
+  Unsatisfiable or missing optional dependencies are skipped with a warning, and a deprecated selection is reported
+  with the registry's deprecation text.
 - It downloads each tarball from the URL published by the registry, verifies it against the registry's
   `integrity` value (SHA-512, with the legacy SHA-1 `shasum` as a fallback), and extracts it into
   `node_modules/<name>`, stripping the archive's top-level directory like npm does. Tarballs are cached in
@@ -296,7 +298,8 @@ keeps the framework's default `@npm` alias can install straight into `vendor/npm
 
 Foxy owns that directory: every entry that the lock does not list is removed on every install, except entries whose
 name starts with a dot (such as `.bin`), so do not point it at a directory that also receives asset-packagist
-packages from Composer. The root package directory, any of its parents, and filesystem roots are rejected. Package
+packages from Composer. The root package directory, any of its parents, and filesystem roots are rejected, and
+symbolic links in the path are resolved before that check. Package
 names read from `package.json`, `foxy.lock`, and the registry must follow npm's name grammar (an optional `@scope/`
 followed by a name of letters, digits, `.`, `_`, and `-`, up to 214 characters); any other name is rejected before a
 path is built from it. Scoped packages keep the npm layout (`vendor/npm-asset/@popperjs/core`), not asset-packagist's

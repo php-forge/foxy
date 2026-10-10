@@ -48,11 +48,11 @@
 
 ## Installation
 
-Authorize the Composer plugin and install Foxy 0.4:
+Authorize the Composer plugin and install Foxy 0.3:
 
 ```bash
 composer config allow-plugins.php-forge/foxy true
-composer require php-forge/foxy:^0.4
+composer require php-forge/foxy:^0.3
 ```
 
 Selecting a manager explicitly is recommended for reproducible local and CI behavior:
@@ -60,7 +60,7 @@ Selecting a manager explicitly is recommended for reproducible local and CI beha
 ```json
 {
   "require": {
-    "php-forge/foxy": "^0.4"
+    "php-forge/foxy": "^0.3"
   },
   "config": {
     "allow-plugins": {

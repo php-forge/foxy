@@ -2,7 +2,7 @@
 
 ## Which PHP and Composer versions are required?
 
-Foxy 0.4 requires PHP 8.3 or later and Composer 2.10.2 or later. See the
+Foxy 0.3 requires PHP 8.3 or later and Composer 2.10.2 or later. See the
 [requirements](index.md#requirements).
 
 ## Why use Foxy instead of documenting frontend dependencies manually?

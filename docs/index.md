@@ -39,7 +39,7 @@ Composer plugins execute code during Composer operations. Authorize Foxy explici
 
 ```bash
 composer config allow-plugins.php-forge/foxy true
-composer require php-forge/foxy:^0.4
+composer require php-forge/foxy:^0.3
 ```
 
 The plugin is installed in the configured Composer vendor directory, normally `vendor/php-forge/foxy`.

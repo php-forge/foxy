@@ -37,4 +37,14 @@ final class NativeManagerProvider
         yield 'parent directory' => ['..', '{parent}'];
         yield 'root package directory' => ['{cwd}', '{cwd}'];
     }
+
+    /**
+     * @return iterable<string, array{string, string, string}>
+     */
+    public static function protectedLinkTargets(): iterable
+    {
+        yield 'filesystem root' => ['node_modules', '/', 'node_modules'];
+        yield 'parent of root package directory' => ['link', '{parent}', 'link/{basename}'];
+        yield 'root package directory' => ['node_modules', '{cwd}', 'node_modules'];
+    }
 }

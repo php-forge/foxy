@@ -16,13 +16,52 @@ use function array_keys;
 use function sprintf;
 
 /**
- * Unit tests for {@see DependencyResolver} flat resolution, constraint accumulation, warnings, and pruning.
+ * Unit tests for {@see DependencyResolver} flat resolution, re-picks, constraint retraction, warnings, and pruning.
  *
  * {@see DependencyResolverProvider} for test case data providers.
  */
 final class DependencyResolverTest extends TestCase
 {
     private const string TARBALL = 'https://registry.test/%1$s/-/%1$s-%2$s.tgz';
+
+    public function testResolveCascadesRetractionToDroppedPackages(): void
+    {
+        $registry = $this->cascadeRegistry()
+            ->add(self::metadata('m', ['1.0.0' => ['dependencies' => ['b' => '*']]]));
+
+        self::assertEquals(
+            [
+                'a' => self::package('a', '1.0.0'),
+                'b' => self::package('b', '1.0.0'),
+                'm' => self::package('m', '1.0.0'),
+                'z' => self::package('z', '1.0.0'),
+            ],
+            $this->resolver($registry)->resolve([new Requirement('a', '*', ''), new Requirement('m', '*', '')]),
+            'The `^2` recorded by the dropped x@2.0.0 must not block z 1.0.0.',
+        );
+    }
+
+    public function testResolveDropsOptionalConstraintBlockingMandatoryRequirement(): void
+    {
+        $registry = (new InMemoryRegistry())
+            ->add(self::metadata('o', ['1.0.0' => ['optionalDependencies' => ['x' => '^2.0']]]))
+            ->add(self::metadata('m', ['1.0.0' => ['dependencies' => ['x' => '^1.0']]]))
+            ->add(self::metadata('x', ['1.0.0' => [], '2.0.0' => []]));
+
+        $conflict = Message::NATIVE_VERSION_CONFLICT->getMessage('x', '"^2.0" from o@1.0.0, "^1.0" from m@1.0.0');
+
+        self::assertEquals(
+            [
+                'm' => self::package('m', '1.0.0'),
+                'o' => self::package('o', '1.0.0'),
+                'x' => self::package('x', '1.0.0'),
+            ],
+            $this->resolver($registry, $this->optionalWarning('x', '^2.0', $conflict))->resolve(
+                [new Requirement('o', '^1.0', ''), new Requirement('m', '^1.0', '')],
+            ),
+            'The mandatory range must win and the declaring package must stay.',
+        );
+    }
 
     public function testResolveDropsPackagesOnlyDiscardedVersionsRequired(): void
     {
@@ -90,6 +129,26 @@ final class DependencyResolverTest extends TestCase
             ['widgets', 'popper', '42'],
             $registry->requested,
             'Optional peers must never be fetched.',
+        );
+    }
+
+    public function testResolveKeepsLowerVersionAfterConstraintsLoosen(): void
+    {
+        $registry = (new InMemoryRegistry())
+            ->add(self::metadata('a', ['1.0.0' => [], '2.0.0' => ['dependencies' => ['x' => '^1.0']]]))
+            ->add(self::metadata('b', ['1.0.0' => ['dependencies' => ['a' => '^1.0']]]))
+            ->add(self::metadata('x', ['1.0.0' => [], '2.0.0' => []]));
+
+        self::assertEquals(
+            [
+                'a' => self::package('a', '1.0.0'),
+                'b' => self::package('b', '1.0.0'),
+                'x' => self::package('x', '1.0.0'),
+            ],
+            $this->resolver($registry)->resolve(
+                [new Requirement('a', '*', ''), new Requirement('b', '*', ''), new Requirement('x', '*', '')],
+            ),
+            'The retracted `^1.0` must not upgrade x.',
         );
     }
 
@@ -168,6 +227,61 @@ final class DependencyResolverTest extends TestCase
                 new Requirement('bar', '^1.0', ''),
                 new Requirement('foo', '>=1.1', ''),
             ],
+        );
+    }
+
+    public function testResolveReselectsDroppedPackage(): void
+    {
+        $registry = (new InMemoryRegistry())
+            ->add(self::metadata('a', ['1.0.0' => [], '2.0.0' => ['dependencies' => ['x' => '^2.0']]]))
+            ->add(self::metadata('b', ['1.0.0' => ['dependencies' => ['a' => '^1.0', 'c' => '*']]]))
+            ->add(self::metadata('c', ['1.0.0' => ['dependencies' => ['x' => '^2.0']]]))
+            ->add(self::metadata('x', ['2.0.0' => ['dependencies' => ['w' => '*']]]))
+            ->add(self::metadata('w', ['1.0.0' => []]));
+
+        self::assertEquals(
+            [
+                'a' => self::package('a', '1.0.0'),
+                'b' => self::package('b', '1.0.0'),
+                'c' => self::package('c', '1.0.0'),
+                'w' => self::package('w', '1.0.0'),
+                'x' => self::package('x', '2.0.0'),
+            ],
+            $this->resolver($registry)->resolve([new Requirement('a', '*', ''), new Requirement('b', '*', '')]),
+            'The reselected x must bring its dependency back.',
+        );
+    }
+
+    public function testResolveRetractsConstraintsOfAbandonedVersion(): void
+    {
+        $registry = (new InMemoryRegistry())
+            ->add(
+                self::metadata(
+                    'a',
+                    [
+                        '1.0.0' => ['dependencies' => ['x' => '^1.0']],
+                        '2.0.0' => ['dependencies' => ['x' => '^2.0']],
+                    ],
+                ),
+            )
+            ->add(self::metadata('b', ['1.0.0' => ['dependencies' => ['a' => '^1.0']]]))
+            ->add(self::metadata('x', ['1.0.0' => [], '2.0.0' => []]));
+
+        self::assertEquals(
+            [
+                'a' => self::package('a', '1.0.0'),
+                'b' => self::package('b', '1.0.0'),
+                'x' => self::package('x', '1.0.0'),
+            ],
+            $this->resolver($registry)->resolve(
+                [new Requirement('a', '^1.0 || ^2.0', ''), new Requirement('b', '*', '')],
+            ),
+            'The `^2.0` declared by the abandoned a@2.0.0 must not block x 1.0.0.',
+        );
+        self::assertSame(
+            ['a', 'b', 'x'],
+            $registry->requested,
+            'Each package must be fetched once.',
         );
     }
 
@@ -254,6 +368,46 @@ final class DependencyResolverTest extends TestCase
             ['bar' => self::package('bar', '1.0.0'), 'foo' => self::package('foo', '1.1.0')],
             $packages,
             'The previous selection must be kept.',
+        );
+    }
+
+    public function testResolveSkipsConflictingOptionalDependencyWithoutChangingSelection(): void
+    {
+        $registry = (new InMemoryRegistry())
+            ->add(self::metadata('x', ['1.0.0' => [], '2.0.0' => []]))
+            ->add(self::metadata('o', ['1.0.0' => ['optionalDependencies' => ['x' => '<2']]]))
+            ->add(self::metadata('p', ['1.0.0' => ['optionalDependencies' => ['x' => '^3.0']]]));
+
+        $conflict = Message::NATIVE_VERSION_CONFLICT->getMessage(
+            'x',
+            '"*" from root, "<2" from o@1.0.0, "^3.0" from p@1.0.0',
+        );
+
+        self::assertEquals(
+            [
+                'o' => self::package('o', '1.0.0'),
+                'p' => self::package('p', '1.0.0'),
+                'x' => self::package('x', '1.0.0'),
+            ],
+            $this->resolver($registry, $this->optionalWarning('x', '^3.0', $conflict))->resolve(
+                [new Requirement('x', '*', ''), new Requirement('o', '*', ''), new Requirement('p', '*', '')],
+            ),
+            'The optional `<2` must keep binding x.',
+        );
+    }
+
+    public function testResolveSkipsRequirementsOfDroppedPackages(): void
+    {
+        self::assertEquals(
+            [
+                'a' => self::package('a', '1.0.0'),
+                'b' => self::package('b', '1.0.0'),
+                'z' => self::package('z', '1.0.0'),
+            ],
+            $this->resolver($this->cascadeRegistry())->resolve(
+                [new Requirement('a', '*', ''), new Requirement('b', '*', '')],
+            ),
+            'The queued `z ^2` of the dropped x@2.0.0 must be ignored.',
         );
     }
 
@@ -352,6 +506,21 @@ final class DependencyResolverTest extends TestCase
         $this->resolver(new InMemoryRegistry())->resolve([new Requirement('widgets', $spec, '')]);
     }
 
+    public function testThrowRuntimeExceptionWhenMandatoryConstraintsConflictWithoutOptionalOnes(): void
+    {
+        $registry = (new InMemoryRegistry())
+            ->add(self::metadata('o', ['1.0.0' => ['optionalDependencies' => ['x' => '^2.0']]]))
+            ->add(self::metadata('m', ['1.0.0' => ['dependencies' => ['x' => '^3.0']]]))
+            ->add(self::metadata('x', ['1.0.0' => [], '2.0.0' => []]));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            Message::NATIVE_VERSION_CONFLICT->getMessage('x', '"^3.0" from m@1.0.0'),
+        );
+
+        $this->resolver($registry)->resolve([new Requirement('o', '^1.0', ''), new Requirement('m', '^1.0', '')]);
+    }
+
     public function testThrowRuntimeExceptionWhenNoVersionSatisfiesEveryConstraint(): void
     {
         $registry = (new InMemoryRegistry())
@@ -374,6 +543,49 @@ final class DependencyResolverTest extends TestCase
         );
 
         $this->resolver(new InMemoryRegistry())->resolve([new Requirement('foo', '^1.0', '')]);
+    }
+
+    public function testThrowRuntimeExceptionWhenRepickReturnsToAbandonedVersion(): void
+    {
+        $registry = (new InMemoryRegistry())
+            ->add(
+                self::metadata(
+                    'alpha',
+                    [
+                        '1.0.0' => ['dependencies' => ['beta' => '2.0.0']],
+                        '2.0.0' => ['dependencies' => ['beta' => '1.0.0']],
+                    ],
+                ),
+            )
+            ->add(
+                self::metadata(
+                    'beta',
+                    [
+                        '1.0.0' => ['dependencies' => ['alpha' => '1.0.0']],
+                        '2.0.0' => ['dependencies' => ['alpha' => '2.0.0']],
+                    ],
+                ),
+            );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            Message::NATIVE_VERSION_CONFLICT->getMessage('beta', '"*" from root, "2.0.0" from alpha@1.0.0'),
+        );
+
+        $this->resolver($registry)->resolve([new Requirement('alpha', '*', ''), new Requirement('beta', '*', '')]);
+    }
+
+    /**
+     * Returns a registry where only a@2.0.0 requires x, x@2.0.0 requires `z ^2.0`, and b@1.0.0 requires `a ^1.0` and
+     * `z ^1.0`.
+     */
+    private function cascadeRegistry(): InMemoryRegistry
+    {
+        return (new InMemoryRegistry())
+            ->add(self::metadata('a', ['1.0.0' => [], '2.0.0' => ['dependencies' => ['x' => '^2.0']]]))
+            ->add(self::metadata('b', ['1.0.0' => ['dependencies' => ['a' => '^1.0', 'z' => '^1.0']]]))
+            ->add(self::metadata('x', ['2.0.0' => ['dependencies' => ['z' => '^2.0']]]))
+            ->add(self::metadata('z', ['1.0.0' => [], '2.0.0' => []]));
     }
 
     /**
