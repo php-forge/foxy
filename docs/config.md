@@ -271,7 +271,8 @@ Foxy then performs the installation itself, in PHP:
   Unsatisfiable or missing optional dependencies are skipped with a warning, together with the whole subtree of an
   optional package whose own dependencies cannot be installed, and a deprecated selection is reported with the
   registry's deprecation text. A `file:` package keeps the version its manifest declares; a constraint from another
-  package that this version does not satisfy is reported as a conflict.
+  package that this version does not satisfy is reported as a conflict, unless the `file:` entry is itself optional,
+  in which case the local package is dropped like any other optional dependency.
 - It downloads each tarball from the URL published by the registry, verifies it against the registry's
   `integrity` value (SHA-512, with the legacy SHA-1 `shasum` as a fallback), and extracts it into
   `node_modules/<name>`, stripping the archive's top-level directory like npm does. Tarballs are cached in

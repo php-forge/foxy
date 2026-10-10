@@ -12,7 +12,7 @@ use Foxy\Exception\{Message, RuntimeException};
 
 use function array_diff_key;
 use function array_is_list;
-use function array_map;
+use function basename;
 use function dirname;
 use function file_exists;
 use function in_array;
@@ -136,11 +136,8 @@ final readonly class NativeInstaller implements NativeInstallerInterface
 
                 $fingerprint[$name] = $local['specs'];
 
-                $locals[$name] = ResolvedPackage::fromLocal($name, $local['version'], $path);
-
-                foreach ($local['requirements'] as $requirement) {
-                    $requirements[] = $requirement;
-                }
+                $locals[$name] = new LocalPackage($name, $local['version'], $path, $local['requirements']);
+                $requirements[] = new Requirement($name, $spec, '', $optional);
             }
         }
 
@@ -153,12 +150,7 @@ final readonly class NativeInstaller implements NativeInstallerInterface
         $packages = $update ? null : $this->lockedPackages($lock, $fingerprint, $locals);
 
         if (null === $packages) {
-            $packages = $locals + $this->resolver->resolve(
-                $requirements,
-                array_map(static fn(ResolvedPackage $local): string => $local->version, $locals),
-            );
-
-            ksort($packages, SORT_STRING);
+            $packages = $this->resolver->resolve($requirements, $locals);
 
             $lock->write($fingerprint, $packages);
         }
@@ -173,7 +165,7 @@ final readonly class NativeInstaller implements NativeInstallerInterface
      * Both directories are compared after resolving symbolic links as far as PHP's `realpath()` resolves them; the
      * install directory is created first so it can be resolved.
      *
-     * @param array<string, ResolvedPackage> $locals Local packages keyed by name.
+     * @param array<string, LocalPackage> $locals Local packages keyed by name.
      *
      * @throws RuntimeException if a local package directory overlaps the install directory.
      */
@@ -188,7 +180,7 @@ final readonly class NativeInstaller implements NativeInstallerInterface
         $install = $this->fs->normalizePath(Platform::realpath($installDirectory)) . '/';
 
         foreach ($locals as $name => $local) {
-            $directory = $this->localDirectory($manifestPath, (string) $local->path);
+            $directory = $this->localDirectory($manifestPath, $local->path);
             $source = $this->fs->normalizePath(Platform::realpath($directory)) . '/';
 
             if (str_starts_with($source, $install) || str_starts_with($install, $source)) {
@@ -220,6 +212,9 @@ final readonly class NativeInstaller implements NativeInstallerInterface
     /**
      * Installs the packages into the install directory and removes the entries outside the install set.
      *
+     * A symbolic link standing in for the `@scope` directory of a package is removed first, so the package is never
+     * written into the link target.
+     *
      * @param array<array-key, ResolvedPackage> $packages Packages in installation order.
      *
      * @throws RuntimeException if a download, an extraction, or a local copy fails, or a directory cannot be removed.
@@ -235,7 +230,13 @@ final readonly class NativeInstaller implements NativeInstallerInterface
 
         foreach ($packages as $package) {
             $target = "{$installDirectory}/{$package->name}";
+            $scope = dirname($target);
             $installed[] = $package->name;
+
+            if ($scope !== $installDirectory && is_link($scope)) {
+                $this->io->write('  - Removing ' . basename($scope));
+                $this->remove($scope);
+            }
 
             $this->remove($target);
 
@@ -291,8 +292,11 @@ final readonly class NativeInstaller implements NativeInstallerInterface
     /**
      * Returns the locked packages when the lock file is fresh, or `null` when it is missing or stale.
      *
+     * A local package must be locked at its current version, except that an optional one may be absent: the resolver
+     * dropped it, and adding it to the manifest would have changed the fingerprint.
+     *
      * @param Fingerprint $fingerprint Current requirements fingerprint.
-     * @param array<string, ResolvedPackage> $locals Current local packages keyed by name.
+     * @param array<string, LocalPackage> $locals Current local packages keyed by name.
      *
      * @throws RuntimeException if the lock file is malformed.
      *
@@ -311,7 +315,13 @@ final readonly class NativeInstaller implements NativeInstallerInterface
         }
 
         foreach ($locals as $name => $local) {
-            if (($locked['packages'][$name] ?? null)?->version !== $local->version) {
+            $entry = $locked['packages'][$name] ?? null;
+
+            if (null === $entry && isset($fingerprint['']['optionalDependencies'][$name])) {
+                continue;
+            }
+
+            if ($entry?->version !== $local->version) {
                 return null;
             }
         }

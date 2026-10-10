@@ -30,8 +30,9 @@ use const SORT_STRING;
  * version and retracts the constraints it declared, cascading to every selection left without constraints, which is
  * dropped until something requires it again. A selection is never upgraded because its constraints loosened. An
  * abandoned version satisfying every current constraint may be selected again once; abandoning it a second time is
- * final, and selecting it again is reported as a version conflict, so resolution always ends. Local packages are
- * fixed selections that are never fetched.
+ * final, and selecting it again is reported as a version conflict, so resolution always ends. Local packages,
+ * selected by root `file:` requirements, are fixed selections that are never fetched; an optional one is an optional
+ * subtree like any other, also dropped when a mandatory requirement rejects its version.
  *
  * Dependencies, non-optional peer dependencies, and optional dependencies are followed. An optional constraint never
  * blocks a mandatory one: it is dropped with a warning instead, and an optional dependency that is unsatisfiable or
@@ -45,6 +46,7 @@ use const SORT_STRING;
 final readonly class DependencyResolver
 {
     private const string DEPRECATED = '<warning>The package "%s" (%s) is deprecated: %s</warning>';
+    private const string FILE_PROTOCOL = 'file:';
     private const string OPTIONAL_SKIPPED = '<warning>The optional dependency "%s" (%s) was skipped: %s</warning>';
 
     /**
@@ -56,15 +58,17 @@ final readonly class DependencyResolver
     /**
      * Resolves the requirements and their transitive dependencies.
      *
-     * @param list<Requirement> $requirements Registry requirements; `file:` entries never reach the resolver.
-     * @param array<string, string> $locals Versions of the local (`file:`) packages keyed by name; a requirement on a
-     * local package is checked against its version and never fetched, and local packages are not part of the result.
+     * @param list<Requirement> $requirements Root requirements; a root `file:` requirement selects the local package of
+     * the same name.
+     * @param array<string, LocalPackage> $locals Local (`file:`) packages keyed by name. A selected local package is
+     * never fetched: later requirements are checked against its version, and an optional one is dropped, with its
+     * subtree, when a mandatory requirement rejects its version.
      *
      * @throws RuntimeException if a mandatory requirement uses an unsupported protocol, an invalid range, has no
      * version satisfying its mandatory constraints, would return to a version abandoned twice, rejects the version of a
      * local package, or the registry fails.
      *
-     * @return array<string, ResolvedPackage> Selected packages keyed and sorted by name.
+     * @return array<string, ResolvedPackage> Selected registry and local packages keyed and sorted by name.
      */
     public function resolve(array $requirements, array $locals = []): array
     {
@@ -110,8 +114,19 @@ final readonly class DependencyResolver
 
                 $released = false;
 
-                foreach (self::subtreeRoots($constraints[$requirement->name] ?? []) as $key) {
-                    if (self::dropSubtree($optionalRoots[$key], $key, $constraints, $selected, $dropped)) {
+                $roots = self::subtreeRoots($constraints[$requirement->name] ?? []);
+
+                $current = $selected[$requirement->name] ?? null;
+
+                if ($current instanceof LocalPackage) {
+                    $roots[$current->name] = $current->name;
+                }
+
+                foreach ($roots as $key) {
+                    if (
+                        isset($optionalRoots[$key])
+                        && self::dropSubtree($optionalRoots[$key], $key, $constraints, $selected, $dropped)
+                    ) {
                         $this->skip($optionalRoots[$key], $exception);
 
                         $released = true;
@@ -131,7 +146,8 @@ final readonly class DependencyResolver
                 continue;
             }
 
-            $key = "{$version->name}@{$version->version}";
+            $key = self::key($version);
+
             $previous = $selected[$requirement->name] ?? null;
             $selected[$requirement->name] = $version;
 
@@ -143,7 +159,7 @@ final readonly class DependencyResolver
                 unset($abandoned[$key]);
             }
 
-            if (null !== $version->deprecated) {
+            if ($version instanceof PackageVersion && null !== $version->deprecated) {
                 $this->io->writeError(
                     sprintf(self::DEPRECATED, $version->name, $version->version, $version->deprecated),
                 );
@@ -161,7 +177,7 @@ final readonly class DependencyResolver
             }
 
             if (null !== $previous) {
-                $source = "{$previous->name}@{$previous->version}";
+                $source = self::key($previous);
                 $abandoned[$source] = isset($readmitted[$source]);
 
                 self::retract($source, $constraints, $selected, $dropped);
@@ -171,7 +187,9 @@ final readonly class DependencyResolver
         $resolved = [];
 
         foreach (self::reachable($requirements, $selected) as $name => $version) {
-            $resolved[$name] = ResolvedPackage::fromRegistry($version);
+            $resolved[$name] = $version instanceof LocalPackage
+                ? ResolvedPackage::fromLocal($version->name, $version->version, $version->path)
+                : ResolvedPackage::fromRegistry($version);
         }
 
         ksort($resolved, SORT_STRING);
@@ -206,10 +224,11 @@ final readonly class DependencyResolver
      * mandatory constraint requires it.
      *
      * @param Requirement $root Optional requirement that selected the package.
-     * @param string $key Selection (`name@version`) at the top of the subtree.
+     * @param string $key Selection at the top of the subtree, as {@see key()} returns it.
      * @param array<string, list<Constraint>> $constraints Constraints keyed by package name.
-     * @param array<string, PackageVersion> $selected Current selections.
-     * @param array<string, PackageVersion> $dropped Selections no longer required, keyed by `name@version`.
+     * @param array<string, LocalPackage|PackageVersion> $selected Current selections.
+     * @param array<string, LocalPackage|PackageVersion> $dropped Selections no longer required, keyed as {@see key()}
+     * returns them.
      */
     private static function dropSubtree(
         Requirement $root,
@@ -220,11 +239,11 @@ final readonly class DependencyResolver
     ): bool {
         $current = $selected[$root->name] ?? null;
 
-        if (null === $current || "{$root->name}@{$current->version}" !== $key) {
+        if (null === $current || self::key($current) !== $key) {
             return false;
         }
 
-        foreach ($constraints[$root->name] as $constraint) {
+        foreach ($constraints[$root->name] ?? [] as $constraint) {
             if (!$constraint['optional']) {
                 return false;
             }
@@ -279,12 +298,21 @@ final readonly class DependencyResolver
     }
 
     /**
+     * Returns the source string a selection gives its requirements: `name@version` for a registry version, the name
+     * for a local package.
+     */
+    private static function key(LocalPackage|PackageVersion $selection): string
+    {
+        return $selection instanceof LocalPackage ? $selection->name : "{$selection->name}@{$selection->version}";
+    }
+
+    /**
      * Returns the selections reachable from the requirements through the selected versions' dependencies.
      *
      * @param list<Requirement> $requirements
-     * @param array<string, PackageVersion> $selected
+     * @param array<string, LocalPackage|PackageVersion> $selected
      *
-     * @return array<string, PackageVersion>
+     * @return array<string, LocalPackage|PackageVersion>
      */
     private static function reachable(array $requirements, array $selected): array
     {
@@ -309,17 +337,33 @@ final readonly class DependencyResolver
     }
 
     /**
-     * Returns the requirements a version declares: dependencies, non-optional peers, and optional dependencies.
+     * Returns the requirements a selection declares: dependencies, non-optional peers, and optional dependencies.
      *
-     * An optional dependency overrides a dependency or a peer of the same name, as npm does.
+     * An optional dependency overrides a dependency or a peer of the same name, as npm does; a local package carries
+     * its requirements already built.
      *
      * @param string|null $optionalRoot Optional subtree the requirements belong to, or `null` for none.
      *
      * @return list<Requirement>
      */
-    private static function requirementsOf(PackageVersion $version, string|null $optionalRoot = null): array
-    {
-        $source = "{$version->name}@{$version->version}";
+    private static function requirementsOf(
+        LocalPackage|PackageVersion $version,
+        string|null $optionalRoot = null,
+    ): array {
+        if ($version instanceof LocalPackage) {
+            return array_map(
+                static fn(Requirement $requirement): Requirement => new Requirement(
+                    $requirement->name,
+                    $requirement->spec,
+                    $requirement->source,
+                    $requirement->optional,
+                    $optionalRoot,
+                ),
+                $version->requirements,
+            );
+        }
+
+        $source = self::key($version);
 
         $optionalPeers = array_map(strval(...), $version->optionalPeerDependencies);
 
@@ -348,10 +392,11 @@ final readonly class DependencyResolver
      * Removes the constraints declared by a replaced selection and, depth-first, those of every selection left without
      * constraints, which is unselected and recorded as dropped.
      *
-     * @param string $source Replaced selection (`name@version`) whose constraints are retracted.
+     * @param string $source Replaced selection, as {@see key()} returns it, whose constraints are retracted.
      * @param array<string, list<Constraint>> $constraints Constraints keyed by package name.
-     * @param array<string, PackageVersion> $selected Current selections.
-     * @param array<string, PackageVersion> $dropped Selections no longer required, keyed by `name@version`.
+     * @param array<string, LocalPackage|PackageVersion> $selected Current selections.
+     * @param array<string, LocalPackage|PackageVersion> $dropped Selections no longer required, keyed as
+     * {@see key()} returns them.
      */
     private static function retract(string $source, array &$constraints, array &$selected, array &$dropped): void
     {
@@ -372,7 +417,7 @@ final readonly class DependencyResolver
                 $constraints[$name] = $kept;
 
                 if ([] === $kept && isset($selected[$name])) {
-                    $key = "{$name}@{$selected[$name]->version}";
+                    $key = self::key($selected[$name]);
                     $dropped[$key] = $selected[$name];
                     $sources[] = $key;
 
@@ -392,10 +437,10 @@ final readonly class DependencyResolver
      *
      * @param array<string, PackageMetadata> $metadata Metadata fetched so far, keyed by name.
      * @param array<string, list<Constraint>> $constraints Constraints recorded so far, keyed by name.
-     * @param array<string, PackageVersion> $selected Current selections.
+     * @param array<string, LocalPackage|PackageVersion> $selected Current selections.
      * @param array<string, bool> $abandoned Selections replaced by a re-pick, keyed by `name@version`, with `true`
      * when the abandonment is final because the version was already selected again once.
-     * @param array<string, string> $locals Versions of the local packages keyed by name.
+     * @param array<string, LocalPackage> $locals Local packages keyed by name.
      *
      * @throws RuntimeException if the specification is unsupported or invalid, the registry fails, an optional
      * requirement rejects the current selection, no version satisfies the constraints, the version found was
@@ -408,9 +453,21 @@ final readonly class DependencyResolver
         array $selected,
         array $abandoned,
         array $locals,
-    ): PackageVersion|null {
+    ): LocalPackage|PackageVersion|null {
         $name = $requirement->name;
         $spec = $requirement->spec;
+        $local = $locals[$name] ?? null;
+
+        if (null !== $local && '' === $requirement->source && str_starts_with($spec, self::FILE_PROTOCOL)) {
+            $constraints[$name][] = [
+                'range' => NpmRange::parse('*', $name),
+                'source' => '',
+                'optional' => $requirement->optional,
+                'root' => null,
+            ];
+
+            return $local;
+        }
 
         if (self::isUnsupported($spec)) {
             throw new RuntimeException(
@@ -418,19 +475,25 @@ final readonly class DependencyResolver
             );
         }
 
-        if (isset($locals[$name])) {
-            $range = NpmRange::parse($spec, $name);
+        $current = $selected[$name] ?? null;
 
-            if ($range->satisfies($locals[$name])) {
+        if ($current instanceof LocalPackage) {
+            $range = NpmRange::parse($spec, $name);
+            $constraint = [
+                'range' => $range,
+                'source' => $requirement->source,
+                'optional' => $requirement->optional,
+                'root' => $requirement->optionalRoot,
+            ];
+
+            if ($range->satisfies($current->version)) {
+                $constraints[$name][] = $constraint;
+
                 return null;
             }
 
             throw new RuntimeException(
-                Message::NATIVE_LOCAL_VERSION_CONFLICT->getMessage(
-                    $name,
-                    $locals[$name],
-                    self::describe([['range' => $range, 'source' => $requirement->source]]),
-                ),
+                Message::NATIVE_LOCAL_VERSION_CONFLICT->getMessage($name, $current->version, self::describe([$constraint])),
             );
         }
 
@@ -444,7 +507,6 @@ final readonly class DependencyResolver
             'optional' => $requirement->optional,
             'root' => $requirement->optionalRoot,
         ];
-        $current = $selected[$name] ?? null;
 
         if (null !== $current && $range->satisfies($current->version)) {
             $constraints[$name][] = $constraint;

@@ -171,6 +171,23 @@ final class NativeInstallerTest extends TestCase
         );
     }
 
+    public function testInstallCopiesRootOptionalLocalPackage(): void
+    {
+        $this->writeJson('package.json', ['optionalDependencies' => [self::LOCAL_NAME => 'file:' . self::LOCAL_PATH]]);
+        $this->writeLocal(['version' => '1.0.0', 'dependencies' => ['left-pad' => '*']]);
+        $this->install($this->registry());
+
+        self::assertFileExists(
+            "{$this->root}/node_modules/" . self::LOCAL_NAME . '/package.json',
+            'The optional local package must be copied.',
+        );
+        self::assertSame(
+            [self::LOCAL_NAME, 'left-pad'],
+            array_keys($this->lock()['packages']),
+            'The local package and its dependency must be locked.',
+        );
+    }
+
     public function testInstallCreatesScopeDirectoryBeforeMovingPackage(): void
     {
         $registry = $this->registry();
@@ -197,6 +214,53 @@ final class NativeInstallerTest extends TestCase
         self::assertFileExists(
             "{$this->root}/node_modules/@popperjs/core/index.js",
             'The scoped package must be moved into place.',
+        );
+    }
+
+    public function testInstallDropsRootOptionalLocalPackageWithUnavailableDependency(): void
+    {
+        $this->writeJson(
+            'package.json',
+            [
+                'dependencies' => ['left-pad' => '*'],
+                'optionalDependencies' => [self::LOCAL_NAME => 'file:' . self::LOCAL_PATH],
+            ],
+        );
+        $this->writeLocal(['version' => '1.0.0', 'dependencies' => ['missing-pkg' => '^1.0']]);
+
+        $io = $this->io();
+
+        $io
+            ->expects(self::once())
+            ->method('writeError')
+            ->with(
+                '<warning>The optional dependency "' . self::LOCAL_NAME . '" (file:' . self::LOCAL_PATH . ') was skipped: '
+                . Message::NATIVE_PACKAGE_NOT_FOUND->getMessage('missing-pkg', 'memory') . '</warning>',
+            );
+
+        $this->installer($this->registry(), $io)->install(
+            "{$this->root}/package.json",
+            "{$this->root}/foxy.lock",
+            "{$this->root}/node_modules",
+            false,
+        );
+
+        self::assertDirectoryDoesNotExist(
+            "{$this->root}/node_modules/" . self::LOCAL_NAME,
+            'The dropped local package must not be copied.',
+        );
+        self::assertSame(
+            ['left-pad'],
+            array_keys($this->lock()['packages']),
+            'The dropped local package must not be locked.',
+        );
+        self::assertSame(
+            [
+                '' => self::kinds(['left-pad' => '*'], [self::LOCAL_NAME => 'file:' . self::LOCAL_PATH]),
+                self::LOCAL_NAME => self::kinds(['missing-pkg' => '^1.0']),
+            ],
+            $this->lock()['requirements'],
+            'The fingerprint must keep the manifest content.',
         );
     }
 
@@ -272,6 +336,27 @@ final class NativeInstallerTest extends TestCase
         self::assertFileExists(
             "{$this->root}/node_modules/left-pad/index.js",
             'The package must be extracted.',
+        );
+    }
+
+    public function testInstallKeepsSymlinkedInstallDirectory(): void
+    {
+        $this->writeJson('package.json', ['dependencies' => ['left-pad' => '*']]);
+        $this->writeFile('real-modules/.keep', '');
+
+        if (!@symlink("{$this->root}/real-modules", "{$this->root}/modules")) {
+            self::markTestSkipped('Symbolic links are not available.');
+        }
+
+        $this->installInto("{$this->root}/modules");
+
+        self::assertTrue(
+            is_link("{$this->root}/modules"),
+            'The install directory link must be kept.',
+        );
+        self::assertFileExists(
+            "{$this->root}/real-modules/left-pad/index.js",
+            'The package must be installed through the link.',
         );
     }
 
@@ -468,6 +553,38 @@ final class NativeInstallerTest extends TestCase
         );
     }
 
+    public function testInstallReplacesSymlinkedScopeOfInstalledPackage(): void
+    {
+        $this->writeJson('package.json', ['dependencies' => ['@popperjs/core' => '^2.11']]);
+        $this->writeFile('node_modules/.keep', '');
+        $this->writeFile('external/core/package.json', '{"name": "external"}');
+
+        if (!@symlink("{$this->root}/external", "{$this->root}/node_modules/@popperjs")) {
+            self::markTestSkipped('Symbolic links are not available.');
+        }
+
+        $this->install($this->registry());
+
+        self::assertSame(
+            ['  - Removing @popperjs', '  - Installing @popperjs/core (2.11.8): Extracting archive'],
+            $this->output,
+            'The scope link must be removed before the installation.',
+        );
+        self::assertFalse(
+            is_link("{$this->root}/node_modules/@popperjs"),
+            'The scope must become a real directory.',
+        );
+        self::assertFileExists(
+            "{$this->root}/node_modules/@popperjs/core/index.js",
+            'The package must be extracted into the real scope.',
+        );
+        self::assertStringEqualsFile(
+            "{$this->root}/external/core/package.json",
+            '{"name": "external"}',
+            'The link target must stay intact.',
+        );
+    }
+
     public function testInstallResolvesAgainWhenLocalVersionChanges(): void
     {
         $registry = $this->registry();
@@ -597,6 +714,41 @@ final class NativeInstallerTest extends TestCase
         self::assertFileExists(
             "{$this->root}/node_modules/widgets/index.js",
             'The dependent package must be installed.',
+        );
+    }
+
+    public function testInstallReusesFreshLockWithDroppedOptionalLocalPackage(): void
+    {
+        $registry = $this->registry();
+
+        $this->writeJson(
+            'package.json',
+            [
+                'dependencies' => ['left-pad' => '*'],
+                'optionalDependencies' => [self::LOCAL_NAME => 'file:' . self::LOCAL_PATH],
+            ],
+        );
+        $this->writeLocal(['version' => '1.0.0', 'dependencies' => ['missing-pkg' => '^1.0']]);
+        $this->install($registry);
+
+        $requested = $registry->requested;
+        $compact = $this->compactLock();
+
+        $this->install($registry);
+
+        self::assertSame(
+            $requested,
+            $registry->requested,
+            'The absent optional local package must not make the lock stale.',
+        );
+        self::assertStringEqualsFile(
+            "{$this->root}/foxy.lock",
+            $compact,
+            'A fresh lock must not be rewritten.',
+        );
+        self::assertDirectoryDoesNotExist(
+            "{$this->root}/node_modules/" . self::LOCAL_NAME,
+            'The dropped local package must stay absent.',
         );
     }
 

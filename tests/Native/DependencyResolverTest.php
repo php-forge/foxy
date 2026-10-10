@@ -6,7 +6,7 @@ namespace Foxy\Tests\Native;
 
 use Composer\IO\IOInterface;
 use Foxy\Exception\{Message, RuntimeException};
-use Foxy\Native\{DependencyResolver, PackageMetadata, Requirement, ResolvedPackage};
+use Foxy\Native\{DependencyResolver, LocalPackage, PackageMetadata, Requirement, ResolvedPackage};
 use Foxy\Tests\Fixtures\Native\InMemoryRegistry;
 use Foxy\Tests\Provider\DependencyResolverProvider;
 use PHPUnit\Framework\Attributes\DataProviderExternal;
@@ -30,9 +30,12 @@ final class DependencyResolverTest extends TestCase
             ->add(self::metadata('bar', ['1.0.0' => ['dependencies' => ['foo' => '^1.0']]]));
 
         self::assertEquals(
-            ['bar' => self::package('bar', '1.0.0')],
-            $this->resolver($registry)->resolve([new Requirement('bar', '^1.0', '')], ['foo' => '1.0.0']),
-            'The local package must stay out of the result.',
+            ['bar' => self::package('bar', '1.0.0'), 'foo' => self::localPackage('foo')],
+            $this->resolver($registry)->resolve(
+                [self::localRequirement('foo'), new Requirement('bar', '^1.0', '')],
+                ['foo' => self::local('foo', '1.0.0')],
+            ),
+            'The local package must be selected as it is.',
         );
         self::assertSame(
             ['bar'],
@@ -77,6 +80,42 @@ final class DependencyResolverTest extends TestCase
                 [new Requirement('o', '^1.0', ''), new Requirement('m', '^1.0', '')],
             ),
             'The mandatory range must win and the declaring package must stay.',
+        );
+    }
+
+    public function testResolveDropsOptionalLocalPackageRejectedByMandatoryRequirement(): void
+    {
+        $registry = (new InMemoryRegistry())
+            ->add(self::metadata('bar', ['1.0.0' => ['dependencies' => ['foo' => '^2.0']]]))
+            ->add(self::metadata('foo', ['2.1.0' => []]));
+
+        $conflict = Message::NATIVE_LOCAL_VERSION_CONFLICT->getMessage('foo', '1.0.0', '"^2.0" from bar@1.0.0');
+
+        self::assertEquals(
+            ['bar' => self::package('bar', '1.0.0'), 'foo' => self::package('foo', '2.1.0')],
+            $this->resolver($registry, $this->optionalWarning('foo', 'file:./foo', $conflict))->resolve(
+                [self::localRequirement('foo', true), new Requirement('bar', '^1.0', '')],
+                ['foo' => self::local('foo', '1.0.0')],
+            ),
+            'The registry version must replace the dropped local package.',
+        );
+    }
+
+    public function testResolveDropsOptionalLocalPackageWithUnavailableDependency(): void
+    {
+        $registry = (new InMemoryRegistry())
+            ->add(self::metadata('qux', ['1.0.0' => []]))
+            ->add(self::metadata('left', ['1.0.0' => []]));
+
+        $local = self::local('foo', '1.0.0', [new Requirement('qux', '^1.0', 'foo'), new Requirement('baz', '^1.0', 'foo')]);
+
+        self::assertEquals(
+            ['left' => self::package('left', '1.0.0')],
+            $this->resolver(
+                $registry,
+                $this->optionalWarning('foo', 'file:./foo', Message::NATIVE_PACKAGE_NOT_FOUND->getMessage('baz', 'memory')),
+            )->resolve([self::localRequirement('foo', true), new Requirement('left', '*', '')], ['foo' => $local]),
+            'The local package and its subtree must be dropped.',
         );
     }
 
@@ -199,6 +238,26 @@ final class DependencyResolverTest extends TestCase
             ['widgets', 'popper', '42'],
             $registry->requested,
             'Optional peers must never be fetched.',
+        );
+    }
+
+    public function testResolveKeepsLocalPackageAfterItsLastDependentIsReplaced(): void
+    {
+        $registry = (new InMemoryRegistry())
+            ->add(self::metadata('p', ['1.0.0' => [], '2.0.0' => ['dependencies' => ['foo' => '^1.0']]]))
+            ->add(self::metadata('q', ['1.0.0' => ['dependencies' => ['p' => '^1.0']]]));
+
+        self::assertEquals(
+            [
+                'foo' => self::localPackage('foo'),
+                'p' => self::package('p', '1.0.0'),
+                'q' => self::package('q', '1.0.0'),
+            ],
+            $this->resolver($registry)->resolve(
+                [self::localRequirement('foo'), new Requirement('p', '*', ''), new Requirement('q', '*', '')],
+                ['foo' => self::local('foo', '1.0.0')],
+            ),
+            'The root `file:` entry must keep the local package selected.',
         );
     }
 
@@ -351,6 +410,20 @@ final class DependencyResolverTest extends TestCase
         );
     }
 
+    public function testResolveResolvesRootRangeOnLocalNameFromRegistry(): void
+    {
+        $registry = (new InMemoryRegistry())->add(self::metadata('foo', ['2.0.0' => []]));
+
+        self::assertEquals(
+            ['foo' => self::package('foo', '2.0.0')],
+            $this->resolver($registry)->resolve(
+                [new Requirement('foo', '^2.0', '')],
+                ['foo' => self::local('foo', '1.0.0')],
+            ),
+            'Only a `file:` requirement may select the local package.',
+        );
+    }
+
     public function testResolveRetractsConstraintsOfAbandonedVersion(): void
     {
         $registry = (new InMemoryRegistry())
@@ -500,12 +573,12 @@ final class DependencyResolverTest extends TestCase
         $conflict = Message::NATIVE_LOCAL_VERSION_CONFLICT->getMessage('foo', '1.0.0', '"^2.0" from bar@1.0.0');
 
         self::assertEquals(
-            ['bar' => self::package('bar', '1.0.0')],
+            ['bar' => self::package('bar', '1.0.0'), 'foo' => self::localPackage('foo')],
             $this->resolver($registry, $this->optionalWarning('foo', '^2.0', $conflict))->resolve(
-                [new Requirement('bar', '^1.0', '')],
-                ['foo' => '1.0.0'],
+                [self::localRequirement('foo'), new Requirement('bar', '^1.0', '')],
+                ['foo' => self::local('foo', '1.0.0')],
             ),
-            'The declaring package must be installed.',
+            'The declaring package must be installed beside the local one.',
         );
     }
 
@@ -663,12 +736,34 @@ final class DependencyResolverTest extends TestCase
 
     public function testThrowRuntimeExceptionForDistTagOnLocalPackage(): void
     {
+        $registry = (new InMemoryRegistry())
+            ->add(self::metadata('bar', ['1.0.0' => ['dependencies' => ['foo' => 'latest']]]));
+
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
             Message::NATIVE_RANGE_INVALID->getMessage('latest', 'foo'),
         );
 
-        $this->resolver(new InMemoryRegistry())->resolve([new Requirement('foo', 'latest', '')], ['foo' => '1.0.0']);
+        $this->resolver($registry)->resolve(
+            [self::localRequirement('foo'), new Requirement('bar', '^1.0', '')],
+            ['foo' => self::local('foo', '1.0.0')],
+        );
+    }
+
+    public function testThrowRuntimeExceptionForFileSpecFromRegistryPackage(): void
+    {
+        $registry = (new InMemoryRegistry())
+            ->add(self::metadata('bar', ['1.0.0' => ['dependencies' => ['foo' => 'file:../foo']]]));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            Message::NATIVE_SPEC_UNSUPPORTED->getMessage('file:../foo', 'foo'),
+        );
+
+        $this->resolver($registry)->resolve(
+            [self::localRequirement('foo'), new Requirement('bar', '^1.0', '')],
+            ['foo' => self::local('foo', '1.0.0')],
+        );
     }
 
     public function testThrowRuntimeExceptionForUnknownDistTag(): void
@@ -756,6 +851,19 @@ final class DependencyResolverTest extends TestCase
         $this->resolver($registry)->resolve([new Requirement('o', '^1.0', ''), new Requirement('m', '^1.0', '')]);
     }
 
+    public function testThrowRuntimeExceptionWhenMandatoryLocalDependencyIsMissing(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            Message::NATIVE_PACKAGE_NOT_FOUND->getMessage('baz', 'memory'),
+        );
+
+        $this->resolver(new InMemoryRegistry())->resolve(
+            [self::localRequirement('foo')],
+            ['foo' => self::local('foo', '1.0.0', [new Requirement('baz', '^1.0', 'foo')])],
+        );
+    }
+
     public function testThrowRuntimeExceptionWhenMandatoryRootSubtreeBlocksMandatoryRequirement(): void
     {
         $registry = (new InMemoryRegistry())
@@ -785,6 +893,22 @@ final class DependencyResolverTest extends TestCase
         );
 
         $this->resolver($registry)->resolve([new Requirement('foo', '^2.0', ''), new Requirement('bar', '^1.0', '')]);
+    }
+
+    public function testThrowRuntimeExceptionWhenOptionalLocalDependencyFailsAfterMandatoryRequirement(): void
+    {
+        $registry = (new InMemoryRegistry())
+            ->add(self::metadata('bar', ['1.0.0' => ['dependencies' => ['foo' => '^1.0']]]));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            Message::NATIVE_PACKAGE_NOT_FOUND->getMessage('baz', 'memory'),
+        );
+
+        $this->resolver($registry)->resolve(
+            [new Requirement('bar', '^1.0', ''), self::localRequirement('foo', true)],
+            ['foo' => self::local('foo', '1.0.0', [new Requirement('baz', '^1.0', 'foo')])],
+        );
     }
 
     public function testThrowRuntimeExceptionWhenOptionalSubtreeFailsUnderMandatoryRoot(): void
@@ -860,7 +984,10 @@ final class DependencyResolverTest extends TestCase
             Message::NATIVE_LOCAL_VERSION_CONFLICT->getMessage('foo', '1.0.0', '"^2.0" from bar@1.0.0'),
         );
 
-        $this->resolver($registry)->resolve([new Requirement('bar', '^1.0', '')], ['foo' => '1.0.0']);
+        $this->resolver($registry)->resolve(
+            [self::localRequirement('foo'), new Requirement('bar', '^1.0', '')],
+            ['foo' => self::local('foo', '1.0.0')],
+        );
     }
 
     public function testThrowRuntimeExceptionWhenRepickReturnsToAbandonedVersion(): void
@@ -904,6 +1031,26 @@ final class DependencyResolverTest extends TestCase
             ->add(self::metadata('b', ['1.0.0' => ['dependencies' => ['a' => '^1.0', 'z' => '^1.0']]]))
             ->add(self::metadata('x', ['2.0.0' => ['dependencies' => ['z' => '^2.0']]]))
             ->add(self::metadata('z', ['1.0.0' => [], '2.0.0' => []]));
+    }
+
+    /**
+     * Returns a local package at `./<name>` with the given requirements.
+     *
+     * @param list<Requirement> $requirements
+     */
+    private static function local(string $name, string $version, array $requirements = []): LocalPackage
+    {
+        return new LocalPackage($name, $version, "./{$name}", $requirements);
+    }
+
+    private static function localPackage(string $name): ResolvedPackage
+    {
+        return ResolvedPackage::fromLocal($name, '1.0.0', "./{$name}");
+    }
+
+    private static function localRequirement(string $name, bool $optional = false): Requirement
+    {
+        return new Requirement($name, "file:./{$name}", '', $optional);
     }
 
     /**
