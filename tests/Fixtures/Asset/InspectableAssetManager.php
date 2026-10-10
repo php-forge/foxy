@@ -33,9 +33,9 @@ final class InspectableAssetManager extends AbstractAssetManager
 
     private string|null $versionOutput = null;
 
-    public function buildCommandForTest(string $defaultBin, string $action, array|string $command): string
+    public function buildCommandForTest(string $action, array|string $command): string
     {
-        return $this->buildCommand($defaultBin, $action, $command);
+        return $this->buildCommand($action, $command);
     }
 
     public function disableVersionConverterForTest(): void
@@ -151,7 +151,7 @@ final class InspectableAssetManager extends AbstractAssetManager
 
     protected function getAuditCommand(bool $noDev): string
     {
-        return $this->buildUnconfiguredCommand($this->getDefaultBinary(), $noDev ? ['audit', '--prod'] : ['audit']);
+        return $this->buildUnconfiguredCommand($noDev ? ['audit', '--prod'] : ['audit']);
     }
 
     protected function getAuditEnvironment(): array

@@ -51,6 +51,6 @@ final class PnpmManager extends AbstractAssetManager
             ProcessExecutor::escape('--config.auditConfig={ignoreGhsas:[]}'),
         ];
 
-        return $this->buildUnconfiguredCommand($this->getDefaultBinary(), $command);
+        return $this->buildUnconfiguredCommand($command);
     }
 }

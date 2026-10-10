@@ -286,8 +286,16 @@ Foxy then performs the installation itself, in PHP:
   `cache-read-only` settings; every cached tarball is verified again before use.
 - It writes `foxy.lock`, which records the root requirements and the requirements of every local package (regular
   and optional ones apart), and the selected version, tarball URL, and integrity of every installed package. `composer install` with a lock that
-  matches the current manifests reinstalls exactly those tarballs without a single metadata request;
+  matches the current manifests installs exactly those tarballs without a single metadata request;
   `composer update`, or a lock that no longer matches, resolves again and rewrites the lock. Commit `foxy.lock`.
+- It records what it installed in `.foxy-installed.json` inside the install directory, the counterpart of npm's
+  `node_modules/.package-lock.json`: the `foxy.lock` entry of every package left in place. A registry package whose
+  directory exists and whose entry matches the lock is kept untouched, so a warm install extracts nothing; a package
+  whose entry differs or whose directory is missing is extracted again. `file:` packages are always copied again,
+  since their content can change without a version change. The file is removed at the start of each installation and
+  written at its end, so an interrupted installation leaves none behind. A missing or malformed file only forces every
+  registry package to be extracted again, as happens once on the first install that creates it; deleting it is always
+  safe. Like every dot-entry, the pruning leaves it alone. Do not commit it.
 - It removes entries of the install directory that are not part of the installation (dot-entries such as `.bin`
   are left alone).
 
@@ -317,14 +325,19 @@ followed by a name of letters, digits, `.`, `_`, and `-`, up to 214 characters);
 path is built from it. Scoped packages keep the npm layout (`vendor/npm-asset/@popperjs/core`), not asset-packagist's
 `popperjs--core` form.
 
-The native manager requires the PHP `zlib` extension and prints `Installing`, `Updating`, and `Removing` lines like
-the other managers. Its registry requests go through Composer's HTTP layer: proxies, `cafile`, `disable-tls`, and the
-credentials stored in `auth.json` for the registry host all apply, so a private registry can be configured with
-`registry-url` plus Composer authentication. Credentials are matched against the request's `host:port` exactly as
-written in `registry-url`: `localhost` and `127.0.0.1` are not aliases of each other, and the `auth.json` key must
-include the port when it is not the scheme's default (`npm.example.com:4873`). A plain `http://` registry also needs
-Composer's `config.secure-http` set to `false`. A registry that answers 401 or 403 fails the request with Composer's
-error text, as any other registry failure does:
+The native manager requires the PHP `zlib` extension. Its output follows Composer's verbosity levels: at normal
+verbosity it prints only changes (`Installing`, `Updating`, and `Removing` lines), or
+`Nothing to install, update or remove`; `-v` adds a `Keeping` line per kept package and a `Refreshing` line per
+unchanged `file:` package copied again; `-vv` adds the registry traffic (metadata requests, tarball downloads,
+prefetches, and cache hits); `-vvv` adds Composer's own HTTP log.
+
+Its registry requests go through Composer's HTTP layer: proxies, `cafile`, `disable-tls`, and the credentials stored
+in `auth.json` for the registry host all apply, so a private registry can be configured with `registry-url` plus
+Composer authentication. Credentials are matched against the request's `host:port` exactly as written in
+`registry-url`: `localhost` and `127.0.0.1` are not aliases of each other, and the `auth.json` key must include the
+port when it is not the scheme's default (`npm.example.com:4873`). A plain `http://` registry also needs Composer's
+`config.secure-http` set to `false`. A registry that answers 401 or 403 fails the request with Composer's error text,
+as any other registry failure does:
 
 ```json
 {

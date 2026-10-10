@@ -48,6 +48,8 @@ final class NpmRegistryTest extends TestCase
     private const string LEFT_PAD_URL = 'https://registry.test/left-pad/-/left-pad-1.3.0.tgz';
     private const string METADATA_URL = 'https://registry.test/@scope%2Fpkg';
     private const string TARBALL_URL = 'https://registry.test/@scope/pkg/-/pkg-1.0.0.tgz';
+    private const string TOKEN_TARBALL_URL = self::TARBALL_URL . '?access_token=abc';
+    private const string TOKEN_TARBALL_URL_REDACTED = self::TARBALL_URL . '?access_token=***';
 
     private string $cacheDir = '';
 
@@ -100,6 +102,20 @@ final class NpmRegistryTest extends TestCase
         );
     }
 
+    public function testFetchTarballRedactsAccessTokenAtVeryVerbose(): void
+    {
+        $io = self::veryVerboseIo();
+
+        $this->registry($this->tarballDownloader(NpmRegistryProvider::TARBALL, self::TOKEN_TARBALL_URL), io: $io)
+            ->fetchTarball($this->package(resolved: self::TOKEN_TARBALL_URL), $this->directory);
+
+        self::assertSame(
+            'Downloading @scope/pkg (1.0.0) from ' . self::TOKEN_TARBALL_URL_REDACTED . PHP_EOL,
+            $io->getOutput(),
+            'The access token must be masked.',
+        );
+    }
+
     public function testFetchTarballReplacesCorruptedCacheEntry(): void
     {
         $this->seedCache('corrupted');
@@ -116,6 +132,49 @@ final class NpmRegistryTest extends TestCase
             NpmRegistryProvider::TARBALL,
             file_get_contents($this->cacheEntry()),
             'Cache entry must hold the verified bytes.',
+        );
+    }
+
+    public function testFetchTarballReportsCacheHitAtVeryVerbose(): void
+    {
+        $io = self::veryVerboseIo();
+
+        $this->seedCache(NpmRegistryProvider::TARBALL);
+        $this->registry($this->idleDownloader(), io: $io)->fetchTarball($this->package(), $this->directory);
+
+        self::assertSame(
+            'Loading @scope/pkg (1.0.0) from cache' . PHP_EOL,
+            $io->getOutput(),
+            'The cache hit must be traced.',
+        );
+    }
+
+    public function testFetchTarballReportsDownloadAfterCorruptedCacheHit(): void
+    {
+        $io = self::veryVerboseIo();
+
+        $this->seedCache('corrupted');
+        $this->registry($this->tarballDownloader(NpmRegistryProvider::TARBALL), io: $io)
+            ->fetchTarball($this->package(), $this->directory);
+
+        self::assertSame(
+            'Downloading @scope/pkg (1.0.0) from ' . self::TARBALL_URL . PHP_EOL,
+            $io->getOutput(),
+            'A rejected cache copy must be traced as a download only.',
+        );
+    }
+
+    public function testFetchTarballReportsDownloadAtVeryVerbose(): void
+    {
+        $io = self::veryVerboseIo();
+
+        $this->registry($this->tarballDownloader(NpmRegistryProvider::TARBALL), io: $io)
+            ->fetchTarball($this->package(), $this->directory);
+
+        self::assertSame(
+            'Downloading @scope/pkg (1.0.0) from ' . self::TARBALL_URL . PHP_EOL,
+            $io->getOutput(),
+            'The download must be traced with its URL.',
         );
     }
 
@@ -241,6 +300,62 @@ final class NpmRegistryTest extends TestCase
             'Retrying "' . self::ADVISORIES_URL . '" after a 429 response (1 s)' . PHP_EOL,
             $this->io->getOutput(),
             'The retry must be announced.',
+        );
+    }
+
+    #[DataProviderExternal(NpmRegistryProvider::class, 'credentialedRegistryUrls')]
+    public function testGetMetadataRedactsCredentialsAtVeryVerbose(string $url, string $redacted): void
+    {
+        $io = self::veryVerboseIo();
+
+        $downloader = $this->createMock(HttpDownloader::class);
+
+        $downloader
+            ->expects(self::once())
+            ->method('get')
+            ->with("{$url}/left-pad", self::ACCEPT)
+            ->willReturn($this->metadataResponse());
+
+        $this->registry($downloader, io: $io, url: $url)->getMetadata('left-pad');
+
+        self::assertSame(
+            "Fetching metadata for left-pad ({$redacted}/left-pad)" . PHP_EOL,
+            $io->getOutput(),
+            'Credentials must be masked in the trace only.',
+        );
+    }
+
+    public function testGetMetadataRedactsCredentialsInRetryNotice(): void
+    {
+        $downloader = $this->metadataDownloader(
+            self::transportException(429),
+            'https://user:secret@registry.test/@scope%2Fpkg',
+        );
+
+        $this->registry($downloader, url: 'https://user:secret@registry.test')->getMetadata('@scope/pkg');
+
+        self::assertSame(
+            'Retrying "https://user:***@registry.test/@scope%2Fpkg" after a 429 response (1 s)' . PHP_EOL,
+            $this->io->getOutput(),
+            'The password must be masked.',
+        );
+    }
+
+    public function testGetMetadataReportsRequestAtVeryVerbose(): void
+    {
+        $io = self::veryVerboseIo();
+        $downloader = $this->createMock(HttpDownloader::class);
+
+        $downloader
+            ->method('get')
+            ->willReturn($this->metadataResponse());
+
+        $this->registry($downloader, io: $io)->getMetadata('@scope/pkg');
+
+        self::assertSame(
+            'Fetching metadata for @scope/pkg (' . self::METADATA_URL . ')' . PHP_EOL,
+            $io->getOutput(),
+            'The request must be traced with its URL.',
         );
     }
 
@@ -510,6 +625,42 @@ final class NpmRegistryTest extends TestCase
         );
     }
 
+    public function testPrefetchTarballsRedactsAccessTokenAtVeryVerbose(): void
+    {
+        $io = self::veryVerboseIo();
+
+        $this->registry($this->prefetchDownloader(1, self::serve('corrupted')), io: $io)
+            ->prefetchTarballs([$this->package(resolved: self::TOKEN_TARBALL_URL)], $this->directory);
+
+        self::assertSame(
+            self::TOKEN_TARBALL_URL,
+            $this->copies[0][0],
+            'The download must use the raw URL.',
+        );
+        self::assertSame(
+            'Prefetching @scope/pkg (1.0.0) from ' . self::TOKEN_TARBALL_URL_REDACTED . PHP_EOL
+            . 'Prefetching the tarball of "@scope/pkg" (1.0.0) failed: '
+            . 'The tarball "' . self::TOKEN_TARBALL_URL_REDACTED . '" failed its integrity check.' . PHP_EOL,
+            $io->getOutput(),
+            'The access token must be masked in the trace and the notice.',
+        );
+    }
+
+    public function testPrefetchTarballsReportsQueuedDownloadsAtVeryVerbose(): void
+    {
+        $io = self::veryVerboseIo();
+
+        $this->seedCache(NpmRegistryProvider::TARBALL);
+        $this->registry($this->prefetchDownloader(1, self::serve(self::LEFT_PAD_TARBALL)), io: $io)
+            ->prefetchTarballs([$this->package(), $this->leftPad()], $this->directory);
+
+        self::assertSame(
+            'Prefetching left-pad (1.3.0) from ' . self::LEFT_PAD_URL . PHP_EOL,
+            $io->getOutput(),
+            'Only the queued download must be traced.',
+        );
+    }
+
     public function testPrefetchTarballsRequestsNothingForCachedPackages(): void
     {
         $this->seedCache(NpmRegistryProvider::TARBALL);
@@ -642,6 +793,18 @@ final class NpmRegistryTest extends TestCase
         );
     }
 
+    public function testThrowRuntimeExceptionForRejectedIntegrityOfTokenTarballUrl(): void
+    {
+        $registry = $this->registry($this->tarballDownloader('corrupted', self::TOKEN_TARBALL_URL));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            'The tarball "' . self::TOKEN_TARBALL_URL_REDACTED . '" failed its integrity check.',
+        );
+
+        $registry->fetchTarball($this->package(resolved: self::TOKEN_TARBALL_URL), $this->directory);
+    }
+
     public function testThrowRuntimeExceptionWhenAdvisoriesEndpointIsMissing(): void
     {
         $downloader = $this->createMock(HttpDownloader::class);
@@ -657,6 +820,24 @@ final class NpmRegistryTest extends TestCase
         );
 
         $this->registry($downloader)->getAdvisories(['lodash' => ['4.17.15']]);
+    }
+
+    public function testThrowRuntimeExceptionWhenCredentialedRegistryRequestFails(): void
+    {
+        $downloader = $this->createMock(HttpDownloader::class);
+
+        $downloader
+            ->expects(self::once())
+            ->method('get')
+            ->with('https://user:secret@registry.test/@scope%2Fpkg', self::ACCEPT)
+            ->willThrowException(self::transportException(500, [], 'Internal Server Error'));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            'The registry request "https://user:***@registry.test/@scope%2Fpkg" failed: Internal Server Error',
+        );
+
+        $this->registry($downloader, url: 'https://user:secret@registry.test')->getMetadata('@scope/pkg');
     }
 
     public function testThrowRuntimeExceptionWhenDownloadFailsAfterCorruptedCacheHit(): void
@@ -738,6 +919,23 @@ final class NpmRegistryTest extends TestCase
         );
 
         $this->registry($downloader)->getMetadata('@scope/pkg');
+    }
+
+    public function testThrowRuntimeExceptionWhenPackageIsNotFoundInCredentialedRegistry(): void
+    {
+        $downloader = $this->createMock(HttpDownloader::class);
+
+        $downloader
+            ->expects(self::once())
+            ->method('get')
+            ->willThrowException(self::transportException(404, [], 'Not Found'));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            'The package "@scope/pkg" was not found in the registry "https://user:***@registry.test".',
+        );
+
+        $this->registry($downloader, url: 'https://user:secret@registry.test/')->getMetadata('@scope/pkg');
     }
 
     public function testThrowRuntimeExceptionWhenTarballIsNotFound(): void
@@ -885,8 +1083,10 @@ final class NpmRegistryTest extends TestCase
     /**
      * Returns a downloader whose first metadata request fails with the exception and whose second one succeeds.
      */
-    private function metadataDownloader(TransportException $exception): HttpDownloader&MockObject
-    {
+    private function metadataDownloader(
+        TransportException $exception,
+        string $url = self::METADATA_URL,
+    ): HttpDownloader&MockObject {
         $calls = 0;
         $response = $this->metadataResponse();
         $downloader = $this->createMock(HttpDownloader::class);
@@ -894,7 +1094,7 @@ final class NpmRegistryTest extends TestCase
         $downloader
             ->expects(self::exactly(2))
             ->method('get')
-            ->with(self::METADATA_URL, self::ACCEPT)
+            ->with($url, self::ACCEPT)
             ->willReturnCallback(
                 static function () use (&$calls, $exception, $response): Response {
                     if (0 === $calls++) {
@@ -919,12 +1119,12 @@ final class NpmRegistryTest extends TestCase
         );
     }
 
-    private function package(string|null $integrity = null): ResolvedPackage
+    private function package(string|null $integrity = null, string $resolved = self::TARBALL_URL): ResolvedPackage
     {
         return new ResolvedPackage(
             '@scope/pkg',
             '1.0.0',
-            self::TARBALL_URL,
+            $resolved,
             $integrity ?? 'sha512-' . base64_encode(hash('sha512', NpmRegistryProvider::TARBALL, true)),
         );
     }
@@ -963,12 +1163,13 @@ final class NpmRegistryTest extends TestCase
         HttpDownloader $downloader,
         Cache|null $cache = null,
         IOInterface|null $io = null,
+        string $url = 'https://registry.test/',
     ): NpmRegistry {
         return new NpmRegistry(
             $downloader,
             $cache ?? $this->cache(),
             $io ?? $this->io,
-            'https://registry.test/',
+            $url,
             function (int $seconds): void {
                 $this->delays[] = $seconds;
             },
@@ -1002,16 +1203,16 @@ final class NpmRegistryTest extends TestCase
     }
 
     /**
-     * Returns a downloader that writes the bytes to the requested file once.
+     * Returns a downloader that writes the bytes to the requested file once, expecting the raw tarball URL.
      */
-    private function tarballDownloader(string $bytes): HttpDownloader&MockObject
+    private function tarballDownloader(string $bytes, string $url = self::TARBALL_URL): HttpDownloader&MockObject
     {
         $downloader = $this->createMock(HttpDownloader::class);
 
         $downloader
             ->expects(self::once())
             ->method('copy')
-            ->with(self::TARBALL_URL, "{$this->directory}/scope-pkg-1.0.0.tgz")
+            ->with($url, "{$this->directory}/scope-pkg-1.0.0.tgz")
             ->willReturnCallback(
                 static function (string $url, string $to) use ($bytes): Response {
                     file_put_contents($to, $bytes);
@@ -1042,5 +1243,10 @@ final class NpmRegistryTest extends TestCase
     private static function verboseIo(): BufferIO
     {
         return new BufferIO('', OutputInterface::VERBOSITY_VERBOSE);
+    }
+
+    private static function veryVerboseIo(): BufferIO
+    {
+        return new BufferIO('', OutputInterface::VERBOSITY_VERY_VERBOSE);
     }
 }

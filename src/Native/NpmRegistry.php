@@ -9,7 +9,7 @@ use Composer\Cache;
 use Composer\Downloader\TransportException;
 use Composer\IO\IOInterface;
 use Composer\Util\Http\Response;
-use Composer\Util\HttpDownloader;
+use Composer\Util\{HttpDownloader, Url};
 use Foxy\Exception\{Message, RuntimeException};
 use Throwable;
 
@@ -39,7 +39,12 @@ use const JSON_THROW_ON_ERROR;
  *
  * Requests answered with HTTP 429 are retried up to three times, waiting the `Retry-After` seconds (capped at 60)
  * or 1, 2, and 4 seconds. Tarballs are cached and verified against their Subresource Integrity value on every cache
- * hit and every download; a prefetch fills the cache with parallel downloads and no retry.
+ * hit and every download; a prefetch fills the cache with parallel downloads and no retry. Every metadata request,
+ * tarball download, prefetch, and cache hit is written at very verbose level (`-vv`).
+ *
+ * URLs written to the output or put in an exception message are masked with {@see Url::sanitize()}: an
+ * `access_token` query value and a userinfo password become `***`, and a long or token-like user name keeps its first
+ * three characters.
  */
 final readonly class NpmRegistry implements NpmRegistryInterface
 {
@@ -59,7 +64,7 @@ final readonly class NpmRegistry implements NpmRegistryInterface
      * @param HttpDownloader $httpDownloader Downloader that performs the requests; {@see prefetchTarballs()} needs the
      * async-enabled instance returned by `Composer::getLoop()->getHttpDownloader()`.
      * @param Cache $cache Tarball cache.
-     * @param IOInterface $io Output for the retry and failed prefetch notices.
+     * @param IOInterface $io Output for the retry and failed prefetch notices and the very verbose registry traffic.
      * @param string $url Registry base URL; a trailing slash is ignored.
      * @param (Closure(int): void)|null $delay Replacement for `sleep()` during the 429 back-off, or `null` to sleep.
      */
@@ -91,19 +96,22 @@ final readonly class NpmRegistry implements NpmRegistryInterface
 
         if ($this->cache->copyTo($key, $file)) {
             if ($this->matchesIntegrity($file, $integrity)) {
+                $this->trace("Loading {$package->name} ({$package->version}) from cache");
+
                 return $file;
             }
 
             $this->cache->remove($key);
         }
 
+        $this->trace("Downloading {$package->name} ({$package->version}) from " . Url::sanitize($resolved));
         $this->send($resolved, fn(): Response => $this->httpDownloader->copy($resolved, $file));
 
         if (!$this->matchesIntegrity($file, $integrity)) {
             unlink($file);
 
             throw new RuntimeException(
-                Message::NATIVE_INTEGRITY_MISMATCH->getMessage($resolved),
+                Message::NATIVE_INTEGRITY_MISMATCH->getMessage(Url::sanitize($resolved)),
             );
         }
 
@@ -154,10 +162,12 @@ final readonly class NpmRegistry implements NpmRegistryInterface
     {
         $url = $this->registryUrl() . '/' . str_replace('/', '%2F', $name);
 
+        $this->trace("Fetching metadata for {$name} (" . Url::sanitize($url) . ')');
+
         $response = $this->send(
             $url,
             fn(): Response => $this->httpDownloader->get($url, ['http' => ['header' => [self::METADATA_ACCEPT]]]),
-            Message::NATIVE_PACKAGE_NOT_FOUND->getMessage($name, $this->registryUrl()),
+            Message::NATIVE_PACKAGE_NOT_FOUND->getMessage($name, Url::sanitize($this->registryUrl())),
         );
 
         try {
@@ -206,6 +216,7 @@ final readonly class NpmRegistry implements NpmRegistryInterface
             // The URL hash keeps `@scope/pkg` and `scope-pkg` apart while their downloads run side by side.
             $file = $this->tarballFile($package, $directory, '-' . sha1($resolved) . '.prefetch');
 
+            $this->trace("Prefetching {$package->name} ({$package->version}) from " . Url::sanitize($resolved));
             $this->httpDownloader->addCopy($resolved, $file)->then(
                 function () use ($package, $key, $file, $resolved): void {
                     try {
@@ -214,7 +225,7 @@ final readonly class NpmRegistry implements NpmRegistryInterface
                         } else {
                             $this->reportPrefetchFailure(
                                 $package,
-                                Message::NATIVE_INTEGRITY_MISMATCH->getMessage($resolved),
+                                Message::NATIVE_INTEGRITY_MISMATCH->getMessage(Url::sanitize($resolved)),
                             );
                         }
                     } catch (Throwable $exception) {
@@ -312,7 +323,7 @@ final readonly class NpmRegistry implements NpmRegistryInterface
     /**
      * Runs a request, retrying HTTP 429 responses, and converts transport failures into Foxy exceptions.
      *
-     * @param string $url Requested URL, used in messages.
+     * @param string $url Requested URL; messages carry its {@see Url::sanitize()} copy.
      * @param Closure(): Response $request Request to run.
      * @param string|null $notFound Message thrown for an HTTP 404 response, or `null` to treat it as a failure.
      *
@@ -337,14 +348,21 @@ final readonly class NpmRegistry implements NpmRegistryInterface
 
                 if (429 !== $status || self::RETRIES === $retry) {
                     throw new RuntimeException(
-                        Message::NATIVE_REGISTRY_REQUEST_FAILED->getMessage($url, $exception->getMessage()),
+                        Message::NATIVE_REGISTRY_REQUEST_FAILED->getMessage(
+                            Url::sanitize($url),
+                            $exception->getMessage(),
+                        ),
                     );
                 }
 
                 $seconds = $this->retryDelay($exception, $retry);
 
                 $this->io->writeError(
-                    sprintf('<comment>Retrying "%s" after a 429 response (%d s)</comment>', $url, $seconds),
+                    sprintf(
+                        '<comment>Retrying "%s" after a 429 response (%d s)</comment>',
+                        Url::sanitize($url),
+                        $seconds,
+                    ),
                 );
 
                 ($this->delay ?? sleep(...))($seconds);
@@ -369,5 +387,13 @@ final readonly class NpmRegistry implements NpmRegistryInterface
     private function tarballKey(ResolvedPackage $package): string
     {
         return "tarball/{$package->name}/{$package->version}-" . sha1($package->resolved ?? '') . '.tgz';
+    }
+
+    /**
+     * Writes a registry traffic line at very verbose level (`-vv`).
+     */
+    private function trace(string $message): void
+    {
+        $this->io->writeError($message, true, IOInterface::VERY_VERBOSE);
     }
 }

@@ -37,7 +37,7 @@ use const SORT_STRING;
  * Registry packages are resolved (or read from a fresh `foxy.lock`), downloaded, and extracted into
  * `<install directory>/.foxy-tmp` before being moved into place; `file:` packages are copied from their local
  * directory. Top-level entries of the install directory outside the install set are removed, except dot-entries such
- * as `.bin`.
+ * as `.bin`. A registry package already in place with its recorded lock entry is kept; see {@see InstalledState}.
  *
  * @phpstan-import-type Fingerprint from LockFile
  */
@@ -50,10 +50,14 @@ final readonly class NativeInstaller implements NativeInstallerInterface
     private const string EXTRACTION_SUFFIX = '/package';
     private const string FILE_PROTOCOL = 'file:';
     private const string OPTIONAL_SKIPPED = '<warning>The optional dependency "%s" (%s) was skipped: %s</warning>';
+    /**
+     * Name of the installed state file inside the install directory; see {@see InstalledState}.
+     */
+    private const string STATE_FILE = '.foxy-installed.json';
     private const string TEMPORARY_DIRECTORY = '.foxy-tmp';
 
     /**
-     * @param IOInterface $io Output that receives one line per installed or removed package.
+     * @param IOInterface $io Output that receives one line per changed package, and per kept package at verbose level.
      * @param Filesystem $fs Filesystem used to copy, move, and remove package directories.
      * @param NpmRegistryInterface $registry Registry that provides the tarballs.
      * @param DependencyResolver $resolver Resolver of the registry requirements.
@@ -215,13 +219,23 @@ final readonly class NativeInstaller implements NativeInstallerInterface
     }
 
     /**
-     * Installs the packages into the install directory and removes the entries outside the install set.
+     * Installs the packages into the install directory, removes the entries outside the install set, and records the
+     * install set in the installed state file.
      *
-     * The tarballs of the registry packages are first prefetched in parallel into the registry's cache; each package is
-     * then fetched, verified, and extracted in turn, so a failed prefetch surfaces as the error of its own fetch.
+     * A registry package whose directory exists and whose lock entry equals the recorded one is kept as is; every other
+     * registry package is extracted again, and every `file:` package is copied again since its content may change
+     * without a version change. The state file is removed before any change and written after the pruning, so an
+     * interrupted installation leaves no state and the next one extracts every registry package.
+     *
+     * The tarballs of the registry packages to extract are first prefetched in parallel into the registry's cache; each
+     * package is then fetched, verified, and extracted in turn, so a failed prefetch surfaces as the error of its own
+     * fetch.
      *
      * A symbolic link or a file standing in for the `@scope` directory of a package is removed first, so the package is
      * never written into the link target and a stale file cannot abort the installation.
+     *
+     * Changes are written at normal verbosity, or `Nothing to install, update or remove` when there is none; kept
+     * packages and refreshed local copies are written at verbose level.
      *
      * @param array<array-key, ResolvedPackage> $packages Packages in installation order.
      *
@@ -229,18 +243,48 @@ final readonly class NativeInstaller implements NativeInstallerInterface
      */
     private function installPackages(string $manifestPath, string $installDirectory, array $packages): void
     {
-        $temporary = $installDirectory . '/' . self::TEMPORARY_DIRECTORY;
+        $temporary = "{$installDirectory}/" . self::TEMPORARY_DIRECTORY;
+        $statePath = "{$installDirectory}/" . self::STATE_FILE;
 
+        $stateFile = new InstalledState($statePath, $this->io);
+
+        $state = $stateFile->read();
+
+        $this->remove($statePath);
         $this->remove($temporary);
         $this->fs->ensureDirectoryExists($temporary);
 
+        $changed = false;
+        $entries = [];
         $installed = [];
         $downloads = [];
+        $kept = [];
 
         foreach ($packages as $package) {
-            if (!$package->isLocal()) {
-                $downloads[] = $package;
+            $target = "{$installDirectory}/{$package->name}";
+            $scope = dirname($target);
+            $entry = $package->toLock();
+            $installed[] = $package->name;
+            $entries[$package->name] = $entry;
+
+            if ($scope !== $installDirectory && (is_link($scope) || (file_exists($scope) && !is_dir($scope)))) {
+                $this->io->write('  - Removing ' . basename($scope));
+                $this->remove($scope);
+
+                $changed = true;
             }
+
+            if ($package->isLocal()) {
+                continue;
+            }
+
+            if (($state[$package->name] ?? null) === $entry && is_dir($target) && !is_link($target)) {
+                $kept[$package->name] = true;
+
+                continue;
+            }
+
+            $downloads[] = $package;
         }
 
         if ([] !== $downloads) {
@@ -249,20 +293,33 @@ final readonly class NativeInstaller implements NativeInstallerInterface
 
         foreach ($packages as $package) {
             $target = "{$installDirectory}/{$package->name}";
-            $scope = dirname($target);
-            $installed[] = $package->name;
+            $recorded = $state[$package->name] ?? null;
+            $previous = $recorded['version'] ?? $package->version;
+            $label = $previous === $package->version
+                ? "  - Installing {$package->name} ({$package->version})"
+                : "  - Updating {$package->name} ({$previous} => {$package->version})";
 
-            if ($scope !== $installDirectory && (is_link($scope) || (file_exists($scope) && !is_dir($scope)))) {
-                $this->io->write('  - Removing ' . basename($scope));
-                $this->remove($scope);
+            if (isset($kept[$package->name])) {
+                $this->io->write("  - Keeping {$package->name} ({$package->version})", true, IOInterface::VERBOSE);
+
+                continue;
             }
 
             $this->remove($target);
 
             if (null !== $package->path) {
-                $this->io->write(
-                    "  - Installing {$package->name} ({$package->version}): Copying from {$package->path}",
-                );
+                if ($recorded === $entries[$package->name]) {
+                    $this->io->write(
+                        "  - Refreshing {$package->name} ({$package->version}): Copying from {$package->path}",
+                        true,
+                        IOInterface::VERBOSE,
+                    );
+                } else {
+                    $this->io->write("{$label}: Copying from {$package->path}");
+
+                    $changed = true;
+                }
+
                 $source = $this->localDirectory($manifestPath, $package->path);
 
                 if (!$this->fs->copy($source, $target)) {
@@ -274,8 +331,9 @@ final readonly class NativeInstaller implements NativeInstallerInterface
                 continue;
             }
 
-            $this->io->write("  - Installing {$package->name} ({$package->version}): Extracting archive");
+            $this->io->write("{$label}: Extracting archive");
 
+            $changed = true;
             $extracted = $temporary . self::EXTRACTION_SUFFIX;
 
             $this->extractor->extract(
@@ -287,8 +345,14 @@ final readonly class NativeInstaller implements NativeInstallerInterface
             $this->fs->rename($extracted, $target);
         }
 
-        $this->prune($installDirectory, $installed);
+        $changed = $this->prune($installDirectory, $installed) || $changed;
+
         $this->remove($temporary);
+        $stateFile->write($entries);
+
+        if (!$changed) {
+            $this->io->write('Nothing to install, update or remove');
+        }
     }
 
     private function invalidSpecs(string $field, string $manifestPath): RuntimeException
@@ -339,9 +403,13 @@ final readonly class NativeInstaller implements NativeInstallerInterface
      * @param list<string> $installed Installed package names.
      *
      * @throws RuntimeException if an entry cannot be removed.
+     *
+     * @return bool Whether a package entry was removed.
      */
-    private function prune(string $installDirectory, array $installed): void
+    private function prune(string $installDirectory, array $installed): bool
     {
+        $removed = false;
+
         foreach (self::entries($installDirectory) as $entry) {
             if (str_starts_with($entry, '.')) {
                 continue;
@@ -350,19 +418,21 @@ final readonly class NativeInstaller implements NativeInstallerInterface
             $path = "{$installDirectory}/{$entry}";
 
             if (!str_starts_with($entry, '@') || is_link($path) || !is_dir($path)) {
-                $this->pruneEntry($installDirectory, $entry, $installed);
+                $removed = $this->pruneEntry($installDirectory, $entry, $installed) || $removed;
 
                 continue;
             }
 
             foreach (self::entries($path) as $child) {
-                $this->pruneEntry($installDirectory, "{$entry}/{$child}", $installed);
+                $removed = $this->pruneEntry($installDirectory, "{$entry}/{$child}", $installed) || $removed;
             }
 
             if ([] === self::entries($path)) {
                 $this->remove($path);
             }
         }
+
+        return $removed;
     }
 
     /**
@@ -371,15 +441,19 @@ final readonly class NativeInstaller implements NativeInstallerInterface
      * @param list<string> $installed Installed package names.
      *
      * @throws RuntimeException if the entry cannot be removed.
+     *
+     * @return bool Whether the entry was removed.
      */
-    private function pruneEntry(string $installDirectory, string $name, array $installed): void
+    private function pruneEntry(string $installDirectory, string $name, array $installed): bool
     {
         if (in_array($name, $installed, true)) {
-            return;
+            return false;
         }
 
         $this->io->write("  - Removing {$name}");
         $this->remove("{$installDirectory}/{$name}");
+
+        return true;
     }
 
     /**

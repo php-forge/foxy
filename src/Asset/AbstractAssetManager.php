@@ -147,30 +147,30 @@ abstract class AbstractAssetManager extends AbstractManifestAssetManager
     }
 
     /**
-     * Build the command with binary and command options.
+     * Returns the manager command run by the configured or default binary, followed by the `manager-options` and
+     * `manager-{action}-options` values.
      *
-     * @param string $defaultBin The default binary of command if option isn't defined.
-     * @param string $action The command action to retrieve the options in config.
-     * @param array|string $command The command.
+     * @param string $action The action whose `manager-{action}-options` value is appended.
+     * @param array|string $command The command arguments, joined with spaces.
      */
-    protected function buildCommand(string $defaultBin, string $action, array|string $command): string
+    protected function buildCommand(string $action, array|string $command): string
     {
         $gOptions = trim((string) $this->getManagerConfig()->get('manager-options', ''));
         $options = trim((string) $this->getManagerConfig()->get("manager-{$action}-options", ''));
 
-        return $this->buildUnconfiguredCommand($defaultBin, $command)
+        return $this->buildUnconfiguredCommand($command)
             . ($gOptions === '' ? '' : " {$gOptions}")
             . ($options === '' ? '' : " {$options}");
     }
 
     /**
-     * Build a manager command without inheriting install and update options.
+     * Returns the manager command run by the configured or default binary, without the install and update options.
      *
-     * @param array|string $command The command.
+     * @param array|string $command The command arguments, joined with spaces.
      */
-    protected function buildUnconfiguredCommand(string $defaultBin, array|string $command): string
+    protected function buildUnconfiguredCommand(array|string $command): string
     {
-        return sprintf('%s %s', $this->getManagerBinary($defaultBin), implode(' ', (array) $command));
+        return sprintf('%s %s', $this->getManagerBinary(), implode(' ', (array) $command));
     }
 
     /**
@@ -197,7 +197,7 @@ abstract class AbstractAssetManager extends AbstractManifestAssetManager
      */
     protected function getInstallCommand(): string
     {
-        return $this->buildCommand($this->getDefaultBinary(), 'install', 'install');
+        return $this->buildCommand('install', 'install');
     }
 
     /**
@@ -206,7 +206,7 @@ abstract class AbstractAssetManager extends AbstractManifestAssetManager
      */
     protected function getUpdateCommand(): string
     {
-        return $this->buildCommand($this->getDefaultBinary(), 'update', 'update');
+        return $this->buildCommand('update', 'update');
     }
 
     protected function getVersion(): string|null
@@ -233,7 +233,7 @@ abstract class AbstractAssetManager extends AbstractManifestAssetManager
      */
     protected function getVersionCommand(): string
     {
-        return $this->buildUnconfiguredCommand($this->getDefaultBinary(), '--version');
+        return $this->buildUnconfiguredCommand('--version');
     }
 
     /**
@@ -293,10 +293,10 @@ abstract class AbstractAssetManager extends AbstractManifestAssetManager
         return $this->executor->execute($command, $outputHandler, $workingDirectory);
     }
 
-    private function getManagerBinary(string $defaultBin): string
+    private function getManagerBinary(): string
     {
         /** @var string $bin */
-        $bin = $this->getManagerConfig()->get('manager-bin', $defaultBin);
+        $bin = $this->getManagerConfig()->get('manager-bin', $this->getDefaultBinary());
 
         return Platform::isWindows() ? str_replace('/', '\\', $bin) : $bin;
     }

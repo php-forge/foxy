@@ -342,7 +342,7 @@ final class AbstractAssetManagerTest extends TestCase
 
         self::assertSame(
             'C:\\tools\\inspectable.exe install',
-            $this->createManager()->buildCommandForTest('inspectable.exe', 'install', 'install'),
+            $this->createManager()->buildCommandForTest('install', 'install'),
             'Windows path separators must be normalized.',
         );
     }
@@ -359,7 +359,7 @@ final class AbstractAssetManagerTest extends TestCase
 
         self::assertSame(
             str_replace('/', DIRECTORY_SEPARATOR, 'custom/bin') . ' install --global --local',
-            $this->createManager()->buildCommandForTest('inspectable', 'install', 'install'),
+            $this->createManager()->buildCommandForTest('install', 'install'),
             'Options must be trimmed and ordered.',
         );
     }
@@ -512,7 +512,7 @@ final class AbstractAssetManagerTest extends TestCase
 
         self::assertSame(
             'bin-a install',
-            $inspectable->buildCommandForTest('inspectable', 'install', 'install'),
+            $inspectable->buildCommandForTest('install', 'install'),
             'First manager must keep its own entry after the second probe.',
         );
 

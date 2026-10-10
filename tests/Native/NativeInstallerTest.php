@@ -28,6 +28,7 @@ use function json_decode;
 use function json_encode;
 use function mkdir;
 use function rename;
+use function sprintf;
 use function str_replace;
 use function strlen;
 use function substr;
@@ -50,6 +51,7 @@ final class NativeInstallerTest extends TestCase
     private const string ALPHA_PATH = './vendor/php-forge/composer-asset/acme/alpha';
     private const string LOCAL_NAME = '@composer-asset/acme--theme';
     private const string LOCAL_PATH = './vendor/php-forge/composer-asset/acme/theme';
+    private const string NOTHING = 'Nothing to install, update or remove';
     private const array README = [
         'This file locks the frontend dependencies installed by the Foxy native manager.',
         'Do not edit it manually; composer install and composer update regenerate it.',
@@ -266,6 +268,93 @@ final class NativeInstallerTest extends TestCase
         );
     }
 
+    public function testInstallExtractsAgainPackageReplacedBySymbolicLink(): void
+    {
+        $this->writeJson('package.json', ['dependencies' => ['left-pad' => '*']]);
+        $this->install($this->registry());
+        $this->writeFile('external/index.js', 'external');
+        $this->removePath('node_modules/left-pad');
+
+        if (!@symlink("{$this->root}/external", "{$this->root}/node_modules/left-pad")) {
+            self::markTestSkipped('Symbolic links are not available.');
+        }
+
+        $this->install($this->registry());
+
+        self::assertSame(
+            ['  - Installing left-pad (1.3.0): Extracting archive'],
+            $this->output,
+            'A link must not count as the installed directory.',
+        );
+        self::assertFalse(
+            is_link("{$this->root}/node_modules/left-pad"),
+            'The link must be replaced by a directory.',
+        );
+        self::assertStringEqualsFile(
+            "{$this->root}/external/index.js",
+            'external',
+            'The link target must stay intact.',
+        );
+    }
+
+    public function testInstallExtractsAgainPackageWhoseDirectoryIsMissing(): void
+    {
+        $registry = $this->registry();
+
+        $this->writeJson('package.json', ['dependencies' => ['bootstrap' => '^5.3']]);
+        $this->install($registry);
+        $this->removePath('node_modules/bootstrap');
+        $this->install($registry);
+
+        self::assertSame(
+            ['  - Installing bootstrap (5.3.8): Extracting archive'],
+            $this->output,
+            'Only the missing package must be extracted.',
+        );
+        self::assertSame(
+            ['bootstrap'],
+            $registry->prefetched[1]['names'],
+            'Only the missing package must be prefetched.',
+        );
+    }
+
+    public function testInstallExtractsEverythingAgainWhenStateIsMalformed(): void
+    {
+        $this->writeJson('package.json', ['dependencies' => ['left-pad' => '*']]);
+        $this->install($this->registry());
+        $this->writeFile('node_modules/.foxy-installed.json', '{');
+
+        $io = $this->io(IOInterface::VERBOSE);
+
+        $io
+            ->expects(self::once())
+            ->method('writeError')
+            ->with(
+                '<warning>The installed state file "' . "{$this->root}/node_modules/.foxy-installed.json"
+                . '" is malformed and was ignored.</warning>',
+                true,
+                IOInterface::VERBOSE,
+            );
+
+        $this->installer($this->registry(), $io)->install(
+            "{$this->root}/package.json",
+            "{$this->root}/foxy.lock",
+            "{$this->root}/node_modules",
+            false,
+        );
+
+        self::assertSame(
+            ['  - Installing left-pad (1.3.0): Extracting archive'],
+            $this->output,
+            'A malformed state must keep nothing.',
+        );
+        self::assertSame(
+            ['packages' => ['left-pad' => $this->lockEntry('left-pad', '1.3.0')]],
+            $this->state(),
+            'The malformed state must be replaced.',
+        );
+    }
+
     public function testInstallExtractsResolvedPackagesIntoNodeModules(): void
     {
         $registry = $this->registry();
@@ -359,6 +448,63 @@ final class NativeInstallerTest extends TestCase
         self::assertFileExists(
             "{$this->root}/real-modules/left-pad/index.js",
             'The package must be installed through the link.',
+        );
+    }
+
+    public function testInstallKeepsUnchangedRegistryPackages(): void
+    {
+        $registry = $this->registry();
+
+        $this->writeJson(
+            'package.json',
+            ['dependencies' => ['bootstrap' => '^5.3'], 'devDependencies' => ['left-pad' => '*']],
+        );
+        $this->install($registry);
+        $this->writeFile('node_modules/left-pad/marker.txt', 'marker');
+        $this->install($registry);
+
+        self::assertSame(
+            [self::NOTHING],
+            $this->output,
+            'Kept packages must stay silent at normal verbosity.',
+        );
+
+        $this->install($registry, false, IOInterface::VERBOSE);
+
+        self::assertSame(
+            [
+                '  - Keeping @popperjs/core (2.11.8)',
+                '  - Keeping bootstrap (5.3.8)',
+                '  - Keeping left-pad (1.3.0)',
+                self::NOTHING,
+            ],
+            $this->output,
+            'Each kept package must be listed at verbose level.',
+        );
+        self::assertCount(
+            3,
+            $registry->fetched,
+            'Kept tarballs must not be fetched.',
+        );
+        self::assertCount(
+            1,
+            $registry->prefetched,
+            'Nothing must be prefetched when every package is kept.',
+        );
+        self::assertFileExists(
+            "{$this->root}/node_modules/left-pad/marker.txt",
+            'A kept directory must not be replaced.',
+        );
+        self::assertSame(
+            [
+                'packages' => [
+                    '@popperjs/core' => $this->lockEntry('@popperjs/core', '2.11.8'),
+                    'bootstrap' => $this->lockEntry('bootstrap', '5.3.8'),
+                    'left-pad' => $this->lockEntry('left-pad', '1.3.0'),
+                ],
+            ],
+            $this->state(),
+            'The state must still list the kept packages.',
         );
     }
 
@@ -475,21 +621,20 @@ final class NativeInstallerTest extends TestCase
         );
     }
 
-    public function testInstallPrefetchesUnchangedPackagesAgainFromFreshLock(): void
+    #[DataProviderExternal(NativeInstallerProvider::class, 'staleEntries')]
+    public function testInstallPrunesEntriesOnWarmInstall(string $file, string $line): void
     {
         $registry = $this->registry();
 
         $this->writeJson('package.json', ['dependencies' => ['left-pad' => '*']]);
         $this->install($registry);
+        $this->writeFile("node_modules/{$file}", 'stale');
         $this->install($registry);
 
         self::assertSame(
-            [
-                ['names' => ['left-pad'], 'directory' => "{$this->root}/node_modules/.foxy-tmp", 'fetchedBefore' => 0],
-                ['names' => ['left-pad'], 'directory' => "{$this->root}/node_modules/.foxy-tmp", 'fetchedBefore' => 1],
-            ],
-            $registry->prefetched,
-            'A reinstall from the lock must prefetch the locked packages again.',
+            [$line],
+            $this->output,
+            'A removal alone must count as a change.',
         );
     }
 
@@ -534,6 +679,33 @@ final class NativeInstallerTest extends TestCase
         }
     }
 
+    public function testInstallRecordsInstallSetInStateFile(): void
+    {
+        $this->writeJson(
+            'package.json',
+            ['dependencies' => ['left-pad' => '*', self::LOCAL_NAME => 'file:' . self::LOCAL_PATH]],
+        );
+        $this->writeLocal(['version' => '1.0.0']);
+        $this->writeFile('node_modules/stale/index.js', 'stale');
+        $this->install($this->registry());
+
+        self::assertSame(
+            [
+                'packages' => [
+                    self::LOCAL_NAME => ['version' => '1.0.0', 'file' => self::LOCAL_PATH],
+                    'left-pad' => $this->lockEntry('left-pad', '1.3.0'),
+                ],
+            ],
+            $this->state(),
+            'The state must hold the lock entry of every installed package.',
+        );
+        self::assertSame(
+            $this->lock()['packages'],
+            $this->state()['packages'],
+            'The state entries must match the lock entries.',
+        );
+    }
+
     public function testInstallRemovesDanglingSymbolicLinks(): void
     {
         $this->writeJson('package.json', ['dependencies' => ['left-pad' => '*']]);
@@ -564,6 +736,33 @@ final class NativeInstallerTest extends TestCase
             ['  - Installing left-pad (1.3.0): Extracting archive', '  - Removing stale-link'],
             $this->output,
             'The extraneous link must be reported.',
+        );
+    }
+
+    public function testInstallRemovesStateFileBeforeChangingPackages(): void
+    {
+        $this->writeJson('package.json', ['dependencies' => ['left-pad' => '*']]);
+        $this->install($this->registry());
+        $this->removePath('node_modules/left-pad');
+
+        try {
+            $this->install(new InMemoryRegistry());
+
+            self::fail('Expected the missing tarball to abort the installation.');
+        } catch (RuntimeException $exception) {
+            self::assertSame(
+                Message::NATIVE_REGISTRY_REQUEST_FAILED->getMessage(
+                    $this->lockEntry('left-pad', '1.3.0')['resolved'],
+                    'not registered',
+                ),
+                $exception->getMessage(),
+                'The failed fetch must abort the installation.',
+            );
+        }
+
+        self::assertFileDoesNotExist(
+            "{$this->root}/node_modules/.foxy-installed.json",
+            'An interrupted installation must leave no state.',
         );
     }
 
@@ -620,6 +819,26 @@ final class NativeInstallerTest extends TestCase
         );
     }
 
+    public function testInstallReplacesScopeFileOfRefreshedLocalPackage(): void
+    {
+        $this->writeJson('package.json', ['dependencies' => [self::LOCAL_NAME => 'file:' . self::LOCAL_PATH]]);
+        $this->writeLocal(['version' => '1.0.0']);
+        $this->install($this->registry());
+        $this->removePath('node_modules/@composer-asset');
+        $this->writeFile('node_modules/@composer-asset', 'stale');
+        $this->install($this->registry());
+
+        self::assertSame(
+            ['  - Removing @composer-asset'],
+            $this->output,
+            'The scope removal must count as a change.',
+        );
+        self::assertFileExists(
+            "{$this->root}/node_modules/" . self::LOCAL_NAME . '/package.json',
+            'The local package must be copied into a real scope.',
+        );
+    }
+
     public function testInstallReplacesSymlinkedScopeOfInstalledPackage(): void
     {
         $this->writeJson('package.json', ['dependencies' => ['@popperjs/core' => '^2.11']]);
@@ -649,6 +868,71 @@ final class NativeInstallerTest extends TestCase
             "{$this->root}/external/core/package.json",
             '{"name": "external"}',
             'The link target must stay intact.',
+        );
+    }
+
+    public function testInstallReportsLocalCopiesByRecordedVersion(): void
+    {
+        $registry = $this->registry();
+        $copy = '@composer-asset/acme--theme (%s): Copying from ' . self::LOCAL_PATH;
+
+        $this->writeJson('package.json', ['dependencies' => [self::LOCAL_NAME => 'file:' . self::LOCAL_PATH]]);
+        $this->writeLocal(['version' => '1.0.0']);
+        $this->install($registry);
+
+        self::assertSame(
+            ['  - Installing ' . sprintf($copy, '1.0.0')],
+            $this->output,
+            'A local package without a recorded entry must be reported as installed.',
+        );
+
+        $this->writeLocal(['version' => '1.1.0']);
+        $this->install($registry);
+
+        self::assertSame(
+            ['  - Updating ' . sprintf($copy, '1.0.0 => 1.1.0')],
+            $this->output,
+            'A new local version must be reported as an update.',
+        );
+
+        $this->writeFile(self::LOCAL_PATH . '/index.js', 'changed');
+        $this->install($registry);
+
+        self::assertSame(
+            [self::NOTHING],
+            $this->output,
+            'A refreshed copy must stay silent at normal verbosity.',
+        );
+
+        $this->install($registry, false, IOInterface::VERBOSE);
+
+        self::assertSame(
+            ['  - Refreshing ' . sprintf($copy, '1.1.0'), self::NOTHING],
+            $this->output,
+            'A refreshed copy must be listed at verbose level.',
+        );
+        self::assertStringEqualsFile(
+            "{$this->root}/node_modules/" . self::LOCAL_NAME . '/index.js',
+            'changed',
+            'An unchanged version must still be copied again.',
+        );
+    }
+
+    public function testInstallReportsLocalPackageInstalledWhenRecordedEntryDiffers(): void
+    {
+        $registry = $this->registry();
+
+        $this->writeJson('package.json', ['dependencies' => ['theme' => 'file:./theme']]);
+        $this->writeJson('theme/package.json', ['version' => '1.0.0']);
+        $this->install($registry);
+        $this->writeJson('package.json', ['dependencies' => ['theme' => 'file:./themes/theme']]);
+        $this->writeJson('themes/theme/package.json', ['version' => '1.0.0']);
+        $this->install($registry);
+
+        self::assertSame(
+            ['  - Installing theme (1.0.0): Copying from ./themes/theme'],
+            $this->output,
+            'A moved source of the same version must be reported as installed.',
         );
     }
 
@@ -959,9 +1243,9 @@ final class NativeInstallerTest extends TestCase
             'A fresh lock must not request metadata.',
         );
         self::assertCount(
-            2 * $fetched,
+            $fetched,
             $registry->fetched,
-            'Locked tarballs must be fetched again.',
+            'Kept tarballs must not be fetched again.',
         );
         self::assertStringEqualsFile(
             "{$this->root}/foxy.lock",
@@ -1078,9 +1362,9 @@ final class NativeInstallerTest extends TestCase
             'The modules directory must be created.',
         );
         self::assertSame(
-            [],
+            [self::NOTHING],
             $this->output,
-            'Nothing must be reported.',
+            'Only the no-change line must be reported.',
         );
     }
 
@@ -1095,6 +1379,25 @@ final class NativeInstallerTest extends TestCase
             ['' => self::kinds(['left-pad' => '*'])],
             $this->lock()['requirements'],
             'The malformed lock must be replaced.',
+        );
+    }
+
+    public function testInstallUpdatesPackageWhoseRecordedVersionDiffers(): void
+    {
+        $registry = $this->registry();
+
+        $this->writeJson('package.json', ['dependencies' => ['bootstrap' => '5.2.0']]);
+        $this->install($registry);
+        $this->writeJson('package.json', ['dependencies' => ['bootstrap' => '^5.3']]);
+        $this->install($registry);
+
+        self::assertSame(
+            [
+                '  - Installing @popperjs/core (2.11.8): Extracting archive',
+                '  - Updating bootstrap (5.2.0 => 5.3.8): Extracting archive',
+            ],
+            $this->output,
+            'A recorded version must turn the extraction into an update.',
         );
     }
 
@@ -1405,9 +1708,12 @@ final class NativeInstallerTest extends TestCase
         return $compact;
     }
 
-    private function install(InMemoryRegistry $registry, bool $update = false): void
-    {
-        $this->installer($registry, $this->io())->install(
+    private function install(
+        InMemoryRegistry $registry,
+        bool $update = false,
+        int $verbosity = IOInterface::NORMAL,
+    ): void {
+        $this->installer($registry, $this->io($verbosity))->install(
             "{$this->root}/package.json",
             "{$this->root}/foxy.lock",
             "{$this->root}/node_modules",
@@ -1481,9 +1787,10 @@ final class NativeInstallerTest extends TestCase
     }
 
     /**
-     * Returns an output mock that records the written lines into {@see $output}.
+     * Returns an output mock that records into {@see $output} the lines visible at the given verbosity, as Composer
+     * filters them, and checks that every line ends with a newline.
      */
-    private function io(): IOInterface&MockObject
+    private function io(int $verbosity = IOInterface::NORMAL): IOInterface&MockObject
     {
         $this->output = [];
 
@@ -1492,8 +1799,16 @@ final class NativeInstallerTest extends TestCase
         $io
             ->method('write')
             ->willReturnCallback(
-                function (string $message): void {
-                    $this->output[] = $message;
+                function (
+                    string $message,
+                    bool $newline = true,
+                    int $level = IOInterface::NORMAL,
+                ) use ($verbosity): void {
+                    self::assertTrue($newline, 'Every line must end with a newline.');
+
+                    if ($level <= $verbosity) {
+                        $this->output[] = $message;
+                    }
                 },
             );
 
@@ -1598,6 +1913,27 @@ final class NativeInstallerTest extends TestCase
         $this->publish($registry, 'left-pad', ['1.3.0' => []]);
 
         return $registry;
+    }
+
+    /**
+     * Removes a file, a directory, or a link below the test root.
+     */
+    private function removePath(string $path): void
+    {
+        (new Filesystem())->remove("{$this->root}/{$path}");
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function state(): array
+    {
+        return json_decode(
+            (string) file_get_contents("{$this->root}/node_modules/.foxy-installed.json"),
+            true,
+            512,
+            JSON_THROW_ON_ERROR,
+        );
     }
 
     private static function tarballUrl(string $name, string $version): string

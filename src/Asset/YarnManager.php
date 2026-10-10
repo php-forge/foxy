@@ -52,7 +52,7 @@ final class YarnManager extends AbstractAssetManager
             $command = [...$command, '--environment', 'production'];
         }
 
-        return $this->buildUnconfiguredCommand($this->getDefaultBinary(), $command);
+        return $this->buildUnconfiguredCommand($command);
     }
 
     protected function getAuditEnvironment(): array
@@ -62,6 +62,6 @@ final class YarnManager extends AbstractAssetManager
 
     protected function getUpdateCommand(): string
     {
-        return $this->buildCommand($this->getDefaultBinary(), 'update', 'up');
+        return $this->buildCommand('update', 'up');
     }
 }
