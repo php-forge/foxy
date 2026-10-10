@@ -553,6 +553,24 @@ final class NativeInstallerTest extends TestCase
         );
     }
 
+    public function testInstallReplacesScopeFileOfInstalledPackage(): void
+    {
+        $this->writeJson('package.json', ['dependencies' => ['@popperjs/core' => '^2.11']]);
+        $this->writeFile('node_modules/@popperjs', 'stale');
+
+        $this->install($this->registry());
+
+        self::assertSame(
+            ['  - Removing @popperjs', '  - Installing @popperjs/core (2.11.8): Extracting archive'],
+            $this->output,
+            'The scope file must be removed before the installation.',
+        );
+        self::assertFileExists(
+            "{$this->root}/node_modules/@popperjs/core/index.js",
+            'The package must be extracted into a real scope.',
+        );
+    }
+
     public function testInstallReplacesSymlinkedScopeOfInstalledPackage(): void
     {
         $this->writeJson('package.json', ['dependencies' => ['@popperjs/core' => '^2.11']]);

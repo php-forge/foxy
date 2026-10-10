@@ -212,8 +212,8 @@ final readonly class NativeInstaller implements NativeInstallerInterface
     /**
      * Installs the packages into the install directory and removes the entries outside the install set.
      *
-     * A symbolic link standing in for the `@scope` directory of a package is removed first, so the package is never
-     * written into the link target.
+     * A symbolic link or a file standing in for the `@scope` directory of a package is removed first, so the package is
+     * never written into the link target and a stale file cannot abort the installation.
      *
      * @param array<array-key, ResolvedPackage> $packages Packages in installation order.
      *
@@ -233,7 +233,7 @@ final readonly class NativeInstaller implements NativeInstallerInterface
             $scope = dirname($target);
             $installed[] = $package->name;
 
-            if ($scope !== $installDirectory && is_link($scope)) {
+            if ($scope !== $installDirectory && (is_link($scope) || (file_exists($scope) && !is_dir($scope)))) {
                 $this->io->write('  - Removing ' . basename($scope));
                 $this->remove($scope);
             }

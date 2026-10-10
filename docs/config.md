@@ -266,8 +266,10 @@ Foxy then performs the installation itself, in PHP:
   `dependencies`, `peerDependencies`, and `optionalDependencies` are intersected per package name, and the highest
   satisfying version wins. When a later constraint forces a package to a lower version, the constraints that its
   abandoned version had introduced are withdrawn, and optional dependencies never block a required one. Dist-tags
-  such as `latest` or `next` are honored. A conflict that only nested `node_modules` could solve is reported as an
-  error that names every constraint and its origin; install such a project with a JavaScript manager instead.
+  such as `latest` or `next` are honored. The resolver never backtracks to an older version of a package to escape
+  a conflict that the dependencies of its highest acceptable version introduce; such a conflict, like one that only
+  nested `node_modules` could solve, is reported as an error that names every constraint and its origin. Install
+  such a project with a JavaScript manager instead.
   Unsatisfiable or missing optional dependencies are skipped with a warning, together with the whole subtree of an
   optional package whose own dependencies cannot be installed, and a deprecated selection is reported with the
   registry's deprecation text. A `file:` package keeps the version its manifest declares; a constraint from another
