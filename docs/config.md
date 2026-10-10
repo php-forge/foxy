@@ -294,8 +294,8 @@ Foxy then performs the installation itself, in PHP:
   whose entry differs or whose directory is missing is extracted again. `file:` packages are always copied again,
   since their content can change without a version change. The file is removed at the start of each installation and
   written at its end, so an interrupted installation leaves none behind. A missing or malformed file only forces every
-  package to be extracted again, as happens once on the first install that creates it; deleting it is always safe.
-  Like every dot-entry, the pruning leaves it alone. Do not commit it.
+  registry package to be extracted again, as happens once on the first install that creates it; deleting it is always
+  safe. Like every dot-entry, the pruning leaves it alone. Do not commit it.
 - It removes entries of the install directory that are not part of the installation (dot-entries such as `.bin`
   are left alone).
 

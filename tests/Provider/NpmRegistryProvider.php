@@ -30,6 +30,15 @@ final class NpmRegistryProvider
     }
 
     /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function credentialedRegistryUrls(): iterable
+    {
+        yield 'password' => ['https://user:secret@registry.test', 'https://user:***@registry.test'];
+        yield 'token as user name' => ['https://npm_0123456789abcdef@registry.test', 'https://npm***@registry.test'];
+    }
+
+    /**
      * @return iterable<string, array{string}>
      */
     public static function rejectedIntegrities(): iterable

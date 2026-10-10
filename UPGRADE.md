@@ -35,10 +35,11 @@ or `composer foxy:audit` to keep that check.
   installs the development dependencies together with the others. A private registry must implement that endpoint
   (Verdaccio: enable its `audit` middleware); otherwise the audit fails with status `2`.
 - The install directory gains a hidden `.foxy-installed.json` file that records what Foxy installed. The first install
-  after the upgrade extracts every package once and writes it; later installs keep the packages whose directory and
-  recorded entry still match `foxy.lock` and report only what changed, printing `Nothing to install, update or remove`
-  when nothing did. Run Composer with `-v` to list the kept packages and `-vv` to follow the registry traffic. Delete
-  the file to force a full re-extraction.
+  after the upgrade extracts every registry package once and writes it; later installs keep the registry packages
+  whose directory and recorded entry still match `foxy.lock`, copy the `file:` packages again, and report only what
+  changed, printing `Nothing to install, update or remove` when nothing did. Run Composer with `-v` to list the kept
+  and refreshed packages and `-vv` to follow the registry traffic. Delete the file to extract every registry package
+  again.
 
 ### Rollbacks
 

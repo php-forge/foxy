@@ -225,7 +225,7 @@ final readonly class NativeInstaller implements NativeInstallerInterface
      * A registry package whose directory exists and whose lock entry equals the recorded one is kept as is; every other
      * registry package is extracted again, and every `file:` package is copied again since its content may change
      * without a version change. The state file is removed before any change and written after the pruning, so an
-     * interrupted installation leaves no state and the next one extracts every package.
+     * interrupted installation leaves no state and the next one extracts every registry package.
      *
      * The tarballs of the registry packages to extract are first prefetched in parallel into the registry's cache; each
      * package is then fetched, verified, and extracted in turn, so a failed prefetch surfaces as the error of its own

@@ -22,7 +22,8 @@ use const SORT_STRING;
  * Reads and writes the hidden state file of an install directory: the lock entry of every package the last successful
  * native installation left in place, the counterpart of npm's `node_modules/.package-lock.json`.
  *
- * The state is a cache: a missing or malformed file reads as empty, so the installer extracts every package again.
+ * The state is a cache: a missing or malformed file reads as empty, so the installer extracts every registry package
+ * again.
  */
 final readonly class InstalledState
 {
