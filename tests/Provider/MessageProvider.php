@@ -168,6 +168,11 @@ final class MessageProvider
             ['pnpm', 1, 'ERR_PNPM_AUDIT_BAD_RESPONSE'],
             'The pnpm audit command failed with status code 1. ERR_PNPM_AUDIT_BAD_RESPONSE',
         ];
+        yield 'AUDIT_CVE_RESOLUTION_MISSING' => [
+            Message::AUDIT_CVE_RESOLUTION_MISSING,
+            ['GHSA-aaaa-bbbb-cccc'],
+            'The CVE resolver returned no result for "GHSA-aaaa-bbbb-cccc".',
+        ];
         yield 'AUDIT_DENO_ADVISORY_ACTIONS_MISMATCH' => [
             Message::AUDIT_DENO_ADVISORY_ACTIONS_MISMATCH,
             ['advisory 2'],

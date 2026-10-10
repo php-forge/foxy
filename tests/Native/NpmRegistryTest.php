@@ -328,6 +328,30 @@ final class NpmRegistryTest extends TestCase
         );
     }
 
+    public function testPrefetchTarballsDiscardsDownloadWhenCachingThrows(): void
+    {
+        $io = self::verboseIo();
+        $cache = $this->createMock(Cache::class);
+
+        $cache->method('isEnabled')->willReturn(true);
+        $cache->method('isReadOnly')->willReturn(false);
+        $cache->method('getAge')->willReturn(false);
+        $cache->method('copyFrom')->willThrowException(new RuntimeException('disk full'));
+
+        $this->registry($this->prefetchDownloader(1, self::serve(NpmRegistryProvider::TARBALL)), $cache, $io)
+            ->prefetchTarballs([$this->package()]);
+
+        self::assertFileDoesNotExist(
+            $this->copies[0][1],
+            'Temporary file must be removed when caching fails.',
+        );
+        self::assertSame(
+            'Prefetching the tarball of "@scope/pkg" (1.0.0) failed: disk full' . PHP_EOL,
+            $io->getOutput(),
+            'Verbose notice must name the package and the caching error.',
+        );
+    }
+
     public function testPrefetchTarballsDiscardsDownloadWithMismatchingIntegrity(): void
     {
         $io = self::verboseIo();

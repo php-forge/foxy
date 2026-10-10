@@ -179,9 +179,9 @@ final readonly class NpmRegistry implements NpmRegistryInterface
      * Downloads the tarballs missing from the cache in parallel, verifying each before it is cached.
      *
      * Nothing is downloaded when the cache is disabled or read-only, since the downloads could not be kept. A package
-     * without a tarball URL is skipped. A download that fails or does not match its integrity value is discarded with
-     * a verbose notice; {@see fetchTarball()} downloads it again and reports the error. Every temporary file is
-     * removed before the method returns.
+     * without a tarball URL is skipped. A download that fails, does not match its integrity value, or cannot be
+     * cached is discarded with a verbose notice; {@see fetchTarball()} downloads it again and reports the error.
+     * Every temporary file is removed before the method returns.
      *
      * @param list<ResolvedPackage> $packages Registry packages whose tarballs are wanted.
      */
@@ -205,13 +205,17 @@ final readonly class NpmRegistry implements NpmRegistryInterface
 
             $this->httpDownloader->addCopy($resolved, $file)->then(
                 function () use ($package, $key, $file, $resolved): void {
-                    if ($this->matchesIntegrity($file, $package->integrity ?? '')) {
-                        $this->cache->copyFrom($key, $file);
-                    } else {
-                        $this->reportPrefetchFailure(
-                            $package,
-                            Message::NATIVE_INTEGRITY_MISMATCH->getMessage($resolved),
-                        );
+                    try {
+                        if ($this->matchesIntegrity($file, $package->integrity ?? '')) {
+                            $this->cache->copyFrom($key, $file);
+                        } else {
+                            $this->reportPrefetchFailure(
+                                $package,
+                                Message::NATIVE_INTEGRITY_MISMATCH->getMessage($resolved),
+                            );
+                        }
+                    } catch (Throwable $exception) {
+                        $this->reportPrefetchFailure($package, $exception->getMessage());
                     }
 
                     unlink($file);

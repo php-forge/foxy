@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Foxy\Audit;
 
+use Foxy\Exception\{Message, RuntimeException};
 use Throwable;
 
 use function array_fill_keys;
@@ -62,6 +63,8 @@ final readonly class CveEnricher
     /**
      * Returns the resolution of every GHSA identifier, marking each failed lookup as `unavailable` with one warning.
      *
+     * A batch that throws, and an identifier the resolver leaves out, count as failed lookups.
+     *
      * @param list<string> $ghsaIds Unique canonical GHSA identifiers, in first-seen order.
      * @param callable(string): void $warningHandler Receives the warnings in the order of `$ghsaIds`.
      *
@@ -78,7 +81,9 @@ final readonly class CveEnricher
         $resolutions = [];
 
         foreach ($ghsaIds as $ghsaId) {
-            $result = $results[$ghsaId];
+            $result = $results[$ghsaId] ?? new RuntimeException(
+                Message::AUDIT_CVE_RESOLUTION_MISSING->getMessage($ghsaId),
+            );
 
             if ($result instanceof Throwable) {
                 $warningHandler(

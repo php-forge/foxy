@@ -236,6 +236,13 @@ enum Message: string
     case AUDIT_COMMAND_FAILED_WITH_DIAGNOSTICS = 'The %s audit command failed with status code %d. %s';
 
     /**
+     * Error when a CVE resolver answers a batch without one of the requested advisories.
+     *
+     * Format: "The CVE resolver returned no result for "%s"."
+     */
+    case AUDIT_CVE_RESOLUTION_MISSING = 'The CVE resolver returned no result for "%s".';
+
+    /**
      * Deno parser detail when advisory actions do not match the patched versions.
      *
      * Format: "%s actions must update the package to its patched versions"

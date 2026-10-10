@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Foxy\Tests\Audit;
 
 use Foxy\Audit\{AuditFinding, AuditReport, CveEnricher, CveResolution, CveResolverInterface, CveStatus, Severity};
+use Foxy\Exception\Message;
 use Foxy\Tests\Provider\CveEnricherProvider;
 use PHPUnit\Framework\Attributes\DataProviderExternal;
 use PHPUnit\Framework\TestCase;
@@ -163,6 +164,46 @@ final class CveEnricherTest extends TestCase
             ['Unable to resolve CVE identifiers for GHSA-aaaa-bbbb-cccc: not found'],
             $warnings,
             'Only the failed advisory must emit a warning.',
+        );
+    }
+
+    public function testEnricherMarksAdvisoryUnavailableWhenResolverOmitsIt(): void
+    {
+        $resolver = $this->createMock(CveResolverInterface::class);
+
+        $resolver
+            ->expects(self::once())
+            ->method('resolveMany')
+            ->with(['GHSA-aaaa-bbbb-cccc', 'GHSA-35jh-r3h4-6jhm'])
+            ->willReturn(['GHSA-35jh-r3h4-6jhm' => new CveResolution(['CVE-2021-23337'], CveStatus::RESOLVED)]);
+
+        $warnings = [];
+
+        $enriched = (new CveEnricher($resolver))->enrich(
+            new AuditReport(
+                'npm',
+                [
+                    $this->finding('example-package', 'GHSA-aaaa-bbbb-cccc'),
+                    $this->finding('lodash', 'GHSA-35jh-r3h4-6jhm'),
+                ],
+            ),
+            static function (string $warning) use (&$warnings): void {
+                $warnings[] = $warning;
+            },
+        );
+
+        self::assertSame(
+            [CveStatus::UNAVAILABLE, CveStatus::RESOLVED],
+            array_map(static fn(AuditFinding $finding): CveStatus => $finding->cveStatus, $enriched->findings),
+            'Only the omitted advisory must be marked unavailable.',
+        );
+        self::assertSame(
+            [
+                'Unable to resolve CVE identifiers for GHSA-aaaa-bbbb-cccc: '
+                . Message::AUDIT_CVE_RESOLUTION_MISSING->getMessage('GHSA-aaaa-bbbb-cccc'),
+            ],
+            $warnings,
+            'The omitted advisory must produce one warning.',
         );
     }
 
