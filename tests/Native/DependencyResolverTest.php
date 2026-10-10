@@ -371,28 +371,25 @@ final class DependencyResolverTest extends TestCase
         );
     }
 
-    public function testResolveSkipsConflictingOptionalDependencyWithoutChangingSelection(): void
+    public function testResolveSkipsOptionalRequirementRejectingCurrentSelection(): void
     {
         $registry = (new InMemoryRegistry())
             ->add(self::metadata('x', ['1.0.0' => [], '2.0.0' => []]))
-            ->add(self::metadata('o', ['1.0.0' => ['optionalDependencies' => ['x' => '<2']]]))
-            ->add(self::metadata('p', ['1.0.0' => ['optionalDependencies' => ['x' => '^3.0']]]));
+            ->add(self::metadata('z', ['1.0.0' => ['optionalDependencies' => ['x' => '^1.0']]]))
+            ->add(self::metadata('zz', ['1.0.0' => ['dependencies' => ['x' => '^2.0']]]));
 
-        $conflict = Message::NATIVE_VERSION_CONFLICT->getMessage(
-            'x',
-            '"*" from root, "<2" from o@1.0.0, "^3.0" from p@1.0.0',
-        );
+        $conflict = Message::NATIVE_VERSION_CONFLICT->getMessage('x', '"*" from root, "^1.0" from z@1.0.0');
 
         self::assertEquals(
             [
-                'o' => self::package('o', '1.0.0'),
-                'p' => self::package('p', '1.0.0'),
-                'x' => self::package('x', '1.0.0'),
+                'x' => self::package('x', '2.0.0'),
+                'z' => self::package('z', '1.0.0'),
+                'zz' => self::package('zz', '1.0.0'),
             ],
-            $this->resolver($registry, $this->optionalWarning('x', '^3.0', $conflict))->resolve(
-                [new Requirement('x', '*', ''), new Requirement('o', '*', ''), new Requirement('p', '*', '')],
+            $this->resolver($registry, $this->optionalWarning('x', '^1.0', $conflict))->resolve(
+                [new Requirement('x', '*', ''), new Requirement('z', '*', ''), new Requirement('zz', '*', '')],
             ),
-            'The optional `<2` must keep binding x.',
+            'x 2.0.0 must stay selected for the mandatory `^2.0`.',
         );
     }
 
@@ -438,6 +435,23 @@ final class DependencyResolverTest extends TestCase
         );
     }
 
+    public function testResolveSkipsUnsatisfiableOptionalDependencyWithoutSelection(): void
+    {
+        $registry = (new InMemoryRegistry())
+            ->add(self::metadata('chokidar', ['3.6.0' => ['optionalDependencies' => ['fsevents' => '^3.0']]]))
+            ->add(self::metadata('fsevents', ['2.3.3' => []]));
+
+        $conflict = Message::NATIVE_VERSION_CONFLICT->getMessage('fsevents', '"^3.0" from chokidar@3.6.0');
+
+        self::assertEquals(
+            ['chokidar' => self::package('chokidar', '3.6.0')],
+            $this->resolver($registry, $this->optionalWarning('fsevents', '^3.0', $conflict))->resolve(
+                [new Requirement('chokidar', '^3.0', '')],
+            ),
+            'No other fsevents version may be selected.',
+        );
+    }
+
     #[DataProviderExternal(DependencyResolverProvider::class, 'unsupportedSpecs')]
     public function testResolveSkipsUnsupportedOptionalSpec(string $spec): void
     {
@@ -457,6 +471,54 @@ final class DependencyResolverTest extends TestCase
             [],
             $registry->requested,
             'The registry must not be queried.',
+        );
+    }
+
+    public function testResolveTreatsDependencyAlsoListedAsOptionalAsOptional(): void
+    {
+        $registry = (new InMemoryRegistry())
+            ->add(
+                self::metadata(
+                    'widgets',
+                    [
+                        '1.0.0' => [
+                            'dependencies' => ['fsevents' => '^2.3'],
+                            'peerDependencies' => ['fsevents' => '^2.3'],
+                            'optionalDependencies' => ['fsevents' => '^2.3'],
+                        ],
+                    ],
+                ),
+            );
+
+        self::assertEquals(
+            ['widgets' => self::package('widgets', '1.0.0')],
+            $this->resolver(
+                $registry,
+                $this->optionalWarning(
+                    'fsevents',
+                    '^2.3',
+                    Message::NATIVE_PACKAGE_NOT_FOUND->getMessage('fsevents', 'memory'),
+                ),
+            )->resolve([new Requirement('widgets', '^1.0', '')]),
+            'The missing package must be skipped, not fatal.',
+        );
+    }
+
+    public function testResolveUsesOptionalSpecOverDependencySpec(): void
+    {
+        $registry = (new InMemoryRegistry())
+            ->add(
+                self::metadata(
+                    'widgets',
+                    ['1.0.0' => ['dependencies' => ['x' => '^1.0'], 'optionalDependencies' => ['x' => '^2.0']]],
+                ),
+            )
+            ->add(self::metadata('x', ['1.0.0' => [], '2.0.0' => []]));
+
+        self::assertEquals(
+            ['widgets' => self::package('widgets', '1.0.0'), 'x' => self::package('x', '2.0.0')],
+            $this->resolver($registry)->resolve([new Requirement('widgets', '^1.0', '')]),
+            'Only the optional `^2.0` may apply.',
         );
     }
 

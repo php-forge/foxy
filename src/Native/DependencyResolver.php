@@ -30,8 +30,8 @@ use const SORT_STRING;
  * dropped until something requires it again. A selection is never upgraded because its constraints loosened, and
  * re-selecting an abandoned version is reported as a version conflict, so resolution always ends. Dependencies,
  * non-optional peer dependencies, and optional dependencies are followed; an optional constraint never blocks a
- * mandatory one: it is dropped with a warning instead, and an unsatisfiable optional dependency is skipped with a
- * warning. Packages no longer reachable from the requirements are dropped from the result.
+ * mandatory one: it is dropped with a warning instead, and an optional dependency that is unsatisfiable or rejects
+ * the current selection is skipped with a warning. Packages no longer reachable from the requirements are dropped from the result.
  *
  * @phpstan-type Constraint array{range: NpmRange, source: string, optional: bool}
  */
@@ -215,6 +215,8 @@ final readonly class DependencyResolver
     /**
      * Returns the requirements a version declares: dependencies, non-optional peers, and optional dependencies.
      *
+     * An optional dependency overrides a dependency or a peer of the same name, as npm does.
+     *
      * @return list<Requirement>
      */
     private static function requirementsOf(PackageVersion $version): array
@@ -226,11 +228,13 @@ final readonly class DependencyResolver
         $requirements = [];
 
         foreach ($version->dependencies as $name => $spec) {
-            $requirements[] = new Requirement((string) $name, $spec, $source);
+            if (!isset($version->optionalDependencies[$name])) {
+                $requirements[] = new Requirement((string) $name, $spec, $source);
+            }
         }
 
         foreach ($version->peerDependencies as $name => $spec) {
-            if (!in_array((string) $name, $optionalPeers, true)) {
+            if (!isset($version->optionalDependencies[$name]) && !in_array((string) $name, $optionalPeers, true)) {
                 $requirements[] = new Requirement((string) $name, $spec, $source);
             }
         }
@@ -284,16 +288,18 @@ final readonly class DependencyResolver
      * Records the requirement's constraint and returns the version to select, or `null` when the current selection
      * already satisfies it.
      *
-     * When no version satisfies every constraint of a mandatory requirement, the version satisfying the mandatory
-     * constraints is selected and each optional constraint it violates is dropped with a warning.
+     * An optional requirement never changes an existing selection. When no version satisfies every constraint of a
+     * mandatory requirement, the version satisfying the mandatory constraints is selected and each optional constraint
+     * it violates is dropped with a warning.
      *
      * @param array<string, PackageMetadata> $metadata Metadata fetched so far, keyed by name.
      * @param array<string, list<Constraint>> $constraints Constraints recorded so far, keyed by name.
      * @param array<string, PackageVersion> $selected Current selections.
      * @param array<string, PackageVersion> $abandoned Selections replaced by a re-pick, keyed by `name@version`.
      *
-     * @throws RuntimeException if the specification is unsupported or invalid, the registry fails, no version
-     * satisfies the constraints, or the version found was abandoned before.
+     * @throws RuntimeException if the specification is unsupported or invalid, the registry fails, an optional
+     * requirement rejects the current selection, no version satisfies the constraints, or the version found was
+     * abandoned before.
      */
     private function select(
         Requirement $requirement,
@@ -325,6 +331,13 @@ final readonly class DependencyResolver
         }
 
         $candidates = [...$constraints[$name] ?? [], $constraint];
+
+        if (null !== $current && $requirement->optional) {
+            throw new RuntimeException(
+                Message::NATIVE_VERSION_CONFLICT->getMessage($name, self::describe($candidates)),
+            );
+        }
+
         $required = $candidates;
 
         $version = self::highest($package, $candidates);

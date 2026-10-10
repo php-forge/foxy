@@ -23,6 +23,7 @@ final class NpmRegistryProvider
         yield 'sha256 only' => [self::sri('sha256')];
         yield 'sha384 only' => [self::sri('sha384')];
         yield 'sha512 only' => [self::sri('sha512')];
+        yield 'sha512 matching after a wrong sha512' => [self::sri('sha512', 'other') . ' ' . self::sri('sha512')];
         yield 'sha512 preferred over a wrong sha1' => [self::sri('sha1', 'other') . ' ' . self::sri('sha512')];
         yield 'tab-separated tokens' => [self::sri('sha1', 'other') . "\t" . self::sri('sha256')];
         yield 'unknown token before a known one' => ['md5-AAAA ' . self::sri('sha384')];
@@ -37,7 +38,9 @@ final class NpmRegistryProvider
         yield 'digest of other bytes' => [self::sri('sha512', 'other')];
         yield 'empty value' => [''];
         yield 'unknown algorithm' => ['md5-' . base64_encode(hash('md5', self::TARBALL, true))];
+        yield 'two wrong sha512 digests' => [self::sri('sha512', 'other') . ' ' . self::sri('sha512', 'another')];
         yield 'wrong sha512 beside a right sha1' => [self::sri('sha1') . ' ' . self::sri('sha512', 'other')];
+        yield 'wrong sha512 before a right sha1' => [self::sri('sha512', 'other') . ' ' . self::sri('sha1')];
     }
 
     /**

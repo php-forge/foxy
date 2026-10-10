@@ -153,6 +153,8 @@ final class NativeManager extends AbstractManifestAssetManager
      * Returns a normalized absolute path with the symbolic links of its longest existing prefix resolved and the
      * missing suffix appended.
      *
+     * Links are resolved only where `realpath()` resolves them, which excludes Windows.
+     *
      * @throws RuntimeException if the existing prefix cannot be resolved, such as a dangling symbolic link.
      */
     private function canonicalPath(string $path): string

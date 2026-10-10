@@ -333,6 +333,8 @@ final class NativeManagerTest extends TestCase
         string $target,
         string $value,
     ): void {
+        self::skipUnresolvedLinks();
+
         $placeholders = ['{basename}' => basename($this->cwd), '{cwd}' => $this->cwd, '{parent}' => dirname($this->cwd)];
 
         $this->link(strtr($target, $placeholders), "{$this->cwd}/{$link}");
@@ -447,6 +449,8 @@ final class NativeManagerTest extends TestCase
 
     public function testThrowRuntimeExceptionWhenInstallDirectoryIsSymlinkedRootPackageDir(): void
     {
+        self::skipUnresolvedLinks();
+
         mkdir("{$this->cwd}/app");
 
         $this->link("{$this->cwd}/app", "{$this->cwd}/web");
@@ -596,5 +600,15 @@ final class NativeManagerTest extends TestCase
     {
         file_put_contents("{$this->cwd}/package.json", '{}');
         mkdir("{$this->cwd}/node_modules");
+    }
+
+    /**
+     * Skips the test on Windows, where `realpath()` does not resolve symbolic links.
+     */
+    private static function skipUnresolvedLinks(): void
+    {
+        if ('\\' === DIRECTORY_SEPARATOR) {
+            self::markTestSkipped('PHP does not resolve symbolic links with realpath() on Windows.');
+        }
     }
 }

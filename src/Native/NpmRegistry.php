@@ -135,21 +135,36 @@ final readonly class NpmRegistry implements NpmRegistryInterface
     }
 
     /**
-     * Returns whether the file matches the strongest known algorithm of a Subresource Integrity value.
+     * Returns whether the file matches any digest of the strongest known algorithm of a Subresource Integrity value.
+     *
+     * @see https://www.w3.org/TR/SRI/#does-response-match-metadatalist
      */
     private function matchesIntegrity(string $file, string $integrity): bool
     {
         $tokens = preg_split('/\s+/', $integrity);
 
         foreach (self::ALGORITHMS as $algorithm) {
+            $digests = [];
+
             foreach ($tokens as $token) {
                 if (str_starts_with($token, "{$algorithm}-")) {
-                    return hash_equals(
-                        (string) base64_decode(substr($token, strlen($algorithm) + 1), true),
-                        hash_file($algorithm, $file, true),
-                    );
+                    $digests[] = (string) base64_decode(substr($token, strlen($algorithm) + 1), true);
                 }
             }
+
+            if ([] === $digests) {
+                continue;
+            }
+
+            $hash = hash_file($algorithm, $file, true);
+
+            foreach ($digests as $digest) {
+                if (hash_equals($digest, $hash)) {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         return false;

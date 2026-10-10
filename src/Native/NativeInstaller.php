@@ -10,6 +10,7 @@ use Composer\Util\Filesystem;
 use FilesystemIterator;
 use Foxy\Exception\{Message, RuntimeException};
 
+use function array_diff_key;
 use function array_is_list;
 use function dirname;
 use function file_exists;
@@ -63,7 +64,9 @@ final readonly class NativeInstaller implements NativeInstallerInterface
     /**
      * Installs the dependencies declared by the manifest, reading or rewriting the lock file.
      *
-     * A missing manifest declares no dependency. The lock file is reused when it is fresh (same requirements, same
+     * A missing manifest declares no dependency. The `dependencies`, `devDependencies`, and `optionalDependencies` maps
+     * are merged, an optional entry overriding a mandatory one of the same name as npm does; an unsatisfiable optional
+     * entry is skipped with a warning. The lock file is reused when it is fresh (same requirements, same
      * local package versions) and `$update` is `false`; otherwise the requirements are resolved again and the lock
      * file is written before any package is installed, so a download failure leaves a usable lock file.
      *
@@ -82,7 +85,9 @@ final readonly class NativeInstaller implements NativeInstallerInterface
 
         $manifest = $manifestFile->exists() ? $manifestFile->read() : [];
 
-        $rootSpecs = $this->specs($manifest, 'dependencies', $manifestPath)
+        $optionalSpecs = $this->specs($manifest, 'optionalDependencies', $manifestPath);
+        $rootSpecs = $optionalSpecs
+            + $this->specs($manifest, 'dependencies', $manifestPath)
             + $this->specs($manifest, 'devDependencies', $manifestPath);
 
         ksort($rootSpecs, SORT_STRING);
@@ -95,7 +100,7 @@ final readonly class NativeInstaller implements NativeInstallerInterface
             $name = (string) $name;
 
             if (!str_starts_with($spec, self::FILE_PROTOCOL)) {
-                $requirements[] = new Requirement($name, $spec, '');
+                $requirements[] = new Requirement($name, $spec, '', isset($optionalSpecs[$name]));
 
                 continue;
             }
@@ -300,6 +305,8 @@ final readonly class NativeInstaller implements NativeInstallerInterface
     /**
      * Returns the version, the requirements fingerprint, and the registry requirements of a local package.
      *
+     * An optional dependency overrides a dependency or a non-optional peer of the same name, as npm does.
+     *
      * @param string $name Local package name, the source of its requirements.
      * @param string $directory Absolute directory of the local package.
      *
@@ -324,16 +331,16 @@ final readonly class NativeInstaller implements NativeInstallerInterface
 
         $version = $manifest['version'] ?? null;
         $meta = $manifest['peerDependenciesMeta'] ?? [];
+        $optionalDependencies = $this->specs($manifest, 'optionalDependencies', $manifestPath);
         $peers = [];
 
         foreach ($this->specs($manifest, 'peerDependencies', $manifestPath) as $peer => $spec) {
-            if (true !== ($meta[$peer]['optional'] ?? null)) {
+            if (true !== ($meta[$peer]['optional'] ?? null) && !isset($optionalDependencies[$peer])) {
                 $peers[$peer] = $spec;
             }
         }
 
-        $dependencies = $this->specs($manifest, 'dependencies', $manifestPath);
-        $optionalDependencies = $this->specs($manifest, 'optionalDependencies', $manifestPath);
+        $dependencies = array_diff_key($this->specs($manifest, 'dependencies', $manifestPath), $optionalDependencies);
 
         $requirements = [];
 

@@ -257,9 +257,10 @@ Set `manager` to `native` to install the frontend dependencies without Bun, Deno
 
 Foxy then performs the installation itself, in PHP:
 
-- It reads `dependencies` and `devDependencies` from the merged root `package.json`. Each `file:` entry (the
+- It reads `dependencies`, `devDependencies`, and `optionalDependencies` from the merged root `package.json`; as in
+  npm, an `optionalDependencies` entry overrides a `dependencies` entry of the same name. Each `file:` entry (the
   Composer assets and any other local package) is copied into `node_modules/<name>`, and its own `dependencies`,
-  non-optional `peerDependencies`, and `optionalDependencies` join the resolution.
+  non-optional `peerDependencies`, and `optionalDependencies` join the resolution with the same override rule.
 - It resolves every other dependency against the registry with asset-packagist semantics: a flat `node_modules`
   with one version per package. Constraints from the root manifest, the local packages, and the transitive
   `dependencies`, `peerDependencies`, and `optionalDependencies` are intersected per package name, and the highest
@@ -298,8 +299,9 @@ keeps the framework's default `@npm` alias can install straight into `vendor/npm
 
 Foxy owns that directory: every entry that the lock does not list is removed on every install, except entries whose
 name starts with a dot (such as `.bin`), so do not point it at a directory that also receives asset-packagist
-packages from Composer. The root package directory, any of its parents, and filesystem roots are rejected, and
-symbolic links in the path are resolved before that check. Package
+packages from Composer. The root package directory, any of its parents, and filesystem roots are rejected; symbolic
+links in the path are resolved before that check where PHP's `realpath()` resolves them, which it does not on
+Windows. Package
 names read from `package.json`, `foxy.lock`, and the registry must follow npm's name grammar (an optional `@scope/`
 followed by a name of letters, digits, `.`, `_`, and `-`, up to 214 characters); any other name is rejected before a
 path is built from it. Scoped packages keep the npm layout (`vendor/npm-asset/@popperjs/core`), not asset-packagist's

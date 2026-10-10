@@ -250,6 +250,64 @@ final class NativeInstallerTest extends TestCase
         );
     }
 
+    public function testInstallLetsLocalOptionalDependencyOverrideMandatoryOne(): void
+    {
+        $this->writeJson('package.json', ['dependencies' => [self::LOCAL_NAME => 'file:' . self::LOCAL_PATH]]);
+        $this->writeLocal(
+            [
+                'version' => '1.0.0',
+                'dependencies' => ['bootstrap' => '5.2.0', 'missing-pkg' => '^1.0'],
+                'peerDependencies' => ['missing-pkg' => '^1.0'],
+                'optionalDependencies' => ['bootstrap' => '^5.3', 'missing-pkg' => '^2.0'],
+            ],
+        );
+
+        $this->installWithOptionalWarning('missing-pkg', '^2.0');
+
+        self::assertStringEqualsFile(
+            "{$this->root}/node_modules/bootstrap/index.js",
+            'bootstrap@5.3.8',
+            'The optional specification must be resolved.',
+        );
+        self::assertSame(
+            [
+                '' => [self::LOCAL_NAME => 'file:' . self::LOCAL_PATH],
+                self::LOCAL_NAME => ['bootstrap' => '^5.3', 'missing-pkg' => '^2.0'],
+            ],
+            $this->lock()['requirements'],
+            'The local requirements must record the optional specifications.',
+        );
+    }
+
+    public function testInstallLetsRootOptionalDependencyOverrideMandatoryOne(): void
+    {
+        $this->writeJson(
+            'package.json',
+            [
+                'dependencies' => ['bootstrap' => '^4.0'],
+                'devDependencies' => ['left-pad' => '*'],
+                'optionalDependencies' => ['missing-pkg' => '^1.0', 'bootstrap' => '^5.3'],
+            ],
+        );
+
+        $this->installWithOptionalWarning('missing-pkg', '^1.0');
+
+        self::assertStringEqualsFile(
+            "{$this->root}/node_modules/bootstrap/index.js",
+            'bootstrap@5.3.8',
+            'The optional specification must be resolved.',
+        );
+        self::assertFileExists(
+            "{$this->root}/node_modules/left-pad/index.js",
+            'The remaining requirements must be installed.',
+        );
+        self::assertSame(
+            ['' => ['bootstrap' => '^5.3', 'left-pad' => '*', 'missing-pkg' => '^1.0']],
+            $this->lock()['requirements'],
+            'The root requirements must include the optional map, sorted.',
+        );
+    }
+
     public function testInstallOrdersLocalPackagesAmongRegistryPackages(): void
     {
         $this->writeJson('web/package.json', ['dependencies' => ['theme' => 'file:../vendor/acme/theme']]);
@@ -391,6 +449,27 @@ final class NativeInstallerTest extends TestCase
             ['left-pad', 'left-pad'],
             $registry->requested,
             'A lock without the local entry is stale.',
+        );
+    }
+
+    public function testInstallResolvesAgainWhenRootOptionalSpecChanges(): void
+    {
+        $registry = $this->registry();
+
+        $this->writeJson('package.json', ['optionalDependencies' => ['bootstrap' => '5.2.0']]);
+        $this->install($registry);
+        $this->writeJson('package.json', ['optionalDependencies' => ['bootstrap' => '^5.3']]);
+        $this->install($registry);
+
+        self::assertStringEqualsFile(
+            "{$this->root}/node_modules/bootstrap/index.js",
+            'bootstrap@5.3.8',
+            'The new specification must be resolved.',
+        );
+        self::assertSame(
+            ['' => ['bootstrap' => '^5.3']],
+            $this->lock()['requirements'],
+            'The lock file must record the new specification.',
         );
     }
 
@@ -725,6 +804,29 @@ final class NativeInstallerTest extends TestCase
         $fs = new Filesystem();
 
         return new NativeInstaller($io, $fs, $registry, new DependencyResolver($registry, $io), new TarballExtractor($fs));
+    }
+
+    /**
+     * Installs with the default registry and expects one skipped-optional warning for a package missing from it.
+     */
+    private function installWithOptionalWarning(string $name, string $spec): void
+    {
+        $io = $this->io();
+
+        $io
+            ->expects(self::once())
+            ->method('writeError')
+            ->with(
+                "<warning>The optional dependency \"{$name}\" ({$spec}) was skipped: "
+                . Message::NATIVE_PACKAGE_NOT_FOUND->getMessage($name, 'memory') . '</warning>',
+            );
+
+        $this->installer($this->registry(), $io)->install(
+            "{$this->root}/package.json",
+            "{$this->root}/foxy.lock",
+            "{$this->root}/node_modules",
+            false,
+        );
     }
 
     /**
