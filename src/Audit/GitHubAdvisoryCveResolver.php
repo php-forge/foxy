@@ -36,10 +36,9 @@ final readonly class GitHubAdvisoryCveResolver implements CveResolverInterface
      *
      * @param list<string> $ghsaIds GHSA identifiers to resolve, trimmed and compared case-insensitively.
      *
+     * @throws RuntimeException if an identifier is not a GHSA identifier; nothing is requested in that case.
      * @return array<string, CveResolution|Throwable> Resolutions keyed by canonical GHSA identifier; a `Throwable` is
      * the transport, JSON, or document error of that lookup.
-     *
-     * @throws RuntimeException if an identifier is not a GHSA identifier; nothing is requested in that case.
      */
     public function resolveMany(array $ghsaIds): array
     {

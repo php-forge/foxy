@@ -17,10 +17,9 @@ interface CveResolverInterface
      *
      * @param list<string> $ghsaIds GHSA identifiers to resolve.
      *
+     * @throws RuntimeException if an identifier is not a GHSA identifier; nothing is requested in that case.
      * @return array<string, CveResolution|Throwable> One result for every identifier, keyed by canonical GHSA
      * identifier; a `Throwable` marks a lookup that failed.
-     *
-     * @throws RuntimeException if an identifier is not a GHSA identifier; nothing is requested in that case.
      */
     public function resolveMany(array $ghsaIds): array;
 }

@@ -17,7 +17,6 @@ use React\Promise\PromiseInterface;
 use Seld\JsonLint\ParsingException;
 use Throwable;
 
-use function array_key_exists;
 use function array_keys;
 use function count;
 use function React\Promise\reject;
@@ -333,8 +332,8 @@ final class GitHubAdvisoryCveResolverTest extends TestCase
 
                     $ghsaId = substr($url, strlen('https://api.github.com/advisories/'));
 
-                    self::assertTrue(
-                        array_key_exists($ghsaId, $answers),
+                    self::assertArrayHasKey(
+                        $ghsaId, $answers,
                         'Request must target an expected advisory URL once.',
                     );
 
