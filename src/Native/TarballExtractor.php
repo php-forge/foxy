@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Foxy\Native;
 
-use Throwable;
 use Composer\Util\Filesystem;
 use Foxy\Exception\{Message, RuntimeException};
+use Throwable;
 
 use function array_map;
 use function array_slice;

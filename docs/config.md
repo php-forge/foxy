@@ -257,27 +257,27 @@ Set `manager` to `native` to install the frontend dependencies without Bun, Deno
 
 Foxy then performs the installation itself, in PHP:
 
-1. It reads `dependencies` and `devDependencies` from the merged root `package.json`. Each `file:` entry (the
-   Composer assets and any other local package) is copied into `node_modules/<name>`, and its own `dependencies`,
-   non-optional `peerDependencies`, and `optionalDependencies` join the resolution.
-2. It resolves every other dependency against the registry with asset-packagist semantics: a flat `node_modules`
-   with one version per package. Constraints from the root manifest, the local packages, and the transitive
-   `dependencies`, `peerDependencies`, and `optionalDependencies` are intersected per package name, and the highest
-   satisfying version wins. Dist-tags such as `latest` or `next` are honored. A conflict that only nested
-   `node_modules` could solve is reported as an error that names every constraint and its origin; install such a
-   project with a JavaScript manager instead. Unsatisfiable or missing optional dependencies are skipped with a
-   warning, and a deprecated selection is reported with the registry's deprecation text.
-3. It downloads each tarball from the URL published by the registry, verifies it against the registry's
-   `integrity` value (SHA-512, with the legacy SHA-1 `shasum` as a fallback), and extracts it into
-   `node_modules/<name>`, stripping the archive's top-level directory like npm does. Tarballs are cached in
-   `<cache-files-dir>/foxy/` and are subject to Composer's `cache-files-ttl`, `cache-files-maxsize`, and
-   `cache-read-only` settings; every cached tarball is verified again before use.
-4. It writes `foxy.lock`, which records the root requirements, the requirements of every local package, and the
-   selected version, tarball URL, and integrity of every installed package. `composer install` with a lock that
-   matches the current manifests reinstalls exactly those tarballs without a single metadata request;
-   `composer update`, or a lock that no longer matches, resolves again and rewrites the lock. Commit `foxy.lock`.
-5. It removes entries of the install directory that are not part of the installation (dot-entries such as `.bin`
-   are left alone).
+- It reads `dependencies` and `devDependencies` from the merged root `package.json`. Each `file:` entry (the
+  Composer assets and any other local package) is copied into `node_modules/<name>`, and its own `dependencies`,
+  non-optional `peerDependencies`, and `optionalDependencies` join the resolution.
+- It resolves every other dependency against the registry with asset-packagist semantics: a flat `node_modules`
+  with one version per package. Constraints from the root manifest, the local packages, and the transitive
+  `dependencies`, `peerDependencies`, and `optionalDependencies` are intersected per package name, and the highest
+  satisfying version wins. Dist-tags such as `latest` or `next` are honored. A conflict that only nested
+  `node_modules` could solve is reported as an error that names every constraint and its origin; install such a
+  project with a JavaScript manager instead. Unsatisfiable or missing optional dependencies are skipped with a
+  warning, and a deprecated selection is reported with the registry's deprecation text.
+- It downloads each tarball from the URL published by the registry, verifies it against the registry's
+  `integrity` value (SHA-512, with the legacy SHA-1 `shasum` as a fallback), and extracts it into
+  `node_modules/<name>`, stripping the archive's top-level directory like npm does. Tarballs are cached in
+  `<cache-files-dir>/foxy/` and are subject to Composer's `cache-files-ttl`, `cache-files-maxsize`, and
+  `cache-read-only` settings; every cached tarball is verified again before use.
+- It writes `foxy.lock`, which records the root requirements, the requirements of every local package, and the
+  selected version, tarball URL, and integrity of every installed package. `composer install` with a lock that
+  matches the current manifests reinstalls exactly those tarballs without a single metadata request;
+  `composer update`, or a lock that no longer matches, resolves again and rewrites the lock. Commit `foxy.lock`.
+- It removes entries of the install directory that are not part of the installation (dot-entries such as `.bin`
+  are left alone).
 
 The install directory is `node_modules` next to `package.json` by default. `native-install-dir` changes it; a
 relative value is resolved from `root-package-json-dir`, an absolute value is used as is. A Yii 2 application that
@@ -294,10 +294,13 @@ keeps the framework's default `@npm` alias can install straight into `vendor/npm
 }
 ```
 
-Foxy owns that directory: everything in it that the lock does not list is removed on every install, so do not point
-it at a directory that also receives asset-packagist packages from Composer. The root package directory, any of its
-parents, and filesystem roots are rejected. Scoped packages keep the npm layout (`vendor/npm-asset/@popperjs/core`),
-not asset-packagist's `popperjs--core` form.
+Foxy owns that directory: every entry that the lock does not list is removed on every install, except entries whose
+name starts with a dot (such as `.bin`), so do not point it at a directory that also receives asset-packagist
+packages from Composer. The root package directory, any of its parents, and filesystem roots are rejected. Package
+names read from `package.json`, `foxy.lock`, and the registry must follow npm's name grammar (an optional `@scope/`
+followed by a name of letters, digits, `.`, `_`, and `-`, up to 214 characters); any other name is rejected before a
+path is built from it. Scoped packages keep the npm layout (`vendor/npm-asset/@popperjs/core`), not asset-packagist's
+`popperjs--core` form.
 
 The native manager requires the PHP `zlib` extension and prints `Installing`, `Updating`, and `Removing` lines like
 the other managers. Its registry requests go through Composer's HTTP layer: proxies, `cafile`, `disable-tls`, and the

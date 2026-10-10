@@ -6,19 +6,21 @@ namespace Foxy\Tests\Asset;
 
 use Composer\IO\IOInterface;
 use Composer\Package\RootPackageInterface;
-use Composer\Util\Filesystem;
+use Composer\Util\{Filesystem, Platform};
 use Foxy\Asset\NativeManager;
 use Foxy\Config\Config;
 use Foxy\Exception\{Message, RuntimeException};
 use Foxy\Fallback\FallbackInterface;
 use Foxy\Native\NativeInstallerInterface;
 use Foxy\Tests\Provider\NativeManagerProvider;
-use PHPUnit\Framework\Attributes\DataProviderExternal;
+use PHPUnit\Framework\Attributes\{DataProviderExternal, PreserveGlobalState, RunInSeparateProcess};
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Xepozz\InternalMocker\MockerState;
 
 use function chdir;
+use function define;
+use function defined;
 use function dirname;
 use function file_get_contents;
 use function file_put_contents;
@@ -29,6 +31,8 @@ use function strtr;
 use function sys_get_temp_dir;
 use function uniqid;
 use function unlink;
+
+use const DIRECTORY_SEPARATOR;
 
 /**
  * Unit tests for {@see NativeManager} selection, validation, install directory resolution, and installer orchestration.
@@ -144,11 +148,44 @@ final class NativeManagerTest extends TestCase
         );
     }
 
+    public function testRunAcceptsInstallDirectoryDifferingFromRootPackageDirOnlyByCase(): void
+    {
+        if (Platform::isWindows()) {
+            self::markTestSkipped('Paths differing only by letter case name the same directory on Windows.');
+        }
+
+        mkdir("{$this->cwd}/app");
+
+        $root = $this->cwd . DIRECTORY_SEPARATOR . 'app';
+
+        $this->installer
+            ->expects(self::once())
+            ->method('install')
+            ->with(
+                $root . DIRECTORY_SEPARATOR . 'package.json',
+                $root . DIRECTORY_SEPARATOR . 'foxy.lock',
+                (new Filesystem())->normalizePath("{$this->cwd}/APP"),
+                false,
+            );
+
+        self::assertSame(
+            0,
+            $this->manager(
+                [
+                    'run-asset-manager' => true,
+                    'native-install-dir' => "{$this->cwd}/APP",
+                    'root-package-json-dir' => 'app',
+                ],
+            )->run(),
+            'Case must be significant outside Windows.',
+        );
+    }
+
     public function testRunForcesInstallWhenUpdatesAreDisabled(): void
     {
         $this->markInstalled();
 
-        $this->expectInstall("{$this->cwd}/", false, self::INSTALLING);
+        $this->expectInstall($this->cwd, false, self::INSTALLING);
 
         $manager = $this->manager(['run-asset-manager' => true]);
 
@@ -170,7 +207,7 @@ final class NativeManagerTest extends TestCase
         $root = $this->cwd;
 
         if (null !== $rootPackageDir) {
-            $root .= "/{$rootPackageDir}";
+            $root .= DIRECTORY_SEPARATOR . $rootPackageDir;
 
             mkdir($root);
         }
@@ -178,7 +215,12 @@ final class NativeManagerTest extends TestCase
         $this->installer
             ->expects(self::once())
             ->method('install')
-            ->with("{$root}/package.json", "{$root}/foxy.lock", str_replace('{cwd}', $this->cwd, $expected), false);
+            ->with(
+                $root . DIRECTORY_SEPARATOR . 'package.json',
+                $root . DIRECTORY_SEPARATOR . 'foxy.lock',
+                (new Filesystem())->normalizePath(str_replace('{cwd}', $this->cwd, $expected)),
+                false,
+            );
 
         $this->manager(
             ['run-asset-manager' => true, 'native-install-dir' => $value, 'root-package-json-dir' => $rootPackageDir],
@@ -189,7 +231,7 @@ final class NativeManagerTest extends TestCase
     {
         mkdir("{$this->cwd}/web");
 
-        $this->expectInstall("{$this->cwd}/web/", false, self::INSTALLING);
+        $this->expectInstall($this->cwd . DIRECTORY_SEPARATOR . 'web', false, self::INSTALLING);
 
         self::assertSame(
             0,
@@ -200,7 +242,7 @@ final class NativeManagerTest extends TestCase
 
     public function testRunInstallsIntoCurrentDirectory(): void
     {
-        $this->expectInstall("{$this->cwd}/", false, self::INSTALLING);
+        $this->expectInstall($this->cwd, false, self::INSTALLING);
 
         self::assertSame(
             0,
@@ -255,7 +297,7 @@ final class NativeManagerTest extends TestCase
         $this->markInstalled();
 
         $this->expectInstall(
-            "{$this->cwd}/",
+            $this->cwd,
             true,
             '<info>Updating frontend dependencies with the native manager</info>',
         );
@@ -281,7 +323,9 @@ final class NativeManagerTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            Message::NATIVE_INSTALL_DIR_INVALID->getMessage(strtr($expected, $placeholders)),
+            Message::NATIVE_INSTALL_DIR_INVALID->getMessage(
+                (new Filesystem())->normalizePath(strtr($expected, $placeholders)),
+            ),
         );
 
         $this->manager(['run-asset-manager' => true, 'native-install-dir' => strtr($value, $placeholders)])->run();
@@ -317,6 +361,30 @@ final class NativeManagerTest extends TestCase
         }
     }
 
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function testThrowRuntimeExceptionWhenInstallDirectoryIsRootPackageDirInOtherCaseOnWindows(): void
+    {
+        if (!defined('PHP_WINDOWS_VERSION_BUILD')) {
+            define('PHP_WINDOWS_VERSION_BUILD', 1);
+        }
+
+        mkdir("{$this->cwd}/app");
+
+        $this->installer
+            ->expects(self::never())
+            ->method('install');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(
+            Message::NATIVE_INSTALL_DIR_INVALID->getMessage((new Filesystem())->normalizePath("{$this->cwd}/APP")),
+        );
+
+        $this->manager(
+            ['run-asset-manager' => true, 'native-install-dir' => "{$this->cwd}/APP", 'root-package-json-dir' => 'app'],
+        )->run();
+    }
+
     public function testThrowRuntimeExceptionWhenRootPackageDirIsMissing(): void
     {
         $this->installer
@@ -328,7 +396,7 @@ final class NativeManagerTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            Message::ASSET_ROOT_PACKAGE_DIR_MISSING->getMessage("{$this->cwd}/missing"),
+            Message::ASSET_ROOT_PACKAGE_DIR_MISSING->getMessage($this->cwd . DIRECTORY_SEPARATOR . 'missing'),
         );
 
         $this->manager(['run-asset-manager' => true, 'root-package-json-dir' => 'missing'])->run();
@@ -399,16 +467,21 @@ final class NativeManagerTest extends TestCase
     }
 
     /**
-     * Expects one installation into the directory and the given progress line.
+     * Expects one installation into the `node_modules` directory of the root package and the given progress line.
      *
-     * @param string $directory Root package directory with a trailing slash.
+     * @param string $root Root package directory, without a trailing separator.
      */
-    private function expectInstall(string $directory, bool $update, string $line): void
+    private function expectInstall(string $root, bool $update, string $line): void
     {
         $this->installer
             ->expects(self::once())
             ->method('install')
-            ->with("{$directory}package.json", "{$directory}foxy.lock", "{$directory}node_modules", $update);
+            ->with(
+                $root . DIRECTORY_SEPARATOR . 'package.json',
+                $root . DIRECTORY_SEPARATOR . 'foxy.lock',
+                (new Filesystem())->normalizePath($root . DIRECTORY_SEPARATOR . 'node_modules'),
+                $update,
+            );
         $this->io
             ->expects(self::once())
             ->method('write')

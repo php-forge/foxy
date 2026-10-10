@@ -25,8 +25,7 @@ use function substr;
  * Entries are POSIX ustar headers by default; a name longer than 100 bytes is split into the `prefix` and `name`
  * fields. {@see addEntry()} overrides any raw header field (`magic`, `checksum`, `size`, `prefix`, ...) to produce
  * malformed or GNU-style headers. `size` and `mtime` are space-terminated; `checksum` is seven octal digits and NUL in
- * POSIX headers and GNU tar's six digits, NUL and space in headers with the GNU magic (`ustar `).;
- * ```
+ * POSIX headers and GNU tar's six digits, NUL and space in headers with the GNU magic (`ustar `).
  */
 final class TarArchive
 {

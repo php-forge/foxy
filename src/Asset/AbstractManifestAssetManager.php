@@ -105,7 +105,7 @@ abstract class AbstractManifestAssetManager implements AssetManagerInterface
         return $this;
     }
 
-    public function setUpdatable($updatable): static
+    public function setUpdatable(bool $updatable): static
     {
         $this->updatable = $updatable;
 

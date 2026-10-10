@@ -558,7 +558,7 @@ final class NativeInstallerTest extends TestCase
         $this->expectExceptionMessage(
             Message::NATIVE_MANIFEST_DEPENDENCIES_INVALID->getMessage(
                 'peerDependencies',
-                "{$this->root}/vendor/php-forge/composer-asset/acme/theme/package.json",
+                $this->localDirectory() . '/package.json',
             ),
         );
 
@@ -599,7 +599,7 @@ final class NativeInstallerTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
             Message::NATIVE_LOCAL_PACKAGE_MISSING->getMessage(
-                "{$this->root}/vendor/php-forge/composer-asset/acme/theme",
+                $this->localDirectory(),
                 self::LOCAL_NAME,
             ),
         );
@@ -624,7 +624,7 @@ final class NativeInstallerTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
             Message::NATIVE_PACKAGE_COPY_FAILED->getMessage(
-                "{$this->root}/vendor/php-forge/composer-asset/acme/theme",
+                $this->localDirectory(),
                 "{$this->root}/node_modules/@composer-asset/acme--theme",
             ),
         );
@@ -745,6 +745,15 @@ final class NativeInstallerTest extends TestCase
             );
 
         return $io;
+    }
+
+    /**
+     * Returns the local package directory as the installer resolves it: the `file:` path joined to the manifest
+     * directory with `/` and normalized.
+     */
+    private function localDirectory(): string
+    {
+        return (new Filesystem())->normalizePath("{$this->root}/" . self::LOCAL_PATH);
     }
 
     /**

@@ -97,8 +97,9 @@ the directory `native-install-dir` names):
 }
 ```
 
-The selected versions are recorded in `foxy.lock`; commit it so that `composer install` reinstalls exactly the same
-files without consulting the registry. The native manager keeps one version per package, like asset-packagist, and
+The selected versions are recorded in `foxy.lock`; commit it so that `composer install` reinstalls the same versions
+without any registry metadata request. Tarballs come from the Composer cache, or are downloaded again from the URLs
+recorded in the lock when the cache is empty. The native manager keeps one version per package, like asset-packagist, and
 does not run lifecycle scripts. `native-install-dir` moves the install directory, for example to `vendor/npm-asset`
 for Yii 2's default `@npm` alias. See the [native manager reference](docs/config.md#native-manager) for its scope.
 

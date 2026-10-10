@@ -14,10 +14,26 @@ final class NativeInstallerProvider
      */
     public static function invalidDependencyMaps(): iterable
     {
-        yield 'dependencies holding a list' => ['{"dependencies": ["a"]}', 'dependencies'];
-        yield 'dependencies holding a number spec' => ['{"dependencies": {"a": 1}}', 'dependencies'];
-        yield 'dependencies holding a string' => ['{"dependencies": "a"}', 'dependencies'];
-        yield 'devDependencies holding an empty name' => ['{"devDependencies": {"": "1.0.0"}}', 'devDependencies'];
+        yield 'dependencies holding a list' => [
+            '{"dependencies": ["a"]}',
+            'dependencies',
+        ];
+        yield 'dependencies holding a number spec' => [
+            '{"dependencies": {"a": 1}}',
+            'dependencies',
+        ];
+        yield 'dependencies holding a string' => [
+            '{"dependencies": "a"}',
+            'dependencies',
+        ];
+        yield 'devDependencies holding a traversal name' => [
+            '{"devDependencies": {"../../src": "1.0.0"}}',
+            'devDependencies',
+        ];
+        yield 'devDependencies holding an empty name' => [
+            '{"devDependencies": {"": "1.0.0"}}',
+            'devDependencies',
+        ];
     }
 
     /**

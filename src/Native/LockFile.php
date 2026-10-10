@@ -44,7 +44,8 @@ final readonly class LockFile
      *
      * Keys are package names; PHP stores a numeric name such as `123` as an `int` key.
      *
-     * @throws RuntimeException if the file is not valid JSON or does not have the lock file shape.
+     * @throws RuntimeException if the file is not valid JSON, does not have the lock file shape, or keys a requirement or
+     * a package by an invalid package name.
      *
      * @return array{
      *     requirements: array<array-key, array<array-key, string>>,
@@ -66,8 +67,8 @@ final readonly class LockFile
                 throw $this->invalid();
             }
 
-            foreach ($specs as $spec) {
-                if (!is_string($spec)) {
+            foreach ($specs as $name => $spec) {
+                if (!PackageName::isValid((string) $name) || !is_string($spec)) {
                     throw $this->invalid();
                 }
             }
@@ -145,10 +146,14 @@ final readonly class LockFile
     /**
      * Returns the package of a lock entry: `{version, file}` or `{version, resolved, integrity}`.
      *
-     * @throws RuntimeException if the entry has neither shape.
+     * @throws RuntimeException if the name is not a valid package name or the entry has neither shape.
      */
     private function package(string $name, mixed $entry): ResolvedPackage
     {
+        if (!PackageName::isValid($name)) {
+            throw $this->invalid();
+        }
+
         $version = $entry['version'] ?? null;
 
         if (!is_string($version)) {

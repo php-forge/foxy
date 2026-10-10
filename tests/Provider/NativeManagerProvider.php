@@ -30,6 +30,9 @@ final class NativeManagerProvider
     public static function invalidInstallDirectories(): iterable
     {
         yield 'current directory' => ['.', '{cwd}'];
+        yield 'drive letter without separator' => ['C:', 'C:'];
+        yield 'drive root' => ['C:/', 'C:/'];
+        yield 'drive root with backslash' => ['C:\\', 'C:/'];
         yield 'filesystem root' => ['/', '/'];
         yield 'parent directory' => ['..', '{parent}'];
         yield 'root package directory' => ['{cwd}', '{cwd}'];

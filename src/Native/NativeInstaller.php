@@ -385,7 +385,7 @@ final readonly class NativeInstaller implements NativeInstallerInterface
      * @param string $field Field name, such as `dependencies`.
      * @param string $manifestPath Manifest path, used in the error message.
      *
-     * @throws RuntimeException if the field does not map non-empty package names to version strings.
+     * @throws RuntimeException if the field does not map valid package names to version strings.
      *
      * @return array<array-key, string>
      */
@@ -398,7 +398,7 @@ final readonly class NativeInstaller implements NativeInstallerInterface
         }
 
         foreach ($specs as $name => $spec) {
-            if ('' === $name || !is_string($spec)) {
+            if (!PackageName::isValid((string) $name) || !is_string($spec)) {
                 throw $this->invalidSpecs($field, $manifestPath);
             }
         }

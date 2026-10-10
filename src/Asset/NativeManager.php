@@ -5,18 +5,19 @@ declare(strict_types=1);
 namespace Foxy\Asset;
 
 use Composer\IO\IOInterface;
-use Composer\Util\Filesystem;
+use Composer\Util\{Filesystem, Platform};
 use Foxy\Config\Config;
 use Foxy\Exception\{Message, RuntimeException};
 use Foxy\Fallback\FallbackInterface;
 use Foxy\Native\NativeInstallerInterface;
 use Throwable;
 
-use function dirname;
 use function is_dir;
 use function is_string;
+use function preg_match;
 use function sprintf;
 use function str_starts_with;
+use function strtolower;
 use function trim;
 
 /**
@@ -142,10 +143,20 @@ final class NativeManager extends AbstractManifestAssetManager
     }
 
     /**
+     * Returns a normalized path in the form used for comparisons: lowercased on Windows, where paths are
+     * case-insensitive, and unchanged elsewhere.
+     */
+    private function comparablePath(string $path): string
+    {
+        return Platform::isWindows() ? strtolower($path) : $path;
+    }
+
+    /**
      * Returns the normalized directory the packages are installed into.
      *
      * The `native-install-dir` value defaults to `node_modules` when it is not a string or is blank; a relative value
-     * is resolved against the root package directory. Normalization also drops trailing slashes and backslashes.
+     * is resolved against the root package directory. Normalization also drops trailing slashes and backslashes. The
+     * comparison with the root package directory ignores letter case on Windows.
      *
      * @throws RuntimeException if the directory is the root package directory, one of its parents, or a filesystem
      * root, since the installer removes every entry of the directory outside the install set.
@@ -162,9 +173,12 @@ final class NativeManager extends AbstractManifestAssetManager
         $path = $this->fs->normalizePath(
             $this->fs->isAbsolutePath($directory) ? $directory : $this->getRootPackagePath($directory),
         );
-        $root = $this->fs->normalizePath($this->getRootPackageDir());
+        $comparablePath = $this->comparablePath($path);
+        $root = $this->comparablePath($this->fs->normalizePath($this->getRootPackageDir()));
 
-        if (dirname($path) === $path || str_starts_with("{$root}/", "{$path}/")) {
+        if (1 === preg_match('{^(?:[A-Za-z]:)?/?$}', $comparablePath)
+            || str_starts_with("{$root}/", "{$comparablePath}/")
+        ) {
             throw new RuntimeException(Message::NATIVE_INSTALL_DIR_INVALID->getMessage($path));
         }
 

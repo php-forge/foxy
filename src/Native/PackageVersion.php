@@ -15,9 +15,9 @@ final readonly class PackageVersion
      * @param string $tarball Tarball URL (`dist.tarball`).
      * @param string $integrity Subresource Integrity value: `dist.integrity`, or `sha1-<base64>` derived from
      * `dist.shasum`.
-     * @param array<string, string> $dependencies Runtime dependencies keyed by package name.
-     * @param array<string, string> $peerDependencies Peer dependencies keyed by package name.
-     * @param array<string, string> $optionalDependencies Optional dependencies keyed by package name.
+     * @param array<array-key, string> $dependencies Runtime dependencies keyed by package name.
+     * @param array<array-key, string> $peerDependencies Peer dependencies keyed by package name.
+     * @param array<array-key, string> $optionalDependencies Optional dependencies keyed by package name.
      * @param list<string> $optionalPeerDependencies Peer names whose `peerDependenciesMeta` entry declares
      * `optional: true`.
      * @param string|null $deprecated Deprecation text, or `null` when the version is not deprecated.

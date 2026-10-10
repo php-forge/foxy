@@ -105,6 +105,10 @@ final class TarballExtractorTest extends TestCase
         $destination = $this->extract(TarArchive::create()->addFile('package/bin/tool', 'run', $mode)->gzip());
 
         if ($executable) {
+            if ('\\' === DIRECTORY_SEPARATOR) {
+                self::markTestSkipped('POSIX execute bits are not available on Windows.');
+            }
+
             self::assertSame(
                 0o755,
                 fileperms("{$destination}/bin/tool") & 0o777,

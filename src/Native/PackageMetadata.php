@@ -8,6 +8,7 @@ use Composer\Semver\VersionParser;
 use Foxy\Exception\{Message, RuntimeException};
 use UnexpectedValueException;
 
+use function array_keys;
 use function base64_encode;
 use function is_array;
 use function is_string;
@@ -89,6 +90,31 @@ final readonly class PackageMetadata
     }
 
     /**
+     * Returns the dependency map of a version entry field, keyed by valid package names.
+     *
+     * @param array<mixed> $entry Version entry.
+     * @param string $path Path of the version entry, used in error messages.
+     *
+     * @throws RuntimeException if the field is not a map of strings or a key is not a valid package name.
+     *
+     * @return array<array-key, string>
+     */
+    private static function dependencyMap(string $name, array $entry, string $field, string $path): array
+    {
+        $fieldPath = "{$path}.{$field}";
+
+        $map = self::stringMap($name, $entry, $field, $fieldPath);
+
+        foreach (array_keys($map) as $dependency) {
+            if (!PackageName::isValid((string) $dependency)) {
+                throw self::invalid($name, Message::NATIVE_METADATA_REASON_STRING_MAP_REQUIRED->getMessage($fieldPath));
+            }
+        }
+
+        return $map;
+    }
+
+    /**
      * Returns the Subresource Integrity value of a version entry's `dist` object.
      *
      * @param array<mixed> $dist
@@ -141,9 +167,9 @@ final readonly class PackageMetadata
         }
 
         $integrity = self::integrity($name, $path, $dist);
-        $dependencies = self::stringMap($name, $entry, 'dependencies', "{$path}.dependencies");
-        $peerDependencies = self::stringMap($name, $entry, 'peerDependencies', "{$path}.peerDependencies");
-        $optionalDependencies = self::stringMap($name, $entry, 'optionalDependencies', "{$path}.optionalDependencies");
+        $dependencies = self::dependencyMap($name, $entry, 'dependencies', $path);
+        $peerDependencies = self::dependencyMap($name, $entry, 'peerDependencies', $path);
+        $optionalDependencies = self::dependencyMap($name, $entry, 'optionalDependencies', $path);
 
         $peerDependenciesMeta = $entry['peerDependenciesMeta'] ?? [];
 
@@ -182,7 +208,7 @@ final readonly class PackageMetadata
      *
      * @param array<mixed> $source
      *
-     * @return array<string, string>
+     * @return array<array-key, string>
      */
     private static function stringMap(string $name, array $source, string $field, string $path): array
     {

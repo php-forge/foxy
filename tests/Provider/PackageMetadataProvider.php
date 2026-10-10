@@ -24,6 +24,10 @@ final class PackageMetadataProvider
             self::document(['dependencies' => '^1.0.0']),
             self::reason(Message::NATIVE_METADATA_REASON_STRING_MAP_REQUIRED, 'versions.1.0.0.dependencies'),
         ];
+        yield 'dependencies key is a traversal name' => [
+            self::document(['dependencies' => ['jquery' => '^3.7', '../x' => '^1.0']]),
+            self::reason(Message::NATIVE_METADATA_REASON_STRING_MAP_REQUIRED, 'versions.1.0.0.dependencies'),
+        ];
         yield 'dependencies value is not a string' => [
             self::document(['dependencies' => ['jquery' => '^3.7', 'popper' => 2]]),
             self::reason(Message::NATIVE_METADATA_REASON_STRING_MAP_REQUIRED, 'versions.1.0.0.dependencies'),

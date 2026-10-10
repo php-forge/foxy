@@ -26,6 +26,8 @@ use function sha1;
 use function sys_get_temp_dir;
 use function uniqid;
 
+use const PHP_EOL;
+
 /**
  * Unit tests for {@see NpmRegistry} metadata requests, 429 back-off, and cached, integrity-verified tarball downloads.
  *
@@ -198,7 +200,7 @@ final class NpmRegistryTest extends TestCase
             'Back-off must follow `Retry-After` or the default schedule.',
         );
         self::assertSame(
-            'Retrying "' . self::METADATA_URL . "\" after a 429 response ({$seconds} s)\n",
+            'Retrying "' . self::METADATA_URL . "\" after a 429 response ({$seconds} s)" . PHP_EOL,
             $this->io->getOutput(),
             'Each retry must be announced.',
         );

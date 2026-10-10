@@ -26,7 +26,7 @@ until `manager` is set to `native` or `foxy.lock` exists. Its scope and limits a
 When `manager` is `null`, `foxy.lock` is now a recognized lockfile. A project that keeps both `foxy.lock` and another
 manager's lockfile must configure `manager` explicitly.
 
-### Custom manager implementations
+### Manager base classes
 
 `AbstractAssetManager` now extends the new `AbstractManifestAssetManager`, which holds the manifest merging, root
 package paths, lock file detection, and fallback restoration shared by every manager. `AbstractAssetManager` keeps

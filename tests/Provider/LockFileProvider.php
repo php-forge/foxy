@@ -31,6 +31,14 @@ final class LockFileProvider
         yield 'package has neither resolved nor file' => [
             self::package(['version' => '5.3.8', 'integrity' => self::INTEGRITY]),
         ];
+        yield 'package is keyed by a traversal name' => [
+            self::encode(
+                [
+                    'requirements' => ['' => ['bootstrap' => '^5.3']],
+                    'packages' => ['../../src' => ['version' => '1.0.0', 'file' => './src']],
+                ],
+            ),
+        ];
         yield 'package is not an object' => [self::package('5.3.8')];
         yield 'package version is missing' => [
             self::package(['resolved' => self::RESOLVED, 'integrity' => self::INTEGRITY]),
@@ -40,6 +48,9 @@ final class LockFileProvider
         ];
         yield 'packages is missing' => [self::encode(['requirements' => ['' => ['bootstrap' => '^5.3']]])];
         yield 'packages is not an object' => [self::encode(['requirements' => [], 'packages' => 'bootstrap'])];
+        yield 'requirement is keyed by a traversal name' => [
+            self::encode(['requirements' => ['' => ['..\\x' => '^1.0']], 'packages' => []]),
+        ];
         yield 'requirement spec is not a string' => [
             self::encode(['requirements' => ['' => ['bootstrap' => 5]], 'packages' => []]),
         ];

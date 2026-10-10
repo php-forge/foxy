@@ -135,9 +135,9 @@ final readonly class NpmRange implements Stringable
     /**
      * Returns the partial version right above `major[.minor]` (`1` -> `2`, `1.2` -> `1.3`) for an exclusive bound.
      */
-    private static function bump(string $major, string|null $minor): string
+    private static function bump(int $major, int|null $minor): string
     {
-        return null === $minor ? (string) ((int) $major + 1) : "{$major}." . ((int) $minor + 1);
+        return null === $minor ? (string) ($major + 1) : "{$major}." . ($minor + 1);
     }
 
     /**
@@ -200,8 +200,8 @@ final readonly class NpmRange implements Stringable
         return match ($operator) {
             '' => "{$version}.*",
             '~' => null === $minor ? "~{$version}" : "~{$version}.0",
-            '>' => '>=' . self::bump($major, $minor),
-            '<=' => '<' . self::bump($major, $minor),
+            '>' => '>=' . self::bump((int) $major, null === $minor ? null : (int) $minor),
+            '<=' => '<' . self::bump((int) $major, null === $minor ? null : (int) $minor),
             default => "{$operator}{$version}",
         };
     }
