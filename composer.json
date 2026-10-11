@@ -65,7 +65,7 @@
     "extra": {
         "class": "Foxy\\Foxy",
         "branch-alias": {
-            "dev-main": "0.4.x-dev"
+            "dev-main": "0.5.x-dev"
         }
     },
     "scripts": {

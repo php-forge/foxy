@@ -48,7 +48,7 @@
 
 ## Installation
 
-Authorize the Composer plugin and install Foxy 0.3:
+Authorize the Composer plugin and install Foxy 0.4:
 
 ```bash
 composer config allow-plugins.php-forge/foxy true
