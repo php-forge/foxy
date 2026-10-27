@@ -1,0 +1,18 @@
+# Local editor and generated runtime state.
+.vscode/**
+runtime/**
+
+# Dependencies.
+node_modules/**
+vendor/**
+
+# Dependency lockfiles.
+composer.lock
+foxy.lock
+
+# License texts ship verbatim.
+**/LICENSE*
+
+# Private maintainer files and coverage reports.
+code_coverage/**
+internal/**

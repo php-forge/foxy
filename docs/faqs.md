@@ -2,8 +2,7 @@
 
 ## Which PHP and Composer versions are required?
 
-Foxy 0.4 requires PHP 8.3 or later and Composer 2.10.2 or later. See the
-[requirements](index.md#requirements).
+Foxy 0.4 requires PHP 8.3 or later and Composer 2.10.2 or later. See the [requirements](index.md#requirements).
 
 ## Why use Foxy instead of documenting frontend dependencies manually?
 
@@ -12,8 +11,8 @@ automation, every application must copy dependency names and constraints manuall
 library release.
 
 Foxy creates local frontend package representations for eligible Composer dependencies, merges them into the project
-`package.json`, and delegates version solving and installation to Bun, Deno, npm, pnpm, or Yarn, or performs both
-itself with the `native` manager.
+`package.json`, and delegates version solving and installation to Bun, Deno, npm, pnpm, or Yarn, or performs both itself
+with the `native` manager.
 
 ## How does package activation work?
 
@@ -38,35 +37,34 @@ different location.
 ## How does Foxy select a frontend manager?
 
 Set `config.foxy.manager` to `bun`, `deno`, `native`, `npm`, `pnpm`, or `yarn` for deterministic selection. When it is
-omitted and manager execution is enabled, Foxy first looks for one recognized lockfile and then for an available
-manager executable. With execution disabled, it uses a single recognized lockfile or npm as the manifest adapter
-without probing binaries. Multiple recognized lockfiles require explicit selection in either mode. The `native`
-manager is selected only explicitly or through its `foxy.lock` file, never by availability. The choice is made when the
-first install, update, or audit needs a manager, so other Composer commands neither probe executables nor report
-selection errors.
+omitted and manager execution is enabled, Foxy first looks for one recognized lockfile and then for an available manager
+executable. With execution disabled, it uses a single recognized lockfile or npm as the manifest adapter without probing
+binaries. Multiple recognized lockfiles require explicit selection in either mode. The `native` manager is selected only
+explicitly or through its `foxy.lock` file, never by availability. The choice is made when the first install, update, or
+audit needs a manager, so other Composer commands neither probe executables nor report selection errors.
 
 Explicit selection and a committed lockfile are recommended for CI.
 
 ## Can Foxy install frontend dependencies without Node.js?
 
-Yes. Set `config.foxy.manager` to `native`. Foxy reads the merged `package.json`, resolves every dependency against
-the npm registry with one version per package, downloads and verifies the tarballs, extracts them into `node_modules`,
-and records the result in `foxy.lock`. PHP with the `zlib` extension is the only requirement. The native manager does
-not run lifecycle scripts and does not create `bin` links. See [Native manager](config.md#native-manager) for the
-complete scope.
+Yes. Set `config.foxy.manager` to `native`. Foxy reads the merged `package.json`, resolves every dependency against the
+npm registry with one version per package, downloads and verifies the tarballs, extracts them into `node_modules`, and
+records the result in `foxy.lock`. PHP with the `zlib` extension is the only requirement. The native manager does not
+run lifecycle scripts and does not create `bin` links. See [Native manager](config.md#native-manager) for the complete
+scope.
 
 ## How can frontend dependencies be checked for known CVEs?
 
-Run `composer foxy:audit`. Foxy audits the dependency graph from the selected manager's own lockfile. The default
-table, plain, and JSON formats identify the affected package, advisory, severity, vulnerable range, and available CVE
+Run `composer foxy:audit`. Foxy audits the dependency graph from the selected manager's own lockfile. The default table,
+plain, and JSON formats identify the affected package, advisory, severity, vulnerable range, and available CVE
 identifiers. Use `--format=summary` for compact counts in CI or `--format=json` for a versioned machine-readable
 document.
 
 The registry's audit response commonly contains a GHSA but no CVE. Foxy resolves that relationship through GitHub's
-public advisory API unless `--no-cve` or `--format=summary` is supplied. The lookups run concurrently through
-Composer's HTTP downloader (at most 12 at once; `COMPOSER_MAX_PARALLEL_HTTP` changes the limit), and a `github-oauth`
-token in Composer's `auth.json` applies to them. A lookup failure marks only its own advisory as unavailable without
-hiding the security finding itself. See [Security auditing](usage.md#security-auditing) for options and exit statuses.
+public advisory API unless `--no-cve` or `--format=summary` is supplied. The lookups run concurrently through Composer's
+HTTP downloader (at most 12 at once; `COMPOSER_MAX_PARALLEL_HTTP` changes the limit), and a `github-oauth` token in
+Composer's `auth.json` applies to them. A lookup failure marks only its own advisory as unavailable without hiding the
+security finding itself. See [Security auditing](usage.md#security-auditing) for options and exit statuses.
 
 ## Why is a dependency's package.json not detected?
 
@@ -75,7 +73,8 @@ Check the following:
 1. The package uses one of the documented activation methods.
 2. Its `package.json` exists at the package root or configured Foxy root.
 3. The root application's `enable-packages` configuration does not exclude it.
-4. When manager execution is enabled, the selected frontend manager is installed and allowed by its configured version constraint.
+4. When manager execution is enabled, the selected frontend manager is installed and allowed by its configured version
+   constraint.
 
 Composer must run before a standalone frontend manager command because Foxy creates the local package representations
 during Composer install and update operations.
@@ -112,8 +111,8 @@ Foxy mock packages contain only metadata needed for runtime dependency resolutio
 lifecycle scripts, executable definitions, `devDependencies`, and unrelated publishing metadata prevents an installed
 Composer dependency from injecting those behaviors into the root frontend install.
 
-Publish built assets with the Composer package, or configure intentional build commands and development dependencies
-in the consuming application's own `package.json`.
+Publish built assets with the Composer package, or configure intentional build commands and development dependencies in
+the consuming application's own `package.json`.
 
 ## Why is my custom composer-asset-dir rejected?
 
@@ -127,21 +126,21 @@ Composer. Foxy accepts an empty custom directory and creates the ownership marke
 
 ## How can the PHP memory limit be increased?
 
-See Composer's [memory limit troubleshooting guide](https://getcomposer.org/doc/articles/troubleshooting.md#memory-limit-errors).
+See Composer's
+[memory limit troubleshooting guide](https://getcomposer.org/doc/articles/troubleshooting.md#memory-limit-errors).
 
 ## How is Foxy related to Fxp Composer Asset Plugin?
 
 [Fxp Composer Asset Plugin](https://github.com/fxpio/composer-asset-plugin) made frontend packages available through
-Composer's solver. Foxy takes the opposite approach: Composer packages expose frontend definitions and a native
-frontend manager performs frontend version solving and installation. Foxy is not backward compatible with Fxp Composer
-Asset Plugin configuration.
+Composer's solver. Foxy takes the opposite approach: Composer packages expose frontend definitions and a native frontend
+manager performs frontend version solving and installation. Foxy is not backward compatible with Fxp Composer Asset
+Plugin configuration.
 
 ## Next steps
 
 - 📚 [Getting started](index.md)
 - ⚙️ [Configuration reference](config.md)
-- 💡 [Usage guide](usage.md)
-- 🔌 [Events reference](events.md)
-- 🧪 [Testing guide](testing.md)
+- 💡 [Usage guide and examples](usage.md)
 - ⬆️ [Upgrade guide](../UPGRADE.md)
-- 📖 [README](../README.md)
+
+[Back to documentation](../README.md#documentation)

@@ -31,9 +31,40 @@ The project may provide its own frontend dependencies in `package.json`:
 }
 ```
 
-During Composer install and update operations, Foxy merges eligible Composer package assets into this file and runs
-the selected frontend manager. Existing non-Foxy dependencies are preserved. With `"manager": "native"`, Foxy
-installs the merged file itself and writes `foxy.lock`; see [Native manager](config.md#native-manager).
+During Composer install and update operations, Foxy merges eligible Composer package assets into this file and runs the
+selected frontend manager. Existing non-Foxy dependencies are preserved. With `"manager": "native"`, Foxy installs the
+merged file itself and writes `foxy.lock`; see [Native manager](config.md#native-manager).
+
+### Merge manifests without running a frontend manager
+
+```json
+{
+  "config": {
+    "foxy": {
+      "run-asset-manager": false
+    }
+  }
+}
+```
+
+Foxy still merges eligible packages; it skips automatic manager probing and execution. This is not an asset install, and
+an explicit `composer foxy:audit` still validates and runs the selected manager.
+
+### Use a project manifest in `web/`
+
+```json
+{
+  "config": {
+    "foxy": {
+      "manager": "npm",
+      "root-package-json-dir": "web"
+    }
+  }
+}
+```
+
+Foxy reads and writes `web/package.json` and runs npm from `web/`. Paths are relative to the Composer project. See
+[package.json directory](config.md#packagejson-directory).
 
 ## Security auditing
 
@@ -49,22 +80,22 @@ report version 2 starting with npm 10.9.8, the current report schemas emitted by
 npm registry's bulk advisories document read by the `native` manager; legacy report formats are rejected instead of
 being interpreted heuristically.
 
-With the `native` manager, `composer foxy:audit` reads `foxy.lock` and asks the configured `registry-url` for
-advisories in one request to npm's bulk advisories endpoint (`POST <registry-url>/-/npm/v1/security/advisories/bulk`),
-sending every locked registry package with its version; local `file:` packages are not sent, and a lock without
-registry packages is clean without a request. `--no-dev` is rejected with status `2` because the native manager
-installs development dependencies together with the others. A registry that does not implement the endpoint fails
-the audit with status `2`.
+With the `native` manager, `composer foxy:audit` reads `foxy.lock` and asks the configured `registry-url` for advisories
+in one request to npm's bulk advisories endpoint (`POST <registry-url>/-/npm/v1/security/advisories/bulk`), sending
+every locked registry package with its version; local `file:` packages are not sent, and a lock without registry
+packages is clean without a request. `--no-dev` is rejected with status `2` because the native manager installs
+development dependencies together with the others. A registry that does not implement the endpoint fails the audit with
+status `2`.
 
 Deno does not provide a machine-readable report. Foxy runs `deno audit --level=low` with `NO_COLOR=1` against
-`deno.lock` and parses its text report strictly. The parser is validated against Deno 2.9.7 and returns status `2`
-when the report layout is not recognized instead of guessing. Deno has no configuration setting that filters audit
-results, and Foxy does not forward manager options to the audit command.
+`deno.lock` and parses its text report strictly. The parser is validated against Deno 2.9.7 and returns status `2` when
+the report layout is not recognized instead of guessing. Deno has no configuration setting that filters audit results,
+and Foxy does not forward manager options to the audit command.
 
 Foxy reports every advisory returned by the manager. `--audit-level` controls only the CI exit threshold:
 
 ```bash
-composer foxy:audit --audit-level=high
+composer foxy:audit --audit-level=high --format=summary
 ```
 
 Valid levels are `low`, `moderate`, `high`, and `critical`; the default is `low`. Use `--no-dev` to audit only the
@@ -77,8 +108,8 @@ composer foxy:audit --no-dev
 For npm workspace roots, Foxy explicitly includes every workspace and the root package so ambient npm workspace
 selection cannot silently narrow the audited lock graph.
 
-`deno audit` cannot exclude development dependencies, so a Deno audit with `--no-dev` returns status `2`. Run the
-Deno audit without `--no-dev` to cover the complete dependency graph.
+`deno audit` cannot exclude development dependencies, so a Deno audit with `--no-dev` returns status `2`. Run the Deno
+audit without `--no-dev` to cover the complete dependency graph.
 
 Foxy also overrides pnpm and Yarn settings that could silently filter the requested dependency graph or known
 advisories. Bun 1.4 cannot safely reset every inherited scope setting while retaining project registry and
@@ -108,8 +139,8 @@ The npm registry's audit data normally identifies advisories by a numeric ID and
 [GitHub global security advisories API](https://docs.github.com/en/rest/security-advisories/global-advisories). The
 lookups run concurrently through Composer's HTTP downloader, at most 12 at once by default; the
 `COMPOSER_MAX_PARALLEL_HTTP` environment variable changes that limit. A `github-oauth` token for `github.com` in
-Composer's `auth.json` applies to these requests and raises GitHub's rate limit. A failed optional lookup marks only
-its own advisory as `unavailable` and does not discard the finding itself or change its audit exit status.
+Composer's `auth.json` applies to these requests and raises GitHub's rate limit. A failed optional lookup marks only its
+own advisory as `unavailable` and does not discard the finding itself or change its audit exit status.
 
 Bun can skip packages from a registry that does not answer its audit request while still returning a successful native
 status. Foxy therefore treats any diagnostic emitted by `bun audit --json` as an unreliable partial report and returns
@@ -131,15 +162,15 @@ Gate a production build on high and critical findings while retaining a compact 
 composer foxy:audit --no-dev --audit-level=high --format=summary
 ```
 
-The explicit command still runs when `run-asset-manager` is `false`; that setting controls automatic install and
-update execution, not a user-requested audit. Foxy must be enabled, the selected binary must satisfy its supported
-version constraint, and the manager's own lockfile must exist. The `native` manager has no binary, so only Foxy and
-`foxy.lock` are required for it.
+The explicit command still runs when `run-asset-manager` is `false`; that setting controls automatic install and update
+execution, not a user-requested audit. Foxy must be enabled, the selected binary must satisfy its supported version
+constraint, and the manager's own lockfile must exist. The `native` manager has no binary, so only Foxy and `foxy.lock`
+are required for it.
 
 ## Library setup
 
-A Composer library becomes eligible for Foxy when it contains the selected manager's package definition and uses one
-of the activation methods below.
+A Composer library becomes eligible for Foxy when it contains the selected manager's package definition and uses one of
+the activation methods below.
 
 ### Required Foxy dependency
 
@@ -165,8 +196,8 @@ Use a development dependency when Foxy is optional for library development:
 }
 ```
 
-The consuming application must still require and authorize Foxy because dependencies of a library are not installed
-from its `require-dev` section.
+The consuming application must still require and authorize Foxy because dependencies of a library are not installed from
+its `require-dev` section.
 
 ### Activation through Composer extra
 
@@ -205,18 +236,18 @@ The embedded manifest must resolve inside the installed library's Composer direc
 
 ## Embedded package metadata
 
-Foxy creates a local package representation for each eligible Composer dependency. It copies only metadata required
-for dependency resolution and compatibility checks. Package lifecycle `scripts`, `devDependencies`, executable
-definitions, entry points, and unrelated publishing metadata are not propagated to the consuming application.
+Foxy creates a local package representation for each eligible Composer dependency. It copies only metadata required for
+dependency resolution and compatibility checks. Package lifecycle `scripts`, `devDependencies`, executable definitions,
+entry points, and unrelated publishing metadata are not propagated to the consuming application.
 
 Library authors should declare runtime frontend requirements in `dependencies`, `optionalDependencies`, or
-`peerDependencies`. Any build step needed to publish those assets should run before the Composer package is released,
-or be configured explicitly by the consuming application.
+`peerDependencies`. Any build step needed to publish those assets should run before the Composer package is released, or
+be configured explicitly by the consuming application.
 
 ## Manually enabling or disabling packages
 
-The root application can use `config.foxy.enable-packages` to include a package that does not declare Foxy or to
-exclude a package that does. See [Package selection](config.md#package-selection).
+The root application can use `config.foxy.enable-packages` to include a package that does not declare Foxy or to exclude
+a package that does. See [Package selection](config.md#package-selection).
 
 ## Behavior and guarantees
 
@@ -226,23 +257,23 @@ exclude a package that does. See [Package selection](config.md#package-selection
 - `root-package-json-dir` controls project reads, writes, and manager working directory.
 - Manager execution does not change the PHP process working directory.
 - The `native` manager installs one version per package into a flat directory (`node_modules` unless
-  `native-install-dir` says otherwise), verifies every tarball against its registry integrity value, and reinstalls
-  from `foxy.lock` without registry metadata requests.
+  `native-install-dir` says otherwise), verifies every tarball against its registry integrity value, and reinstalls from
+  `foxy.lock` without registry metadata requests.
 - Asset restoration occurs when package merging fails or manager execution throws or returns a non-zero result, and
   `fallback-asset` is enabled. It runs before Composer restoration.
 - Composer lock and vendor restoration occurs after any solve exception or non-zero manager result when
   `fallback-composer` is enabled.
 - Read, write, and remove failures are reported through exceptions instead of being silently ignored.
 
-Composer restoration does not include the root `composer.json` bytes. Review that file after a failed
-`composer require` or `composer remove` operation.
+Composer restoration does not include the root `composer.json` bytes. Review that file after a failed `composer require`
+or `composer remove` operation.
 
 ## Next steps
 
 - 📚 [Getting started](index.md)
 - ⚙️ [Configuration reference](config.md)
-- 🔌 [Events reference](events.md)
 - ❓ [Frequently asked questions](faqs.md)
-- 🧪 [Testing guide](testing.md)
-- ⬆️ [Upgrade guide](../UPGRADE.md)
-- 📖 [README](../README.md)
+- 🔌 [Events reference](events.md)
+- 🤖 [AI agents guide](agents.md)
+
+[Back to documentation](../README.md#documentation)

@@ -26,10 +26,16 @@
 /CHANGELOG.md		merge=union
 
 # Exclude files from the archive
+/.agents                        export-ignore
+/.claude                        export-ignore
+/AGENTS.md                      export-ignore
+/internal                       export-ignore
 /.editorconfig                  export-ignore
 /.gitattributes                 export-ignore
 /.github                        export-ignore
 /.gitignore                     export-ignore
+/.prettierignore                export-ignore
+/.prettierrc.json               export-ignore
 /.styleci.yml                   export-ignore
 /codeception.yml                export-ignore
 /composer-require-checker.json  export-ignore

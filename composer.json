@@ -64,23 +64,69 @@
     },
     "extra": {
         "class": "Foxy\\Foxy",
+        "skills": {
+            "source": "skills"
+        },
         "branch-alias": {
             "dev-main": "0.5.x-dev"
         }
     },
     "scripts": {
-        "check-dependencies": "./vendor/bin/composer-require-checker check",
-        "ecs": "./vendor/bin/ecs --fix",
+        "actionlint": "actionlint",
+        "check-dependencies": "composer-require-checker check",
+        "codespell": "codespell --config .github/linters/.codespellrc",
+        "ecs": "ecs check --fix",
+        "ecs-check": "ecs check --ansi",
+        "editorconfig-checker": "editorconfig-checker -config .github/linters/.editorconfig-checker.json",
+        "gitleaks": "gitleaks git --config .github/linters/.gitleaks.toml --redact",
+        "markdownlint": "markdownlint-cli2 --config .github/linters/.markdown-lint.yml '**/*.md'",
         "mutation": [
             "Composer\\Config::disableProcessTimeout",
             "@php -d memory_limit=-1 ./vendor/bin/infection --threads=4 --with-uncovered --min-msi=100 --min-covered-msi=100"
         ],
         "mutation-static": [
             "Composer\\Config::disableProcessTimeout",
-            "@php -d memory_limit=-1 ./vendor/bin/infection --threads=4 --with-uncovered --min-msi=100 --min-covered-msi=100 --static-analysis-tool=phpstan --static-analysis-tool-options='--memory-limit=-1'"
+            "@php -d memory_limit=-1 ./vendor/bin/infection --initial-tests-php-options='-d memory_limit=-1' --test-framework-extra-args='-d memory_limit=-1' --threads=4 --with-uncovered --min-msi=100 --min-covered-msi=100 --static-analysis-tool=phpstan --static-analysis-tool-options='--memory-limit=-1'"
         ],
-        "rector": "./vendor/bin/rector process",
-        "static": "./vendor/bin/phpstan --memory-limit=-1",
-        "tests": "./vendor/bin/phpunit"
+        "prettier": "prettier --check --config .prettierrc.json --ignore-path .prettierignore '**/*.md' '**/*.{yml,yaml}'",
+        "quality": [
+            "@actionlint",
+            "@codespell",
+            "@editorconfig-checker",
+            "@markdownlint",
+            "@prettier",
+            "@yamllint"
+        ],
+        "rector": "rector process",
+        "rector-check": "rector process --dry-run",
+        "security": [
+            "@zizmor",
+            "@gitleaks"
+        ],
+        "static": "phpstan --memory-limit=-1",
+        "tests": "phpunit",
+        "yamllint": "yamllint -c .github/linters/.yamllint.yml .github",
+        "zizmor": "zizmor --persona=pedantic .github"
+    },
+    "scripts-descriptions": {
+        "actionlint": "Lints GitHub Actions workflows with actionlint.",
+        "check-dependencies": "Verifies that used symbols are declared as Composer dependencies.",
+        "codespell": "Checks spelling with codespell.",
+        "ecs": "Applies coding standard fixes with ECS.",
+        "ecs-check": "Checks coding standards with ECS without modifying files.",
+        "editorconfig-checker": "Checks files against the EditorConfig rules.",
+        "gitleaks": "Scans Git history for secrets with Gitleaks.",
+        "markdownlint": "Lints Markdown files with markdownlint-cli2.",
+        "mutation": "Runs mutation testing with Infection.",
+        "mutation-static": "Runs mutation testing with Infection and PHPStan static analysis.",
+        "prettier": "Checks Markdown and YAML formatting with Prettier.",
+        "quality": "Runs all repository quality checks.",
+        "rector": "Applies automated refactoring with Rector.",
+        "rector-check": "Previews Rector refactoring without modifying files.",
+        "security": "Runs the workflow security and secret scanning checks.",
+        "static": "Runs static analysis with PHPStan.",
+        "tests": "Runs PHPUnit.",
+        "yamllint": "Lints YAML files with yamllint.",
+        "zizmor": "Audits GitHub Actions workflows with zizmor."
     }
 }
