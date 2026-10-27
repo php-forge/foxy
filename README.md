@@ -73,9 +73,9 @@ Selecting a manager explicitly is recommended for reproducible local and CI beha
 }
 ```
 
-Valid manager values are `bun`, `deno`, `native`, `npm`, `pnpm`, and `yarn`. When automatic manager execution is
-enabled and `manager` is omitted, Foxy first looks for one recognized lockfile and then checks available executables.
-Configure the manager explicitly when the project contains lockfiles from more than one manager.
+Valid manager values are `bun`, `deno`, `native`, `npm`, `pnpm`, and `yarn`. When automatic manager execution is enabled
+and `manager` is omitted, Foxy first looks for one recognized lockfile and then checks available executables. Configure
+the manager explicitly when the project contains lockfiles from more than one manager.
 
 During automatic Composer processing, `run-asset-manager=false` prevents Foxy from requiring or probing a manager
 binary. Automatic selection uses the single recognized lockfile when present, or npm as the manifest adapter when no
@@ -83,9 +83,9 @@ lockfile exists. An explicit `composer foxy:audit` still validates and runs the 
 
 ## Without Node.js
 
-Set `manager` to `native` and Foxy resolves the merged `package.json` against the npm registry, downloads the
-tarballs, verifies their integrity, and extracts them into a flat `node_modules` directory using PHP alone (or into
-the directory `native-install-dir` names):
+Set `manager` to `native` and Foxy resolves the merged `package.json` against the npm registry, downloads the tarballs,
+verifies their integrity, and extracts them into a flat `node_modules` directory using PHP alone (or into the directory
+`native-install-dir` names):
 
 ```json
 {
@@ -99,8 +99,8 @@ the directory `native-install-dir` names):
 
 The selected versions are recorded in `foxy.lock`; commit it so that `composer install` reinstalls the same versions
 without any registry metadata request. Tarballs come from the Composer cache, or are downloaded again from the URLs
-recorded in the lock when the cache is empty. The native manager keeps one version per package, like asset-packagist, and
-does not run lifecycle scripts. `native-install-dir` moves the install directory, for example to `vendor/npm-asset`
+recorded in the lock when the cache is empty. The native manager keeps one version per package, like asset-packagist,
+and does not run lifecycle scripts. `native-install-dir` moves the install directory, for example to `vendor/npm-asset`
 for Yii 2's default `@npm` alias. See the [native manager reference](docs/config.md#native-manager) for its scope.
 
 ## Frontend security audit
@@ -115,9 +115,8 @@ composer foxy:audit --format=summary --no-dev --audit-level=high
 Foxy normalizes the current npm, pnpm, Yarn, Bun, Deno, and native audit reports and identifies the affected package,
 advisory, severity, vulnerable range, and CVE identifiers when GitHub maps the advisory to a CVE. The command returns
 `0` when no advisory meets the configured threshold, `1` when at least one does, and `2` when the audit cannot be
-completed reliably. With Deno and the `native` manager, `--no-dev` is rejected because neither can exclude
-development dependencies.
-See the [usage guide](docs/usage.md#security-auditing) for formats and CI examples.
+completed reliably. With Deno and the `native` manager, `--no-dev` is rejected because neither can exclude development
+dependencies. See the [usage guide](docs/usage.md#security-auditing) for formats and CI examples.
 
 ## Quick start
 
@@ -145,18 +144,32 @@ Composer may remain at the repository root while frontend tooling runs from `web
 }
 ```
 
-Foxy reads and writes `web/package.json` and runs the selected manager from `web/`. Relative paths are resolved from
-the Composer project directory.
+Foxy reads and writes `web/package.json` and runs the selected manager from `web/`. Relative paths are resolved from the
+Composer project directory.
 
 ## Documentation
 
-- [Getting started](docs/index.md)
-- [Configuration reference](docs/config.md)
-- [Usage guide](docs/usage.md)
-- [Events reference](docs/events.md)
-- [Frequently asked questions](docs/faqs.md)
-- [Upgrade guide](UPGRADE.md)
-- [Testing guide](docs/testing.md)
+- 📚 [Getting started](docs/index.md)
+- ⚙️ [Configuration reference](docs/config.md)
+- 💡 [Usage guide and examples](docs/usage.md)
+- 🔌 [Events reference](docs/events.md)
+- ❓ [Frequently asked questions](docs/faqs.md)
+- 🤖 [AI agents guide](docs/agents.md)
+- ⬆️ [Upgrade guide](UPGRADE.md) and [migration guide](docs/migration.md)
+- 🧪 [Testing guide](docs/testing.md)
+
+## AI assistance
+
+AI agents can use the [documentation index](https://yii2-framework.github.io/docs/llms.txt) to discover pages and fetch
+a page's Markdown version by appending `index.md` to its URL. The
+[AI agents guide](https://yii2-framework.github.io/docs/project/ai-agents/) covers skill installation, client setup, and
+verification.
+
+- 🤖 [`php-forge-foxy` skill](docs/agents.md): configure asset integration and audits.
+
+Match the documentation to the installed Foxy revision. If the hosted documentation is unavailable or does not match,
+use the [repository guides](#documentation), [skill source](skills/php-forge-foxy/SKILL.md), source PHPDoc, and
+[changelog](CHANGELOG.md).
 
 ## Package information
 
@@ -164,16 +177,22 @@ the Composer project directory.
 [![Latest Stable Version](https://img.shields.io/packagist/v/php-forge/foxy.svg?style=for-the-badge&logo=packagist&logoColor=white&label=Stable)](https://packagist.org/packages/php-forge/foxy)
 [![Total Downloads](https://img.shields.io/packagist/dt/php-forge/foxy.svg?style=for-the-badge&logo=composer&logoColor=white&label=Downloads)](https://packagist.org/packages/php-forge/foxy)
 
-## Code quality
+## Project status
 
 [![Codecov](https://img.shields.io/codecov/c/github/php-forge/foxy.svg?style=for-the-badge&logo=codecov&logoColor=white&label=Coverage)](https://codecov.io/gh/php-forge/foxy)
 [![PHPStan Level 5](https://img.shields.io/badge/PHPStan-Level%205-4F5D95.svg?style=for-the-badge&logo=github&logoColor=white)](https://github.com/php-forge/foxy/actions/workflows/static.yml)
 [![Quality](https://img.shields.io/github/actions/workflow/status/php-forge/foxy/quality.yml?style=for-the-badge&label=Quality&logo=github)](https://github.com/php-forge/foxy/actions/workflows/quality.yml)
 [![StyleCI](https://img.shields.io/badge/StyleCI-Passed-44CC11.svg?style=for-the-badge&logo=github&logoColor=white)](https://github.styleci.io/repos/745652761?branch=main)
 
-## Community
+## Our social networks
 
 [![Follow on X](https://img.shields.io/badge/-Follow%20on%20X-1DA1F2.svg?style=for-the-badge&logo=x&logoColor=white&labelColor=000000)](https://x.com/Terabytesoftw)
+
+## Built with AI
+
+[![Built with Claude Code](https://img.shields.io/badge/Built%20with-Claude%20Code-D97757.svg?style=for-the-badge&logo=claude&logoColor=white)](https://claude.com/claude-code)
+[![Built with Codex](https://img.shields.io/badge/Built%20with-Codex-10A37F.svg?style=for-the-badge&logo=openaigym&logoColor=white)](https://openai.com/codex)
+[![Reviewed by CodeRabbit](https://img.shields.io/badge/Reviewed%20by-CodeRabbit-FF570A.svg?style=for-the-badge&logo=coderabbit&logoColor=white)](https://www.coderabbit.ai)
 
 ## License
 

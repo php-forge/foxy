@@ -1,5 +1,12 @@
 ---
-MD007:
-  indent: 2
-MD013: false
-MD033: false
+config:
+  MD007:
+    indent: 2
+  MD013: false
+  MD033: false
+ignores:
+  - .vscode/**
+  - vendor/**
+  - node_modules/**
+  - internal/**
+  - runtime/**

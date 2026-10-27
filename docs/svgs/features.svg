@@ -42,24 +42,8 @@
             </style>
             <div class="container">
                 <div class="alert-box">
-                    <p class="alert-title"><strong>Dependency aggregation</strong></p>
-                    <p class="alert-content">Collects frontend requirements from installed Composer packages</p>
-                </div>
-                <div class="alert-box">
-                    <p class="alert-title"><strong>Native manager support</strong></p>
-                    <p class="alert-content">Delegates solving to Bun, Deno, npm, pnpm, or Yarn</p>
-                </div>
-                <div class="alert-box">
                     <p class="alert-title"><strong>Automatic selection</strong></p>
                     <p class="alert-content">Detects one native lockfile, then an available executable</p>
-                </div>
-                <div class="alert-box">
-                    <p class="alert-title"><strong>Flexible project roots</strong></p>
-                    <p class="alert-content">Supports <code>package.json</code> outside Composer root via <code>root-package-json-dir</code></p>
-                </div>
-                <div class="alert-box">
-                    <p class="alert-title"><strong>Protected mock directory</strong></p>
-                    <p class="alert-content">Validates paths and ownership before recursive replacement</p>
                 </div>
                 <div class="alert-box">
                     <p class="alert-title"><strong>Configurable recovery</strong></p>
@@ -68,6 +52,22 @@
                 <div class="alert-box">
                     <p class="alert-title"><strong>Defensive I/O</strong></p>
                     <p class="alert-content">Throws an explicit <code>RuntimeException</code> on read, write, or remove failures</p>
+                </div>
+                <div class="alert-box">
+                    <p class="alert-title"><strong>Dependency aggregation</strong></p>
+                    <p class="alert-content">Collects frontend requirements from installed Composer packages</p>
+                </div>
+                <div class="alert-box">
+                    <p class="alert-title"><strong>Flexible project roots</strong></p>
+                    <p class="alert-content">Supports <code>package.json</code> outside Composer root via <code>root-package-json-dir</code></p>
+                </div>
+                <div class="alert-box">
+                    <p class="alert-title"><strong>Native manager support</strong></p>
+                    <p class="alert-content">Delegates solving to Bun, Deno, npm, pnpm, or Yarn</p>
+                </div>
+                <div class="alert-box">
+                    <p class="alert-title"><strong>Protected mock directory</strong></p>
+                    <p class="alert-content">Validates paths and ownership before recursive replacement</p>
                 </div>
                 <div class="alert-box">
                     <p class="alert-title"><strong>Stable execution</strong></p>

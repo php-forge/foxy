@@ -23,16 +23,16 @@ Values are resolved in this order, from highest to lowest priority:
 5. Foxy defaults.
 
 Global values must be placed under `config.foxy` in one of the two Composer home files. Composer does not accept
-arbitrary nested options through `composer global config`, but `composer global config --editor` can be used to edit
-the global file directly.
+arbitrary nested options through `composer global config`, but `composer global config --editor` can be used to edit the
+global file directly.
 
 ## Environment variables
 
 Convert an option name to uppercase, replace hyphens with underscores, and prefix it with `FOXY__`. For example,
 `run-asset-manager` becomes `FOXY__RUN_ASSET_MANAGER`.
 
-Foxy accepts strings, integers, case-insensitive boolean values (`true`, `false`, `yes`, `no`, `y`, `n`, `1`, and
-`0`), and JSON arrays or objects.
+Foxy accepts strings, integers, case-insensitive boolean values (`true`, `false`, `yes`, `no`, `y`, `n`, `1`, and `0`),
+and JSON arrays or objects.
 
 ```bash
 FOXY__ENABLED=false composer install
@@ -103,9 +103,9 @@ Foxy resolves the manager when the first install, update, or audit needs it, not
 Composer commands that do none of these (for example `about`, `show`, or `validate`) never probe an executable.
 Selection errors are therefore reported by the first command that needs the manager.
 
-When `run-asset-manager` is `false`, automatic selection does not probe executables. Foxy uses the manager identified
-by a single recognized lockfile, or npm as the manifest adapter when no lockfile exists. Multiple lockfiles still
-require an explicit `manager` value.
+When `run-asset-manager` is `false`, automatic selection does not probe executables. Foxy uses the manager identified by
+a single recognized lockfile, or npm as the manifest adapter when no lockfile exists. Multiple lockfiles still require
+an explicit `manager` value.
 
 ## Manager version constraints
 
@@ -123,11 +123,10 @@ The `native` manager has no binary and no version constraint; `manager-version`,
 `manager-install-options`, `manager-update-options`, and `manager-timeout` do not apply to it.
 
 The `manager-version` option adds another Composer constraint that is evaluated together with the built-in constraint.
-It can narrow the accepted versions for a project, but it cannot replace or widen Foxy's supported range.
-Foxy treats the reported value as one concrete release and validates it from `root-package-json-dir` before every
-manager command. During automatic Composer processing, `run-asset-manager=false` prevents probing, execution, and
-validation of the manager binary. An explicit `composer foxy:audit` remains an exception because it is a direct user
-request.
+It can narrow the accepted versions for a project, but it cannot replace or widen Foxy's supported range. Foxy treats
+the reported value as one concrete release and validates it from `root-package-json-dir` before every manager command.
+During automatic Composer processing, `run-asset-manager=false` prevents probing, execution, and validation of the
+manager binary. An explicit `composer foxy:audit` remains an exception because it is a direct user request.
 
 Narrow the npm constraint for one project:
 
@@ -157,8 +156,8 @@ Manager-prefixed options may also use a map when a shared configuration supports
 }
 ```
 
-For example, configuring npm with `<10.9.8` does not enable an older release because the built-in `>=10.9.8`
-constraint remains in force. Remove `manager-version` to accept the complete built-in range for the selected manager.
+For example, configuring npm with `<10.9.8` does not enable an older release because the built-in `>=10.9.8` constraint
+remains in force. Remove `manager-version` to accept the complete built-in range for the selected manager.
 
 ## Manager executable and options
 
@@ -190,11 +189,11 @@ Use the three manager option settings only when native manager configuration fil
 }
 ```
 
-These values are appended to an external command. Treat project, global, and environment configuration as trusted
-input. Prefer native files such as `.npmrc`, `.yarnrc.yml`, `pnpm-workspace.yaml`, or `bunfig.toml` where appropriate.
-They apply to install and update operations only. `foxy:audit` owns its machine-output, advisory-filter, and
-dependency-scope flags and does not inherit these options. It does honor `manager-bin`, `manager-version`,
-`manager-timeout`, and `root-package-json-dir`.
+These values are appended to an external command. Treat project, global, and environment configuration as trusted input.
+Prefer native files such as `.npmrc`, `.yarnrc.yml`, `pnpm-workspace.yaml`, or `bunfig.toml` where appropriate. They
+apply to install and update operations only. `foxy:audit` owns its machine-output, advisory-filter, and dependency-scope
+flags and does not inherit these options. It does honor `manager-bin`, `manager-version`, `manager-timeout`, and
+`root-package-json-dir`.
 
 Where the native manager supports an explicit override, Foxy neutralizes inherited settings that could exclude
 dependencies or advisories. Bun 1.4 cannot reset every inherited dependency-scope setting without also discarding
@@ -222,10 +221,10 @@ registers each Composer asset directory as a member of the `workspaces` list in 
 - Existing `workspaces` entries are preserved and kept before the Foxy-managed members. Foxy removes a member when its
   Composer asset is removed, and removes the `workspaces` field when no entry remains.
 - `workspaces` must be a list of strings. The object form with a `packages` key is rejected.
-- Composer assets must be located in a subdirectory of the root package directory because Deno rejects workspace
-  members outside it. Foxy writes each member as a normalized path relative to that directory. A
-  `root-package-json-dir` that excludes the Composer vendor directory, or a `composer-asset-dir` outside the root
-  package directory, is not supported with Deno.
+- Composer assets must be located in a subdirectory of the root package directory because Deno rejects workspace members
+  outside it. Foxy writes each member as a normalized path relative to that directory. A `root-package-json-dir` that
+  excludes the Composer vendor directory, or a `composer-asset-dir` outside the root package directory, is not supported
+  with Deno.
 - Updates run `deno update --lockfile-only --recursive && deno install`. The first step updates `deno.lock` within the
   declared version ranges, and the second installs the locked dependencies. `manager-options` applies to both steps,
   `manager-update-options` to the update step, and `manager-install-options` to the install step.
@@ -261,47 +260,47 @@ Set `manager` to `native` to install the frontend dependencies without Bun, Deno
 
 Foxy then performs the installation itself, in PHP:
 
-- It reads `dependencies`, `devDependencies`, and `optionalDependencies` from the merged root `package.json`; as in
-  npm, an `optionalDependencies` entry overrides a `dependencies` entry of the same name. Each `file:` entry (the
-  Composer assets and any other local package) is copied into `node_modules/<name>`, and its own `dependencies`,
-  non-optional `peerDependencies`, and `optionalDependencies` join the resolution with the same override rule.
-- It resolves every other dependency against the registry with asset-packagist semantics: a flat `node_modules`
-  with one version per package. Constraints from the root manifest, the local packages, and the transitive
-  `dependencies`, `peerDependencies`, and `optionalDependencies` are intersected per package name, and the highest
-  satisfying version wins. When a later constraint forces a package to a lower version, the constraints that its
-  abandoned version had introduced are withdrawn, and optional dependencies never block a required one. Dist-tags
-  such as `latest` or `next` are honored. The resolver never backtracks to an older version of a package to escape
-  a conflict that the dependencies of its highest acceptable version introduce; such a conflict, like one that only
-  nested `node_modules` could solve, is reported as an error that names every constraint and its origin. Install
-  such a project with a JavaScript manager instead.
-  Unsatisfiable or missing optional dependencies are skipped with a warning, together with the whole subtree of an
-  optional package whose own dependencies cannot be installed, and a deprecated selection is reported with the
+- It reads `dependencies`, `devDependencies`, and `optionalDependencies` from the merged root `package.json`; as in npm,
+  an `optionalDependencies` entry overrides a `dependencies` entry of the same name. Each `file:` entry (the Composer
+  assets and any other local package) is copied into `node_modules/<name>`, and its own `dependencies`, non-optional
+  `peerDependencies`, and `optionalDependencies` join the resolution with the same override rule.
+- It resolves every other dependency against the registry with asset-packagist semantics: a flat `node_modules` with one
+  version per package. Constraints from the root manifest, the local packages, and the transitive `dependencies`,
+  `peerDependencies`, and `optionalDependencies` are intersected per package name, and the highest satisfying version
+  wins. When a later constraint forces a package to a lower version, the constraints that its abandoned version had
+  introduced are withdrawn, and optional dependencies never block a required one. Dist-tags such as `latest` or `next`
+  are honored. The resolver never backtracks to an older version of a package to escape a conflict that the dependencies
+  of its highest acceptable version introduce; such a conflict, like one that only nested `node_modules` could solve, is
+  reported as an error that names every constraint and its origin. Install such a project with a JavaScript manager
+  instead. Unsatisfiable or missing optional dependencies are skipped with a warning, together with the whole subtree of
+  an optional package whose own dependencies cannot be installed, and a deprecated selection is reported with the
   registry's deprecation text. A `file:` package keeps the version its manifest declares; a constraint from another
-  package that this version does not satisfy is reported as a conflict, unless the `file:` entry is itself optional,
-  in which case the local package is dropped like any other optional dependency.
-- It downloads each tarball from the URL published by the registry, verifies it against the registry's
-  `integrity` value (SHA-512, with the legacy SHA-1 `shasum` as a fallback), and extracts it into
-  `node_modules/<name>`, stripping the archive's top-level directory like npm does. Tarballs are cached in
-  `<cache-files-dir>/foxy/` and are subject to Composer's `cache-files-ttl`, `cache-files-maxsize`, and
-  `cache-read-only` settings; every cached tarball is verified again before use.
-- It writes `foxy.lock`, which records the root requirements and the requirements of every local package (regular
-  and optional ones apart), and the selected version, tarball URL, and integrity of every installed package. `composer install` with a lock that
-  matches the current manifests installs exactly those tarballs without a single metadata request;
-  `composer update`, or a lock that no longer matches, resolves again and rewrites the lock. Commit `foxy.lock`.
+  package that this version does not satisfy is reported as a conflict, unless the `file:` entry is itself optional, in
+  which case the local package is dropped like any other optional dependency.
+- It downloads each tarball from the URL published by the registry, verifies it against the registry's `integrity` value
+  (SHA-512, with the legacy SHA-1 `shasum` as a fallback), and extracts it into `node_modules/<name>`, stripping the
+  archive's top-level directory like npm does. Tarballs are cached in `<cache-files-dir>/foxy/` and are subject to
+  Composer's `cache-files-ttl`, `cache-files-maxsize`, and `cache-read-only` settings; every cached tarball is verified
+  again before use.
+- It writes `foxy.lock`, which records the root requirements and the requirements of every local package (regular and
+  optional ones apart), and the selected version, tarball URL, and integrity of every installed package.
+  `composer install` with a lock that matches the current manifests installs exactly those tarballs without a single
+  metadata request; `composer update`, or a lock that no longer matches, resolves again and rewrites the lock. Commit
+  `foxy.lock`.
 - It records what it installed in `.foxy-installed.json` inside the install directory, the counterpart of npm's
   `node_modules/.package-lock.json`: the `foxy.lock` entry of every package left in place. A registry package whose
   directory exists and whose entry matches the lock is kept untouched, so a warm install extracts nothing; a package
-  whose entry differs or whose directory is missing is extracted again. `file:` packages are always copied again,
-  since their content can change without a version change. The file is removed at the start of each installation and
-  written at its end, so an interrupted installation leaves none behind. A missing or malformed file only forces every
-  registry package to be extracted again, as happens once on the first install that creates it; deleting it is always
-  safe. Like every dot-entry, the pruning leaves it alone. Do not commit it.
-- It removes entries of the install directory that are not part of the installation (dot-entries such as `.bin`
-  are left alone).
+  whose entry differs or whose directory is missing is extracted again. `file:` packages are always copied again, since
+  their content can change without a version change. The file is removed at the start of each installation and written
+  at its end, so an interrupted installation leaves none behind. A missing or malformed file only forces every registry
+  package to be extracted again, as happens once on the first install that creates it; deleting it is always safe. Like
+  every dot-entry, the pruning leaves it alone. Do not commit it.
+- It removes entries of the install directory that are not part of the installation (dot-entries such as `.bin` are left
+  alone).
 
-The install directory is `node_modules` next to `package.json` by default. `native-install-dir` changes it; a
-relative value is resolved from `root-package-json-dir`, an absolute value is used as is. A Yii 2 application that
-keeps the framework's default `@npm` alias can install straight into `vendor/npm-asset`:
+The install directory is `node_modules` next to `package.json` by default. `native-install-dir` changes it; a relative
+value is resolved from `root-package-json-dir`, an absolute value is used as is. A Yii 2 application that keeps the
+framework's default `@npm` alias can install straight into `vendor/npm-asset`:
 
 ```json
 {
@@ -314,16 +313,15 @@ keeps the framework's default `@npm` alias can install straight into `vendor/npm
 }
 ```
 
-Foxy owns that directory: every entry that the lock does not list is removed on every install, except entries whose
-name starts with a dot (such as `.bin`), so do not point it at a directory that also receives asset-packagist
-packages from Composer. The root package directory, any of its parents, filesystem roots, and a directory that
-overlaps a local `file:` package in either direction are rejected; symbolic links in the path are resolved before
-that check as far as PHP's `realpath()` resolves them, which is incomplete on Windows, so treat the check as lexical
-there. A symbolic link found inside the directory is removed as a link, never followed. Package
-names read from `package.json`, `foxy.lock`, and the registry must follow npm's name grammar (an optional `@scope/`
-followed by a name of letters, digits, `.`, `_`, and `-`, up to 214 characters); any other name is rejected before a
-path is built from it. Scoped packages keep the npm layout (`vendor/npm-asset/@popperjs/core`), not asset-packagist's
-`popperjs--core` form.
+Foxy owns that directory: every entry that the lock does not list is removed on every install, except entries whose name
+starts with a dot (such as `.bin`), so do not point it at a directory that also receives asset-packagist packages from
+Composer. The root package directory, any of its parents, filesystem roots, and a directory that overlaps a local
+`file:` package in either direction are rejected; symbolic links in the path are resolved before that check as far as
+PHP's `realpath()` resolves them, which is incomplete on Windows, so treat the check as lexical there. A symbolic link
+found inside the directory is removed as a link, never followed. Package names read from `package.json`, `foxy.lock`,
+and the registry must follow npm's name grammar (an optional `@scope/` followed by a name of letters, digits, `.`, `_`,
+and `-`, up to 214 characters); any other name is rejected before a path is built from it. Scoped packages keep the npm
+layout (`vendor/npm-asset/@popperjs/core`), not asset-packagist's `popperjs--core` form.
 
 The native manager requires the PHP `zlib` extension. Its output follows Composer's verbosity levels: at normal
 verbosity it prints only changes (`Installing`, `Updating`, and `Removing` lines), or
@@ -331,13 +329,13 @@ verbosity it prints only changes (`Installing`, `Updating`, and `Removing` lines
 unchanged `file:` package copied again; `-vv` adds the registry traffic (metadata requests, tarball downloads,
 prefetches, and cache hits); `-vvv` adds Composer's own HTTP log.
 
-Its registry requests go through Composer's HTTP layer: proxies, `cafile`, `disable-tls`, and the credentials stored
-in `auth.json` for the registry host all apply, so a private registry can be configured with `registry-url` plus
-Composer authentication. Credentials are matched against the request's `host:port` exactly as written in
-`registry-url`: `localhost` and `127.0.0.1` are not aliases of each other, and the `auth.json` key must include the
-port when it is not the scheme's default (`npm.example.com:4873`). A plain `http://` registry also needs Composer's
-`config.secure-http` set to `false`. A registry that answers 401 or 403 fails the request with Composer's error text,
-as any other registry failure does:
+Its registry requests go through Composer's HTTP layer: proxies, `cafile`, `disable-tls`, and the credentials stored in
+`auth.json` for the registry host all apply, so a private registry can be configured with `registry-url` plus Composer
+authentication. Credentials are matched against the request's `host:port` exactly as written in `registry-url`:
+`localhost` and `127.0.0.1` are not aliases of each other, and the `auth.json` key must include the port when it is not
+the scheme's default (`npm.example.com:4873`). A plain `http://` registry also needs Composer's `config.secure-http` set
+to `false`. A registry that answers 401 or 403 fails the request with Composer's error text, as any other registry
+failure does:
 
 ```json
 {
@@ -357,27 +355,27 @@ implement it, and a registry that does not fails the audit with status `2`. Verd
 `audit` middleware enabled (`middlewares: audit: enabled: true`); its default configuration answers 404. HTTP 429
 responses are retried up to three times, honoring `Retry-After` up to 60 seconds; other failures are reported
 immediately. Tarballs missing from the cache are first downloaded in parallel through Composer's HTTP downloader
-(`COMPOSER_MAX_PARALLEL_HTTP` sets the limit, 12 by default) and then verified and installed one by one; a tarball
-whose parallel download fails is requested again on its own, with the retries above, and its error is reported then.
-With `cache-read-only` or an unwritable cache, tarballs are downloaded one by one only.
+(`COMPOSER_MAX_PARALLEL_HTTP` sets the limit, 12 by default) and then verified and installed one by one; a tarball whose
+parallel download fails is requested again on its own, with the retries above, and its error is reported then. With
+`cache-read-only` or an unwritable cache, tarballs are downloaded one by one only.
 
 The native manager implements the subset that frontend assets need. It does not support:
 
-- `npm:` aliases, `git`, `github:`, `http(s)`, `workspace:`, and `link:` specifications; each is rejected with an
-  error that names the dependency.
+- `npm:` aliases, `git`, `github:`, `http(s)`, `workspace:`, and `link:` specifications; each is rejected with an error
+  that names the dependency.
 - Nested `node_modules`: two packages that require incompatible versions of the same dependency cannot be installed
   together.
 - Lifecycle scripts (`preinstall`, `install`, `postinstall`, `prepare`), `bin` links, `os`, `cpu`, and `engines`
-  filters, `overrides`, and `resolutions`. Scripts are never executed; packages that need a build step at install
-  time must be installed with a JavaScript manager.
-- Prerelease identifiers that Composer's version parser does not understand, such as `5.0.0-next.3` or
-  `1.0.0-canary.1`: those versions are skipped, and a range or dist-tag that selects one is rejected. Prereleases
-  named `alpha`, `beta`, `RC`, `dev`, and `patch` are matched with npm's rule: only a range that names a prerelease
-  of the same `major.minor.patch` can select it.
+  filters, `overrides`, and `resolutions`. Scripts are never executed; packages that need a build step at install time
+  must be installed with a JavaScript manager.
+- Prerelease identifiers that Composer's version parser does not understand, such as `5.0.0-next.3` or `1.0.0-canary.1`:
+  those versions are skipped, and a range or dist-tag that selects one is rejected. Prereleases named `alpha`, `beta`,
+  `RC`, `dev`, and `patch` are matched with npm's rule: only a range that names a prerelease of the same
+  `major.minor.patch` can select it.
 - Symbolic and hard links inside tarballs (skipped) and `..` or absolute entry paths (rejected).
 
-Selection by availability is also disabled for this manager: without `manager: native` or a `foxy.lock` file, a
-project without a JavaScript manager still reports `No asset manager was found.`.
+Selection by availability is also disabled for this manager: without `manager: native` or a `foxy.lock` file, a project
+without a JavaScript manager still reports `No asset manager was found.`.
 
 ## Manager timeout
 
@@ -434,8 +432,8 @@ Both fallbacks are enabled by default. They can be controlled independently:
 
 Foxy restores `package.json` first and Composer state second, and attempts the Composer restoration even when the
 `package.json` restoration fails. It rethrows the original solve error when restoration succeeds. If a restoration also
-fails, Foxy reports the rollback failure and retains the original error as the previous exception. Disabled fallbacks
-do not create snapshots.
+fails, Foxy reports the rollback failure and retains the original error as the previous exception. Disabled fallbacks do
+not create snapshots.
 
 Composer lock and vendor state are captured at Composer's `pre-operations-exec` event. This is not a fully atomic
 transaction for `composer require` or `composer remove`: Composer may update the root `composer.json` before that event,
@@ -516,15 +514,14 @@ Relative root-project paths are resolved from the Composer project directory. Ab
 supported.
 
 In an installed Composer library, the same option is resolved relative to that library's installation directory and
-identifies the directory containing its embedded `package.json`. The resolved manifest must remain inside the
-library's Composer installation directory.
+identifies the directory containing its embedded `package.json`. The resolved manifest must remain inside the library's
+Composer installation directory.
 
 ## Next steps
 
 - 📚 [Getting started](index.md)
-- 💡 [Usage guide](usage.md)
+- 💡 [Usage guide and examples](usage.md)
 - 🔌 [Events reference](events.md)
 - ❓ [Frequently asked questions](faqs.md)
-- 🧪 [Testing guide](testing.md)
-- ⬆️ [Upgrade guide](../UPGRADE.md)
-- 📖 [README](../README.md)
+
+[Back to documentation](../README.md#documentation)

@@ -44,6 +44,14 @@ composer require php-forge/foxy:^0.4
 
 The plugin is installed in the configured Composer vendor directory, normally `vendor/php-forge/foxy`.
 
+### Verify the installation
+
+Check the installed package version before configuring and installing project assets:
+
+```bash
+composer show php-forge/foxy
+```
+
 ## Manager selection
 
 Set `config.foxy.manager` to `bun`, `deno`, `native`, `npm`, `pnpm`, or `yarn` when reproducible manager selection is
@@ -61,9 +69,8 @@ Commit the selected manager's own lockfile and use the same explicit manager in 
 ## Next steps
 
 - ⚙️ [Configuration reference](config.md)
-- 💡 [Usage guide](usage.md)
-- 🔌 [Events reference](events.md)
-- ❓ [Frequently asked questions](faqs.md)
+- 💡 [Usage guide and examples](usage.md)
+- 🤖 [AI agents guide](agents.md)
 - ⬆️ [Upgrade guide](../UPGRADE.md)
-- 🧪 [Testing guide](testing.md)
-- 📖 [README](../README.md)
+
+[Back to documentation](../README.md#documentation)
