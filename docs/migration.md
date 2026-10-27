@@ -30,10 +30,12 @@ A CI job that relied on any Composer command failing early because of a missing 
 
 ### Native manager
 
-- `composer foxy:audit` audits the `native` manager through the registry's bulk advisories endpoint
-  (`POST /-/npm/v1/security/advisories/bulk`). `--no-dev` is rejected, as for Deno, because the native manager installs
-  the development dependencies together with the others. A private registry must implement that endpoint (Verdaccio:
-  enable its `audit` middleware); otherwise the audit fails with status `2`.
+- `composer foxy:audit` sends the registry packages in `foxy.lock` to the registry's bulk advisories endpoint
+  (`POST /-/npm/v1/security/advisories/bulk`). Local `file:` packages are excluded, and a lock containing only local
+  packages is clean without a registry request. When registry packages remain, a private registry must implement that
+  endpoint (Verdaccio: enable its `audit` middleware); otherwise the audit fails with status `2`. Independently,
+  `--no-dev` is rejected, as for Deno, because the native manager installs the development dependencies together with
+  the others.
 - The install directory gains a hidden `.foxy-installed.json` file that records what Foxy installed. The first install
   after the upgrade extracts every registry package once and writes it; later installs keep the registry packages whose
   directory and recorded entry still match `foxy.lock`, copy the `file:` packages again, and report only what changed,

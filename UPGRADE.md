@@ -19,8 +19,9 @@ list released incompatibilities.
 
 <a id="native-manager"></a>
 
-- Native audits require the registry bulk advisories endpoint and reject `--no-dev`; use a compatible registry and audit
-  the complete graph. The first native install writes `.foxy-installed.json` and extracts registry packages once.
+- Native audits require the registry bulk advisories endpoint when `foxy.lock` contains registry packages. A lock with
+  only local `file:` packages skips the registry request. Native audits still reject `--no-dev`, so audit the complete
+  graph. The first native install writes `.foxy-installed.json` and extracts registry packages once.
 
 <a id="rollbacks"></a>
 

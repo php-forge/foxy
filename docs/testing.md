@@ -89,8 +89,8 @@ composer prettier
 composer yamllint
 ```
 
-The codespell, EditorConfig Checker and Markdownlint configurations are in `.github/linters`. Prettier uses `.gitignore`
-as its ignore path; yamllint checks `.github`.
+The codespell, EditorConfig Checker and Markdownlint configurations are in `.github/linters`. Prettier uses
+`.prettierignore` as its ignore path; yamllint checks `.github`.
 
 ## Static analysis (PHPStan)
 
