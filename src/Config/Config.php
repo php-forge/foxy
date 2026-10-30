@@ -19,6 +19,9 @@ use function strtolower;
 use function strtoupper;
 use function trim;
 
+/**
+ * Resolves Foxy configuration from package values, defaults, and environment overrides.
+ */
 class Config
 {
     private array $cacheEnv = [];
@@ -26,8 +29,10 @@ class Config
     private string|null $scopedManager = null;
 
     /**
-     * @param array $config The config.
-     * @param array $defaults The default values.
+     * Creates a configuration resolver.
+     *
+     * @param array $config Package and global configuration values.
+     * @param array $defaults Default values used when a key is not configured.
      */
     public function __construct(private readonly array $config, private readonly array $defaults = []) {}
 

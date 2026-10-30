@@ -17,8 +17,14 @@ use function trim;
 
 use const JSON_THROW_ON_ERROR;
 
+/**
+ * Parses the newline-delimited JSON report produced by Yarn audit.
+ */
 final class YarnAuditParser extends AbstractAuditParser implements AuditParserInterface
 {
+    /**
+     * Parses a complete Yarn audit report.
+     */
     public function parse(string $output): array
     {
         $this->assertOutputSize($output);
@@ -70,6 +76,9 @@ final class YarnAuditParser extends AbstractAuditParser implements AuditParserIn
         return $findings;
     }
 
+    /**
+     * Returns the Yarn manager name.
+     */
     protected function getManagerName(): string
     {
         return 'yarn';

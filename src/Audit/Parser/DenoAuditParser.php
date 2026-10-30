@@ -19,6 +19,9 @@ use function strlen;
 use function substr;
 use function trim;
 
+/**
+ * Parses the human-readable report produced by `deno audit`.
+ */
 final class DenoAuditParser extends AbstractAuditParser implements AuditParserInterface
 {
     /**
@@ -51,6 +54,9 @@ final class DenoAuditParser extends AbstractAuditParser implements AuditParserIn
         'actions' => "\u{2570} Actions:    ",
     ];
 
+    /**
+     * Parses a complete Deno audit report.
+     */
     public function parse(string $output): array
     {
         $this->assertOutputSize($output);
@@ -110,6 +116,9 @@ final class DenoAuditParser extends AbstractAuditParser implements AuditParserIn
         return $findings;
     }
 
+    /**
+     * Returns the Deno manager name.
+     */
     protected function getManagerName(): string
     {
         return 'deno';

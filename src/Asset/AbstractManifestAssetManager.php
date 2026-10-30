@@ -29,8 +29,18 @@ abstract class AbstractManifestAssetManager implements AssetManagerInterface
 {
     final public const string NODE_MODULES_PATH = './node_modules';
 
+    /**
+     * Whether an existing frontend installation may be updated.
+     */
     protected bool $updatable = true;
 
+    /**
+     * Creates a manager with the services shared by asset manifest operations.
+     *
+     * @param IOInterface $io Composer output used for progress messages.
+     * @param Config $config Foxy configuration.
+     * @param Filesystem $fs Filesystem used to resolve and update manifest paths.
+     */
     public function __construct(
         protected IOInterface $io,
         protected Config $config,
@@ -38,6 +48,8 @@ abstract class AbstractManifestAssetManager implements AssetManagerInterface
     ) {}
 
     /**
+     * Merges Composer asset dependencies into the frontend package manifest.
+     *
      * @throws Exception|ParsingException
      */
     public function addDependencies(RootPackageInterface $rootPackage, array $dependencies): AssetPackageInterface
@@ -64,31 +76,49 @@ abstract class AbstractManifestAssetManager implements AssetManagerInterface
         return $assetPackage->write();
     }
 
+    /**
+     * Returns the frontend package manifest path.
+     */
     public function getPackageJsonPath(): string
     {
         return $this->getRootPackagePath($this->getPackageName());
     }
 
+    /**
+     * Returns the frontend package manifest filename.
+     */
     public function getPackageName(): string
     {
         return 'package.json';
     }
 
+    /**
+     * Returns whether the manager lock file exists.
+     */
     public function hasLockFile(): bool
     {
         return file_exists($this->getLockFilePath());
     }
 
+    /**
+     * Returns whether both the dependency directory and package manifest exist.
+     */
     public function isInstalled(): bool
     {
         return is_dir($this->getNodeModulesPath()) && file_exists($this->getPackageJsonPath());
     }
 
+    /**
+     * Returns whether an existing frontend installation may be updated.
+     */
     public function isUpdatable(): bool
     {
         return $this->updatable && $this->isInstalled();
     }
 
+    /**
+     * Enables or disables updates of an existing frontend installation.
+     */
     public function setUpdatable(bool $updatable): static
     {
         $this->updatable = $updatable;
@@ -97,6 +127,8 @@ abstract class AbstractManifestAssetManager implements AssetManagerInterface
     }
 
     /**
+     * Handles dependencies already present in the frontend installation.
+     *
      * @param list<string> $names the asset package name of composer dependencies.
      */
     protected function actionWhenComposerDependenciesAreAlreadyInstalled(array $names): void
@@ -117,6 +149,9 @@ abstract class AbstractManifestAssetManager implements AssetManagerInterface
         // do nothing by default
     }
 
+    /**
+     * Returns the manager lock-file path under the root package directory.
+     */
     protected function getLockFilePath(): string
     {
         return $this->getRootPackagePath($this->getLockPackageName());
@@ -132,6 +167,9 @@ abstract class AbstractManifestAssetManager implements AssetManagerInterface
         return $this->config->forManager($this->getName());
     }
 
+    /**
+     * Returns the configured manager working directory, or `null` to use the process default.
+     */
     protected function getManagerWorkingDirectory(): string|null
     {
         if (null === $this->getConfiguredRootPackageDir()) {
@@ -149,11 +187,17 @@ abstract class AbstractManifestAssetManager implements AssetManagerInterface
         return $rootPackageDir;
     }
 
+    /**
+     * Returns the `node_modules` path under the root package directory.
+     */
     protected function getNodeModulesPath(): string
     {
         return $this->getRootPackagePath(ltrim(self::NODE_MODULES_PATH, './'));
     }
 
+    /**
+     * Returns the resolved root package directory.
+     */
     protected function getRootPackageDir(): string
     {
         $rootPackageDir = $this->getConfiguredRootPackageDir();
@@ -177,6 +221,9 @@ abstract class AbstractManifestAssetManager implements AssetManagerInterface
         return rtrim($this->getCurrentDirectory(), '/\\') . DIRECTORY_SEPARATOR . $rootPackageDir;
     }
 
+    /**
+     * Resolves a path under the root package directory.
+     */
     protected function getRootPackagePath(string $path): string
     {
         return rtrim($this->getRootPackageDir(), '/\\') . DIRECTORY_SEPARATOR . $path;

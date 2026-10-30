@@ -21,6 +21,9 @@ use Throwable;
 
 use function is_link;
 
+/**
+ * Restores Composer's lock file and installed dependencies after an asset failure.
+ */
 final class ComposerFallback implements FallbackInterface
 {
     private readonly Filesystem $fs;
@@ -40,6 +43,8 @@ final class ComposerFallback implements FallbackInterface
     private bool $vendorDirExisted = false;
 
     /**
+     * Creates a Composer state fallback.
+     *
      * @param Composer $composer The composer.
      * @param IOInterface $io The IO.
      * @param Config $config The config.
@@ -59,6 +64,8 @@ final class ComposerFallback implements FallbackInterface
     }
 
     /**
+     * Restores the captured Composer state without running project scripts.
+     *
      * @throws Exception
      */
     public function restore(): void
@@ -79,6 +86,9 @@ final class ComposerFallback implements FallbackInterface
         $this->restorePreviousLockFile();
     }
 
+    /**
+     * Captures the lock file and vendor-directory state when Composer fallback is enabled.
+     */
     public function save(): self
     {
         $this->resetSnapshot();

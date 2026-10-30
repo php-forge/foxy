@@ -29,6 +29,9 @@ final readonly class GitHubAdvisoryCveResolver implements CveResolverInterface
 {
     private const string API_URL = 'https://api.github.com/advisories/%s';
 
+    /**
+     * Creates a resolver using Composer's asynchronous HTTP downloader.
+     */
     public function __construct(private HttpDownloader $httpDownloader) {}
 
     /**

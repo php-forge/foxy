@@ -12,6 +12,9 @@ use Seld\JsonLint\ParsingException;
 use function is_array;
 use function is_string;
 
+/**
+ * Builds Foxy configuration from Composer's project and global settings.
+ */
 abstract class ConfigBuilder
 {
     /**

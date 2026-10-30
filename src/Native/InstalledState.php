@@ -30,6 +30,8 @@ final readonly class InstalledState
     private const string MALFORMED = '<warning>The installed state file "%s" is malformed and was ignored.</warning>';
 
     /**
+     * Creates an installed-state store for one native install directory.
+     *
      * @param string $path State file path.
      * @param IOInterface $io Output for the verbose notice of a malformed file.
      */

@@ -13,6 +13,9 @@ use Throwable;
 use function is_file;
 use function is_link;
 
+/**
+ * Restores an asset manifest to the state captured before dependency solving.
+ */
 final class AssetFallback implements FallbackInterface
 {
     private readonly Filesystem $fs;
@@ -21,6 +24,14 @@ final class AssetFallback implements FallbackInterface
 
     private bool $snapshotSaved = false;
 
+    /**
+     * Creates a fallback for one asset manifest path.
+     *
+     * @param IOInterface $io Composer I/O used to report restoration.
+     * @param Config $config Foxy configuration controlling asset fallback.
+     * @param string $path Asset manifest path to snapshot.
+     * @param Filesystem|null $fs Filesystem implementation, or `null` to create the Composer default.
+     */
     public function __construct(
         private readonly IOInterface $io,
         private readonly Config $config,
@@ -30,6 +41,9 @@ final class AssetFallback implements FallbackInterface
         $this->fs = $fs ?? new Filesystem();
     }
 
+    /**
+     * Restores the captured manifest, or removes it when Foxy created it.
+     */
     public function restore(): void
     {
         if (!$this->isEnabled() || !$this->snapshotSaved) {
@@ -51,6 +65,9 @@ final class AssetFallback implements FallbackInterface
         }
     }
 
+    /**
+     * Captures the current manifest state when asset fallback is enabled.
+     */
     public function save(): self
     {
         $this->resetSnapshot();

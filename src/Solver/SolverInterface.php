@@ -7,6 +7,9 @@ namespace Foxy\Solver;
 use Composer\Composer;
 use Composer\IO\IOInterface;
 
+/**
+ * Resolves and installs asset dependencies during Composer operations.
+ */
 interface SolverInterface
 {
     /**

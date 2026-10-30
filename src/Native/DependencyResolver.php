@@ -51,6 +51,8 @@ final readonly class DependencyResolver
     private const string OPTIONAL_SKIPPED = '<warning>The optional dependency "%s" (%s) was skipped: %s</warning>';
 
     /**
+     * Creates a resolver backed by the npm registry.
+     *
      * @param NpmRegistryInterface $registry Registry that provides the package metadata.
      * @param IOInterface $io Output that receives the deprecation and skipped-dependency warnings.
      */

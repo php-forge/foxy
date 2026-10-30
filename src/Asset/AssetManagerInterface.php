@@ -8,6 +8,9 @@ use Composer\Package\RootPackageInterface;
 use Foxy\Audit\{AuditParserInterface, AuditProcessResult};
 use Foxy\Exception\RuntimeException;
 
+/**
+ * Defines frontend dependency manager operations used by the Foxy solver.
+ */
 interface AssetManagerInterface
 {
     /**

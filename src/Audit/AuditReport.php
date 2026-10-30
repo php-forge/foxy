@@ -7,13 +7,23 @@ namespace Foxy\Audit;
 use function array_unique;
 use function count;
 
+/**
+ * Contains normalized findings and diagnostics from one package manager audit.
+ */
 final readonly class AuditReport
 {
     /**
-     * @param list<AuditFinding> $findings
+     * Creates an immutable audit report.
+     *
+     * @param string $manager Package manager that produced the report.
+     * @param list<AuditFinding> $findings Normalized security findings.
+     * @param string $diagnostics Diagnostic output emitted by the package manager.
      */
     public function __construct(public string $manager, public array $findings, public string $diagnostics = '') {}
 
+    /**
+     * Returns the number of distinct affected packages.
+     */
     public function countPackages(): int
     {
         return count(
@@ -27,6 +37,8 @@ final readonly class AuditReport
     }
 
     /**
+     * Counts findings for every supported severity.
+     *
      * @return array<string, int>
      */
     public function countSeverities(): array
@@ -46,6 +58,9 @@ final readonly class AuditReport
         return $counts;
     }
 
+    /**
+     * Whether any finding meets or exceeds the minimum severity.
+     */
     public function hasFindingAtLeast(Severity $minimumSeverity): bool
     {
         foreach ($this->findings as $finding) {
@@ -58,7 +73,9 @@ final readonly class AuditReport
     }
 
     /**
-     * @param list<AuditFinding> $findings
+     * Returns a copy with the supplied findings.
+     *
+     * @param list<AuditFinding> $findings Replacement findings.
      */
     public function withFindings(array $findings): self
     {

@@ -7,9 +7,14 @@ namespace Foxy\Event;
 use Composer\Package\PackageInterface;
 use Foxy\FoxyEvents;
 
+/**
+ * Allows listeners to contribute asset packages before dependency solving.
+ */
 final class GetAssetsEvent extends AbstractSolveEvent
 {
     /**
+     * Creates the asset collection event.
+     *
      * @param string $assetDir The directory of mock assets.
      * @param PackageInterface[] $packages All installed Composer packages.
      * @param array<mixed> $assets The map of asset package name and the asset package path.

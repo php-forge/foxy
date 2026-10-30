@@ -36,6 +36,9 @@ use Seld\JsonLint\ParsingException;
 
 use function str_contains;
 
+/**
+ * Integrates frontend dependency managers with Composer's install and update lifecycle.
+ */
 final class Foxy implements PluginInterface, EventSubscriberInterface, Capable, AuditRunnerInterface
 {
     final public const string REQUIRED_COMPOSER_VERSION = '^2.10.2';
@@ -91,6 +94,8 @@ final class Foxy implements PluginInterface, EventSubscriberInterface, Capable, 
     private SolverInterface $solver;
 
     /**
+     * Initializes Foxy for the active Composer project.
+     *
      * @throws ParsingException
      */
     public function activate(Composer $composer, IOInterface $io): void
@@ -114,6 +119,9 @@ final class Foxy implements PluginInterface, EventSubscriberInterface, Capable, 
         $this->composerFallback = new ComposerFallback($composer, $io, $this->config, $input, $fs);
     }
 
+    /**
+     * Audits the asset dependencies through the selected manager.
+     */
     public function audit(AuditRequest $request): AuditReport
     {
         if (!isset($this->config) || !$this->isEnabled()) {
@@ -125,16 +133,25 @@ final class Foxy implements PluginInterface, EventSubscriberInterface, Capable, 
         return (new AuditRunner($this->getAssetManager()))->audit($request);
     }
 
+    /**
+     * Handles plugin deactivation; Foxy keeps no deactivation state.
+     */
     public function deactivate(Composer $composer, IOInterface $io): void
     {
         // Do nothing
     }
 
+    /**
+     * Declares Foxy's Composer command-provider capability.
+     */
     public function getCapabilities(): array
     {
         return [ComposerCommandProvider::class => FoxyCommandProvider::class];
     }
 
+    /**
+     * Returns the Composer events that initialize and run asset solving.
+     */
     public static function getSubscribedEvents(): array
     {
         return [
@@ -183,6 +200,8 @@ final class Foxy implements PluginInterface, EventSubscriberInterface, Capable, 
     }
 
     /**
+     * Replaces the solver used for Composer lifecycle events.
+     *
      * @param SolverInterface $solver The solver instance.
      */
     public function setSolver(SolverInterface $solver): void
@@ -191,6 +210,8 @@ final class Foxy implements PluginInterface, EventSubscriberInterface, Capable, 
     }
 
     /**
+     * Solves asset dependencies for the current Composer install or update event.
+     *
      * @param Event $event The composer script event.
      */
     public function solveAssets(Event $event): void
@@ -205,6 +226,9 @@ final class Foxy implements PluginInterface, EventSubscriberInterface, Capable, 
         $solver->solve($event->getComposer(), $event->getIO());
     }
 
+    /**
+     * Handles plugin removal; Foxy keeps no plugin-specific uninstall state.
+     */
     public function uninstall(Composer $composer, IOInterface $io): void
     {
         // Do nothing

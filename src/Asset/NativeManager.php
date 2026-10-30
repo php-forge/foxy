@@ -40,6 +40,8 @@ final class NativeManager extends AbstractManifestAssetManager
     private const string FILESYSTEM_ROOT = '{^(?:[A-Za-z]:|//[^/]+/[^/]+)?/?$}';
 
     /**
+     * Creates the native manager with its installer and npm registry client.
+     *
      * @param IOInterface $io Output for the progress line.
      * @param Config $config Foxy configuration.
      * @param Filesystem $fs Filesystem used by the manifest handling.
@@ -97,21 +99,33 @@ final class NativeManager extends AbstractManifestAssetManager
         return new AuditProcessResult([] === $this->getAuditParser()->parse($document) ? 0 : 1, $document, '');
     }
 
+    /**
+     * Returns the parser for npm bulk-advisory documents.
+     */
     public function getAuditParser(): AuditParserInterface
     {
         return new NativeAuditParser();
     }
 
+    /**
+     * Returns the native manager lock-file name.
+     */
     public function getLockPackageName(): string
     {
         return 'foxy.lock';
     }
 
+    /**
+     * Returns the manager name used in Foxy configuration.
+     */
     public function getName(): string
     {
         return 'native';
     }
 
+    /**
+     * Returns the unrestricted version constraint because this manager runs in PHP.
+     */
     public function getVersionConstraint(): string
     {
         return '*';

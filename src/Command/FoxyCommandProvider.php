@@ -11,6 +11,9 @@ use Composer\Plugin\Capability\CommandProvider;
 use Foxy\Exception\{Message, RuntimeException};
 use Foxy\Foxy;
 
+/**
+ * Provides Foxy's Composer console commands.
+ */
 final readonly class FoxyCommandProvider implements CommandProvider
 {
     private Composer $composer;
@@ -18,7 +21,9 @@ final readonly class FoxyCommandProvider implements CommandProvider
     private Foxy $plugin;
 
     /**
-     * @param array<string, mixed> $arguments
+     * Creates the provider from Composer's capability arguments.
+     *
+     * @param array<string, mixed> $arguments Composer, I/O, and plugin instances supplied by Composer.
      */
     public function __construct(array $arguments)
     {
@@ -38,6 +43,8 @@ final readonly class FoxyCommandProvider implements CommandProvider
     }
 
     /**
+     * Returns the Foxy commands configured with the active Composer context.
+     *
      * @return list<BaseCommand>
      */
     public function getCommands(): array

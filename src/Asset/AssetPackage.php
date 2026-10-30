@@ -21,6 +21,9 @@ use function str_starts_with;
 
 use const DIRECTORY_SEPARATOR;
 
+/**
+ * Maintains Composer-provided dependencies in a frontend package manifest.
+ */
 final class AssetPackage implements AssetPackageInterface
 {
     public const string COMPOSER_PREFIX = '@composer-asset/';
@@ -32,6 +35,8 @@ final class AssetPackage implements AssetPackageInterface
     private array $package = [];
 
     /**
+     * Loads the frontend package manifest and injects metadata inherited from the Composer root package.
+     *
      * @param RootPackageInterface $rootPackage The composer root package
      * @param JsonFile $jsonFile The JSON file
      *
@@ -52,6 +57,8 @@ final class AssetPackage implements AssetPackageInterface
     }
 
     /**
+     * Adds Composer asset dependencies and returns the names that were already installed.
+     *
      * @param array $dependencies The dependencies
      *
      * @return list<string> The existing packages.
@@ -80,6 +87,9 @@ final class AssetPackage implements AssetPackageInterface
         return $existingPackages;
     }
 
+    /**
+     * Returns Composer-managed dependencies currently declared in the package manifest.
+     */
     public function getInstalledDependencies(): array
     {
         $installedAssets = [];
@@ -99,12 +109,17 @@ final class AssetPackage implements AssetPackageInterface
         return $installedAssets;
     }
 
+    /**
+     * Returns the complete frontend package manifest.
+     */
     public function getPackage(): array
     {
         return $this->package;
     }
 
     /**
+     * Removes Composer-managed dependencies absent from the current dependency set.
+     *
      * @psalm-suppress MixedArrayAccess
      */
     public function removeUnusedDependencies(array $dependencies): self
@@ -120,6 +135,9 @@ final class AssetPackage implements AssetPackageInterface
         return $this;
     }
 
+    /**
+     * Replaces the in-memory frontend package manifest.
+     */
     public function setPackage(array $package): self
     {
         $this->package = $package;
@@ -128,6 +146,8 @@ final class AssetPackage implements AssetPackageInterface
     }
 
     /**
+     * Writes the in-memory package manifest to its JSON file.
+     *
      * @throws Exception
      */
     public function write(): self

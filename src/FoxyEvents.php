@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Foxy;
 
+/**
+ * Defines the lifecycle events dispatched while Foxy solves asset dependencies.
+ */
 abstract class FoxyEvents
 {
     /**

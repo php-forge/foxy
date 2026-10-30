@@ -25,13 +25,21 @@ use function trim;
 
 use const JSON_THROW_ON_ERROR;
 
+/**
+ * Provides strict validation and normalization helpers for audit output parsers.
+ */
 abstract class AbstractAuditParser
 {
     private const int MAX_OUTPUT_BYTES = 16 * 1024 * 1024;
 
+    /**
+     * Returns the package manager name used in malformed-output errors.
+     */
     abstract protected function getManagerName(): string;
 
     /**
+     * Rejects a JSON document that represents a package manager error.
+     *
      * @param array<mixed> $data
      */
     final protected function assertNotErrorDocument(array $data): void
@@ -43,6 +51,9 @@ abstract class AbstractAuditParser
         }
     }
 
+    /**
+     * Rejects audit output that exceeds the parser's size limit.
+     */
     final protected function assertOutputSize(string $output): void
     {
         if (strlen($output) > self::MAX_OUTPUT_BYTES) {
@@ -53,6 +64,8 @@ abstract class AbstractAuditParser
     }
 
     /**
+     * Decodes an audit JSON object after validating its size and shape.
+     *
      * @return array<mixed>
      */
     final protected function decodeObject(string $output): array
@@ -78,11 +91,17 @@ abstract class AbstractAuditParser
         return get_object_vars($data);
     }
 
+    /**
+     * Selects a GHSA identifier from the candidate or URL, falling back to the source identifier.
+     */
     final protected function getAdvisoryId(string $sourceId, string|null $candidate, string|null $url): string
     {
         return $this->getGhsaId($candidate) ?? $this->getGhsaId($url) ?? $sourceId;
     }
 
+    /**
+     * Returns a required boolean field.
+     */
     final protected function getBoolean(array $data, string $key, string $context): bool
     {
         $value = $data[$key] ?? null;
@@ -97,6 +116,8 @@ abstract class AbstractAuditParser
     }
 
     /**
+     * Returns validated, normalized CVE identifiers.
+     *
      * @return list<string>
      */
     final protected function getCves(mixed $value, string $context): array
@@ -118,11 +139,17 @@ abstract class AbstractAuditParser
         return $this->uniqueStrings(array_map(strtoupper(...), $cves));
     }
 
+    /**
+     * Extracts and normalizes a GHSA identifier from a value or URL.
+     */
     final protected function getGhsaId(string|null $value): string|null
     {
         return null === $value ? null : AuditNormalizer::normalizeGhsaReference($value);
     }
 
+    /**
+     * Returns a required non-negative integer field.
+     */
     final protected function getNonNegativeInteger(array $data, string $key, string $context): int
     {
         $value = $data[$key] ?? null;
@@ -137,6 +164,8 @@ abstract class AbstractAuditParser
     }
 
     /**
+     * Converts a decoded JSON object into its property map.
+     *
      * @return array<mixed>
      */
     final protected function getObject(mixed $value, string $context): array
@@ -150,6 +179,9 @@ abstract class AbstractAuditParser
         return get_object_vars($value);
     }
 
+    /**
+     * Returns a sanitized optional string field, or `null` when absent or empty.
+     */
     final protected function getOptionalString(array $data, string $key, string $context): string|null
     {
         if (!isset($data[$key])) {
@@ -167,6 +199,9 @@ abstract class AbstractAuditParser
         return trim($value) === '' ? null : $this->sanitizeString($value);
     }
 
+    /**
+     * Returns a supported normalized severity value.
+     */
     final protected function getSeverity(mixed $value, string $context): Severity
     {
         if (!is_string($value) || null === $severity = Severity::tryFrom(strtolower($value))) {
@@ -178,6 +213,9 @@ abstract class AbstractAuditParser
         return $severity;
     }
 
+    /**
+     * Returns the sum of severity counts and optionally validates the reported total.
+     */
     final protected function getSeverityCount(array $metadata, string $context, bool $requireTotal): int
     {
         $counts = $this->getObject($metadata['vulnerabilities'] ?? null, $context . '.vulnerabilities');
@@ -196,6 +234,9 @@ abstract class AbstractAuditParser
         return $total;
     }
 
+    /**
+     * Returns a non-empty source identifier from a string or integer value.
+     */
     final protected function getSourceId(mixed $value, string $context): string
     {
         if (!is_int($value) && !is_string($value)) {
@@ -215,6 +256,9 @@ abstract class AbstractAuditParser
         return $sourceId;
     }
 
+    /**
+     * Returns a required sanitized string field.
+     */
     final protected function getString(array $data, string $key, string $context, bool $allowEmpty = false): string
     {
         $value = $data[$key] ?? null;
@@ -229,6 +273,8 @@ abstract class AbstractAuditParser
     }
 
     /**
+     * Returns a normalized list containing only strings.
+     *
      * @return list<string>
      */
     final protected function getStringList(mixed $value, string $context): array
@@ -253,6 +299,9 @@ abstract class AbstractAuditParser
         return $this->uniqueStrings($value);
     }
 
+    /**
+     * Creates a package-manager-specific malformed-output exception.
+     */
     final protected function malformed(string $reason, Throwable|null $previous = null): RuntimeException
     {
         return new RuntimeException(
@@ -261,12 +310,17 @@ abstract class AbstractAuditParser
         );
     }
 
+    /**
+     * Replaces control characters and trims surrounding whitespace.
+     */
     final protected function sanitizeString(string $value): string
     {
         return trim((string) preg_replace('/[\x00-\x1F\x7F]+/u', ' ', $value));
     }
 
     /**
+     * Returns unique strings in deterministic order.
+     *
      * @param list<string> $values
      *
      * @return list<string>

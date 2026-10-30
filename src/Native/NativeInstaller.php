@@ -57,6 +57,8 @@ final readonly class NativeInstaller implements NativeInstallerInterface
     private const string TEMPORARY_DIRECTORY = '.foxy-tmp';
 
     /**
+     * Creates the native package installer.
+     *
      * @param IOInterface $io Output that receives one line per changed package, and per kept package at verbose level.
      * @param Filesystem $fs Filesystem used to copy, move, and remove package directories.
      * @param NpmRegistryInterface $registry Registry that provides the tarballs.

@@ -9,6 +9,9 @@ namespace Foxy\Audit\Parser;
  */
 final class BunAuditParser extends AbstractBulkAdvisoryParser
 {
+    /**
+     * Returns the Bun manager name.
+     */
     protected function getManagerName(): string
     {
         return 'bun';

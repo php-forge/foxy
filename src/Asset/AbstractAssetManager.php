@@ -20,10 +20,22 @@ use function putenv;
 use function sprintf;
 use function trim;
 
+/**
+ * Runs an external frontend package manager and validates its executable version.
+ */
 abstract class AbstractAssetManager extends AbstractManifestAssetManager
 {
     private string|null $version = '';
 
+    /**
+     * Creates a manager that executes frontend commands for the configured asset manifest.
+     *
+     * @param IOInterface $io Composer output used for progress messages.
+     * @param Config $config Foxy configuration.
+     * @param ProcessExecutor $executor Process executor used to invoke the manager.
+     * @param Filesystem $fs Filesystem used by manifest handling.
+     * @param VersionConverterInterface|null $versionConverter Converter for manager version output.
+     */
     public function __construct(
         IOInterface $io,
         Config $config,
@@ -41,6 +53,9 @@ abstract class AbstractAssetManager extends AbstractManifestAssetManager
      */
     abstract protected function getAuditCommand(bool $noDev): string;
 
+    /**
+     * Runs the manager audit command against the current lock file.
+     */
     public function audit(bool $noDev): AuditProcessResult
     {
         if (!$this->hasLockFile()) {
@@ -72,11 +87,17 @@ abstract class AbstractAssetManager extends AbstractManifestAssetManager
         );
     }
 
+    /**
+     * Returns whether the manager executable reports a detectable version.
+     */
     public function isAvailable(): bool
     {
         return null !== $this->getVersion();
     }
 
+    /**
+     * Installs or updates frontend dependencies according to the manager state and configuration.
+     */
     public function run(): int
     {
         if (!$this->config->isEnabled('run-asset-manager')) {
@@ -100,6 +121,9 @@ abstract class AbstractAssetManager extends AbstractManifestAssetManager
         );
     }
 
+    /**
+     * Validates the installed manager version against Foxy's supported and configured constraints.
+     */
     public function validate(): void
     {
         $version = $this->getVersion();
@@ -209,6 +233,9 @@ abstract class AbstractAssetManager extends AbstractManifestAssetManager
         return $this->buildCommand('update', 'update');
     }
 
+    /**
+     * Returns the normalized manager version, or `null` when it cannot be detected.
+     */
     protected function getVersion(): string|null
     {
         if ($this->version === '' && $this->versionConverter !== null) {

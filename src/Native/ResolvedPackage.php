@@ -10,6 +10,8 @@ namespace Foxy\Native;
 final readonly class ResolvedPackage
 {
     /**
+     * Describes a registry or local package selected for installation.
+     *
      * @param string $name Package name.
      * @param string $version Installed version.
      * @param string|null $resolved Tarball URL of a registry package.

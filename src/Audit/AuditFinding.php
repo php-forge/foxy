@@ -4,12 +4,25 @@ declare(strict_types=1);
 
 namespace Foxy\Audit;
 
+/**
+ * Represents one normalized frontend dependency security advisory.
+ */
 final readonly class AuditFinding
 {
     /**
-     * @param list<string> $cves
-     * @param list<string> $affectedVersions
-     * @param list<string> $dependencyPaths
+     * Creates an immutable audit finding.
+     *
+     * @param string $package Package affected by the advisory.
+     * @param Severity $severity Normalized advisory severity.
+     * @param string $advisoryId Preferred advisory identifier, such as a GHSA identifier.
+     * @param string|null $sourceId Identifier reported by the package manager.
+     * @param string $title Human-readable advisory title.
+     * @param string $vulnerableVersions Version constraint reported as vulnerable.
+     * @param string|null $url Advisory details URL.
+     * @param list<string> $cves Associated CVE identifiers.
+     * @param CveStatus $cveStatus Status of CVE resolution for this advisory.
+     * @param list<string> $affectedVersions Installed versions affected by the advisory.
+     * @param list<string> $dependencyPaths Dependency paths that include the vulnerable package.
      */
     public function __construct(
         public string $package,
@@ -26,7 +39,9 @@ final readonly class AuditFinding
     ) {}
 
     /**
-     * @param list<string> $cves
+     * Returns a copy with the supplied CVE resolution.
+     *
+     * @param list<string> $cves Resolved CVE identifiers.
      */
     public function withCveResolution(array $cves, CveStatus $status): self
     {

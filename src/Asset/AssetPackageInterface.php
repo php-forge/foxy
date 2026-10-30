@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Foxy\Asset;
 
+/**
+ * Defines mutable access to a frontend package manifest and its Composer-managed dependencies.
+ */
 interface AssetPackageInterface
 {
     /**

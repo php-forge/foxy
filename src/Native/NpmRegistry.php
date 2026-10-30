@@ -61,6 +61,8 @@ final readonly class NpmRegistry implements NpmRegistryInterface
     private const int RETRY_AFTER_LIMIT = 60;
 
     /**
+     * Creates an npm registry client with cache and retry support.
+     *
      * @param HttpDownloader $httpDownloader Downloader that performs the requests; {@see prefetchTarballs()} needs the
      * async-enabled instance returned by `Composer::getLoop()->getHttpDownloader()`.
      * @param Cache $cache Tarball cache.

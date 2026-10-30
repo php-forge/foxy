@@ -17,6 +17,9 @@ use function sprintf;
  */
 final readonly class CveEnricher
 {
+    /**
+     * Creates an enricher backed by the supplied CVE resolver.
+     */
     public function __construct(private CveResolverInterface $resolver) {}
 
     /**

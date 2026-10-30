@@ -11,8 +11,14 @@ use function str_starts_with;
 use function strlen;
 use function substr;
 
+/**
+ * Converts asset-manager version constraints to Composer-compatible constraints.
+ */
 final class SemverConverter implements VersionConverterInterface
 {
+    /**
+     * Converts an asset-manager version constraint to Composer syntax.
+     */
     public function convertVersion(string|null $version = null): string
     {
         if (in_array($version, [null, '', 'latest'], true)) {

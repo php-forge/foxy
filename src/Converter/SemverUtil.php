@@ -17,6 +17,9 @@ use function strlen;
 use function strtolower;
 use function substr;
 
+/**
+ * Normalizes asset-manager semantic versions for Composer.
+ */
 abstract class SemverUtil
 {
     /**
@@ -35,6 +38,9 @@ abstract class SemverUtil
         return $version;
     }
 
+    /**
+     * Converts prerelease and build metadata to Composer's normalized stability notation.
+     */
     public static function convertVersionMetadata(string $version): string
     {
         $pattern = self::createPattern('([a-zA-Z]+|(\-|\+)[a-zA-Z]+|(\-|\+)[0-9]+)');

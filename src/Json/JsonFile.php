@@ -11,6 +11,9 @@ use function array_push;
 use function is_array;
 use function is_string;
 
+/**
+ * Preserves empty arrays and objects while reading and writing package manifests.
+ */
 final class JsonFile extends \Composer\Json\JsonFile
 {
     private const int DEFAULT_OPTIONS = JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE;
@@ -67,6 +70,9 @@ final class JsonFile extends \Composer\Json\JsonFile
         return $this->arrayKeys;
     }
 
+    /**
+     * Reads the JSON document and records how its empty containers are represented.
+     */
     public function read(): array
     {
         $data = parent::read();
@@ -76,6 +82,9 @@ final class JsonFile extends \Composer\Json\JsonFile
         return is_array($data) ? $data : [];
     }
 
+    /**
+     * Writes package data while preserving empty-array keys from the original document.
+     */
     public function write(array $hash, int $options = self::DEFAULT_OPTIONS): void
     {
         $arrayKeys = $this->collectEmptyArrayKeys($hash);

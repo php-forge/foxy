@@ -9,6 +9,9 @@ namespace Foxy\Audit\Parser;
  */
 final class NativeAuditParser extends AbstractBulkAdvisoryParser
 {
+    /**
+     * Returns the native manager name.
+     */
     protected function getManagerName(): string
     {
         return 'native';

@@ -34,13 +34,19 @@ use function str_ends_with;
 use function str_starts_with;
 use function trim;
 
+/**
+ * Merges Composer-provided assets and runs the selected frontend dependency manager.
+ */
 final readonly class Solver implements SolverInterface
 {
     private const string MANAGED_MARKER = '.foxy-managed';
 
     /**
+     * Creates the asset dependency solver and its rollback collaborators.
+     *
      * @param AssetManagerInterface $assetManager The asset manager instance.
      * @param Config $config The config instance.
+     * @param Filesystem $fs Filesystem used to prepare the managed asset directory.
      * @param FallbackInterface|null $composerFallback The composer fallback instance.
      * @param FallbackInterface|null $assetFallback Fallback restored when the asset manager fails to merge the
      * dependencies, throws while running, or returns a non-zero code, or `null` for none.
@@ -53,6 +59,9 @@ final readonly class Solver implements SolverInterface
         private FallbackInterface|null $assetFallback = null,
     ) {}
 
+    /**
+     * Allows the selected manager to update existing asset dependencies.
+     */
     public function setUpdatable($updatable): self
     {
         $this->assetManager->setUpdatable($updatable);
@@ -61,6 +70,8 @@ final readonly class Solver implements SolverInterface
     }
 
     /**
+     * Merges package assets and runs the selected frontend dependency manager.
+     *
      * @throws Exception
      */
     public function solve(Composer $composer, IOInterface $io): void
