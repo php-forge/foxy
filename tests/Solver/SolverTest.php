@@ -1416,12 +1416,7 @@ class SolverTest extends TestCase
 
         $targetContent = JsonFile::encode(['name' => '@composer-asset/foo--bar', 'version' => '1.0.0']) . "\n";
 
-        MockerState::addCondition(
-            'Composer\\Json',
-            'file_put_contents',
-            [$target, $targetContent, 0, null],
-            false,
-        );
+        $this->mockManifestWrite($target, $targetContent, false);
 
         $this->manager
             ->expects(self::never())
@@ -1509,10 +1504,9 @@ class SolverTest extends TestCase
 
         $truncatedTargetContent = substr($targetContent, 0, -2);
 
-        MockerState::addCondition(
-            'Composer\\Json',
-            'file_put_contents',
-            [$target, $targetContent, 0, null],
+        $this->mockManifestWrite(
+            $target,
+            $targetContent,
             static function (string $filename, mixed $data, int $flags, mixed $context): false {
                 self::assertNotFalse(
                     file_put_contents($filename, substr((string) $data, 0, -2), $flags, $context),
@@ -2001,6 +1995,22 @@ class SolverTest extends TestCase
     private function invokeSolverMethodOn(SolverInterface $solver, string $method, mixed ...$arguments): mixed
     {
         return (new ReflectionClass($solver))->getMethod($method)->invoke($solver, ...$arguments);
+    }
+
+    /**
+     * Mocks the direct `file_put_contents()` write of a JSON manifest for every supported Composer version.
+     *
+     * Composer before 2.11 writes from `Composer\Json`. Composer 2.11+ replaces the file through a temporary file in
+     * `Composer\Util` and only writes directly when the target is read-only, so the target is reported as read-only.
+     */
+    private function mockManifestWrite(string $target, string $content, mixed $result): void
+    {
+        foreach (['Composer\\Json', 'Composer\\Util'] as $namespace) {
+            MockerState::addCondition($namespace, 'file_put_contents', [$target, $content, 0, null], $result);
+        }
+
+        MockerState::addCondition('Composer\\Util', 'file_exists', [$target], true);
+        MockerState::addCondition('Composer\\Util', 'is_writable', [$target], false);
     }
 
     /**

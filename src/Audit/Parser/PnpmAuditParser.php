@@ -13,8 +13,14 @@ use function is_array;
 use function is_int;
 use function sprintf;
 
+/**
+ * Parses the JSON advisory report produced by `pnpm audit`.
+ */
 final class PnpmAuditParser extends AbstractAuditParser implements AuditParserInterface
 {
+    /**
+     * Parses a complete pnpm audit report.
+     */
     public function parse(string $output): array
     {
         $data = $this->decodeObject($output);
@@ -61,6 +67,9 @@ final class PnpmAuditParser extends AbstractAuditParser implements AuditParserIn
         return $findings;
     }
 
+    /**
+     * Returns the pnpm manager name.
+     */
     protected function getManagerName(): string
     {
         return 'pnpm';

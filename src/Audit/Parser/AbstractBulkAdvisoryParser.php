@@ -18,6 +18,9 @@ use function sprintf;
  */
 abstract class AbstractBulkAdvisoryParser extends AbstractAuditParser implements AuditParserInterface
 {
+    /**
+     * Parses a bulk advisories JSON object into normalized findings.
+     */
     public function parse(string $output): array
     {
         $packages = $this->decodeObject($output);

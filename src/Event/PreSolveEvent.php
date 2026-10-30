@@ -7,9 +7,14 @@ namespace Foxy\Event;
 use Composer\Package\PackageInterface;
 use Foxy\FoxyEvents;
 
+/**
+ * Announces that asset dependency solving is about to start.
+ */
 final class PreSolveEvent extends AbstractSolveEvent
 {
     /**
+     * Creates the pre-solve event.
+     *
      * @param string $assetDir The directory of mock assets.
      * @param PackageInterface[] $packages All installed Composer packages.
      */

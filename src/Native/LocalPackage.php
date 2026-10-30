@@ -11,6 +11,8 @@ namespace Foxy\Native;
 final readonly class LocalPackage
 {
     /**
+     * Describes a local package selected by the native resolver.
+     *
      * @param string $name Package name, the source of its requirements.
      * @param string $version Version declared by its `package.json` (`0.0.0` when absent).
      * @param string $path Local package directory: the manifest's `file:` value without the prefix, as written.

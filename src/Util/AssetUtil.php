@@ -26,6 +26,9 @@ use function str_replace;
 use function str_starts_with;
 use function strtr;
 
+/**
+ * Reads and normalizes asset metadata exposed by Composer packages.
+ */
 final class AssetUtil
 {
     /**

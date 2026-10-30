@@ -7,6 +7,9 @@ namespace Foxy\Util;
 use Composer\Package\AliasPackage;
 use Composer\Package\Loader\ArrayLoader;
 
+/**
+ * Hydrates Composer package records stored in lock data.
+ */
 final class PackageUtil
 {
     /**

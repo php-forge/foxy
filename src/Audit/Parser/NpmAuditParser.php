@@ -15,8 +15,14 @@ use function is_bool;
 use function is_string;
 use function sprintf;
 
+/**
+ * Parses the JSON report produced by npm audit report version 2.
+ */
 final class NpmAuditParser extends AbstractAuditParser implements AuditParserInterface
 {
+    /**
+     * Parses a complete npm audit report.
+     */
     public function parse(string $output): array
     {
         $data = $this->decodeObject($output);
@@ -37,6 +43,9 @@ final class NpmAuditParser extends AbstractAuditParser implements AuditParserInt
         return $findings;
     }
 
+    /**
+     * Returns the npm manager name.
+     */
     protected function getManagerName(): string
     {
         return 'npm';

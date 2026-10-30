@@ -10,6 +10,8 @@ namespace Foxy\Native;
 final readonly class PackageVersion
 {
     /**
+     * Describes one installable npm package version.
+     *
      * @param string $name Package name.
      * @param string $version Version string, exactly as keyed in the registry `versions` object.
      * @param string $tarball Tarball URL (`dist.tarball`).

@@ -24,12 +24,22 @@ use function is_string;
 use function preg_replace;
 use function trim;
 
+/**
+ * Audits frontend dependencies and renders normalized vulnerability findings.
+ */
 final class AuditCommand extends BaseCommand
 {
     public const int STATUS_FAILED = 2;
     public const int STATUS_OK = 0;
     public const int STATUS_VULNERABLE = 1;
 
+    /**
+     * Creates the audit command and its optional CVE resolver.
+     *
+     * @param AuditRunnerInterface $runner Runs the selected package manager audit.
+     * @param AuditFormatter $formatter Renders the normalized report.
+     * @param CveResolverInterface|null $cveResolver Resolves GHSA advisories to CVE identifiers.
+     */
     public function __construct(
         private readonly AuditRunnerInterface $runner,
         private readonly AuditFormatter $formatter = new AuditFormatter(),
@@ -38,6 +48,9 @@ final class AuditCommand extends BaseCommand
         parent::__construct();
     }
 
+    /**
+     * Configures the audit command options and help text.
+     */
     protected function configure(): void
     {
         $this
@@ -76,6 +89,9 @@ final class AuditCommand extends BaseCommand
             );
     }
 
+    /**
+     * Runs the audit and returns its stable command status.
+     */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $formatValue = $input->getOption('format');

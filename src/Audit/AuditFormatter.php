@@ -19,9 +19,14 @@ use const JSON_PRETTY_PRINT;
 use const JSON_THROW_ON_ERROR;
 use const JSON_UNESCAPED_SLASHES;
 
+/**
+ * Renders normalized audit reports for console output.
+ */
 final readonly class AuditFormatter
 {
     /**
+     * Writes the report in the selected output format.
+     *
      * @throws JsonException
      */
     public function write(

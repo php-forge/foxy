@@ -16,6 +16,9 @@ use function str_repeat;
 use function str_replace;
 use function strlen;
 
+/**
+ * Formats JSON while retaining selected empty containers as arrays.
+ */
 final class JsonFormatter
 {
     public const string ARRAY_KEYS_REGEX = '/["\']([\w\-.]+)["\']\s*:\s*\[\s*]/';

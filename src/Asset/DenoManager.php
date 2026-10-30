@@ -17,35 +17,56 @@ use function preg_match;
 use function str_starts_with;
 use function substr;
 
+/**
+ * Integrates Deno with Foxy's dependency workspace, update, and audit workflows.
+ */
 final class DenoManager extends AbstractAssetManager
 {
     private const array AUDIT_ENVIRONMENT = ['NO_COLOR' => '1'];
 
+    /**
+     * Returns the parser for the human-readable text report produced by `deno audit`.
+     */
     public function getAuditParser(): AuditParserInterface
     {
         return new DenoAuditParser();
     }
 
+    /**
+     * Returns Deno's lock-file name.
+     */
     public function getLockPackageName(): string
     {
         return 'deno.lock';
     }
 
+    /**
+     * Returns the manager name used in Foxy configuration.
+     */
     public function getName(): string
     {
         return 'deno';
     }
 
+    /**
+     * Returns the Deno versions supported by this integration.
+     */
     public function getVersionConstraint(): string
     {
         return '^2.9.7';
     }
 
+    /**
+     * Returns whether the package manifest, dependency directory, and Deno lock file exist.
+     */
     public function isInstalled(): bool
     {
         return parent::isInstalled() && $this->hasLockFile();
     }
 
+    /**
+     * Synchronizes Deno workspace members with the merged Composer asset dependencies.
+     */
     protected function actionWhenComposerDependenciesAreMerged(
         AssetPackageInterface $assetPackage,
         array $previousDependencies,
@@ -96,11 +117,17 @@ final class DenoManager extends AbstractAssetManager
         $assetPackage->setPackage($package);
     }
 
+    /**
+     * Returns the Deno audit command for the complete workspace.
+     */
     protected function getAuditCommand(bool $noDev): string
     {
         return $this->buildUnconfiguredCommand(['audit', '--level=low']);
     }
 
+    /**
+     * Returns environment overrides that disable color in Deno audit output.
+     */
     protected function getAuditEnvironment(): array
     {
         return self::AUDIT_ENVIRONMENT;
@@ -114,6 +141,9 @@ final class DenoManager extends AbstractAssetManager
         return Platform::isWindows() ? 'deno.exe' : 'deno';
     }
 
+    /**
+     * Returns the command that refreshes the lock file and then installs dependencies.
+     */
     protected function getUpdateCommand(): string
     {
         return $this->buildCommand('update', ['update', '--lockfile-only', '--recursive'])
@@ -121,11 +151,17 @@ final class DenoManager extends AbstractAssetManager
             . $this->getInstallCommand();
     }
 
+    /**
+     * Extracts the version number from Deno's version output.
+     */
     protected function normalizeVersionOutput(string $output): string
     {
         return 1 === preg_match('/^deno (\S+)/', $output, $matches) ? $matches[1] : $output;
     }
 
+    /**
+     * Rejects production-only audits because Deno cannot exclude development dependencies.
+     */
     protected function validateAuditConfiguration(bool $noDev): void
     {
         if ($noDev) {

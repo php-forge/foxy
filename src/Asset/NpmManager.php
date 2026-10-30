@@ -18,28 +18,46 @@ use function str_contains;
 use function str_replace;
 use function trim;
 
+/**
+ * Integrates npm with Foxy's install, update, workspace, and audit workflows.
+ */
 final class NpmManager extends AbstractAssetManager
 {
+    /**
+     * Returns the parser for npm audit JSON output.
+     */
     public function getAuditParser(): AuditParserInterface
     {
         return new NpmAuditParser();
     }
 
+    /**
+     * Returns npm's lock-file name.
+     */
     public function getLockPackageName(): string
     {
         return 'package-lock.json';
     }
 
+    /**
+     * Returns the manager name used in Foxy configuration.
+     */
     public function getName(): string
     {
         return 'npm';
     }
 
+    /**
+     * Returns the npm versions supported by this integration.
+     */
     public function getVersionConstraint(): string
     {
         return '>=10.9.8';
     }
 
+    /**
+     * Removes already-installed Composer assets so npm installs their updated manifest paths.
+     */
     protected function actionWhenComposerDependenciesAreAlreadyInstalled(array $names): void
     {
         foreach ($names as $name) {
@@ -47,6 +65,9 @@ final class NpmManager extends AbstractAssetManager
         }
     }
 
+    /**
+     * Returns an npm audit command that covers the root package and every locked workspace.
+     */
     protected function getAuditCommand(bool $noDev): string
     {
         $command = [

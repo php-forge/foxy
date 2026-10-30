@@ -45,6 +45,18 @@ final class InternalMockerExtension implements Extension
                 'name' => 'file_put_contents',
             ],
             [
+                'namespace' => 'Composer\\Util',
+                'name' => 'file_exists',
+            ],
+            [
+                'namespace' => 'Composer\\Util',
+                'name' => 'file_put_contents',
+            ],
+            [
+                'namespace' => 'Composer\\Util',
+                'name' => 'is_writable',
+            ],
+            [
                 'namespace' => 'Foxy\\Asset',
                 'name' => 'getcwd',
             ],

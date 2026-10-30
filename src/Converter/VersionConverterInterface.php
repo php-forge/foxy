@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Foxy\Converter;
 
+/**
+ * Converts an asset-manager version to a Composer-compatible version.
+ */
 interface VersionConverterInterface
 {
     /**

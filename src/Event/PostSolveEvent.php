@@ -7,9 +7,14 @@ namespace Foxy\Event;
 use Composer\Package\PackageInterface;
 use Foxy\FoxyEvents;
 
+/**
+ * Reports the asset-manager result after dependency solving.
+ */
 final class PostSolveEvent extends AbstractSolveEvent
 {
     /**
+     * Creates the post-solve event.
+     *
      * @param string $assetDir The directory of mock assets.
      * @param PackageInterface[] $packages  All installed Composer packages.
      * @param int $runResult The process result of asset manager execution.

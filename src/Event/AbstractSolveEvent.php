@@ -7,9 +7,14 @@ namespace Foxy\Event;
 use Composer\EventDispatcher\Event;
 use Composer\Package\PackageInterface;
 
+/**
+ * Carries the asset directory and installed packages through the solve lifecycle.
+ */
 abstract class AbstractSolveEvent extends Event
 {
     /**
+     * Creates a solve lifecycle event.
+     *
      * @param string $name The event name.
      * @param string $assetDir The directory of mock assets.
      * @param PackageInterface[] $packages All installed Composer packages.

@@ -10,6 +10,9 @@ use Foxy\Exception\{Message, RuntimeException};
 use function preg_match;
 use function str_contains;
 
+/**
+ * Validates Composer runtime requirements used by Foxy.
+ */
 final class ComposerUtil
 {
     /**

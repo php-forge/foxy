@@ -8,6 +8,9 @@ use Foxy\Exception\{Message, RuntimeException};
 
 use function count;
 
+/**
+ * Selects a configured asset manager by name, lock file, or executable availability.
+ */
 final class AssetManagerFinder
 {
     /**
@@ -16,6 +19,8 @@ final class AssetManagerFinder
     private array $managers = [];
 
     /**
+     * Registers the asset managers available for selection.
+     *
      * @param AssetManagerInterface[] $managers The asset managers
      */
     public function __construct(array $managers = [])
@@ -25,6 +30,9 @@ final class AssetManagerFinder
         }
     }
 
+    /**
+     * Registers an asset manager by its unique name.
+     */
     public function addManager(AssetManagerInterface $manager): void
     {
         $this->managers[$manager->getName()] = $manager;

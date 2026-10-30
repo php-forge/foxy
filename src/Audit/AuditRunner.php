@@ -12,10 +12,19 @@ use function in_array;
 use function trim;
 use function usort;
 
+/**
+ * Runs and validates a package manager audit before normalizing its findings.
+ */
 final readonly class AuditRunner implements AuditRunnerInterface
 {
+    /**
+     * Creates an audit runner for the selected asset manager.
+     */
     public function __construct(private AssetManagerInterface $manager) {}
 
+    /**
+     * Runs the configured package manager audit and returns a normalized report.
+     */
     public function audit(AuditRequest $request): AuditReport
     {
         $manager = $this->manager->getName();

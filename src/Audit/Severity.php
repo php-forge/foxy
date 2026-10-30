@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Foxy\Audit;
 
+/**
+ * Normalized security advisory severity levels.
+ */
 enum Severity: string
 {
     case CRITICAL = 'critical';
@@ -12,11 +15,17 @@ enum Severity: string
     case LOW = 'low';
     case MODERATE = 'moderate';
 
+    /**
+     * Whether this severity meets or exceeds the threshold.
+     */
     public function isAtLeast(self $threshold): bool
     {
         return $this->weight() >= $threshold->weight();
     }
 
+    /**
+     * Returns the relative ordering weight of this severity.
+     */
     public function weight(): int
     {
         return match ($this) {

@@ -78,6 +78,8 @@ final readonly class TarballExtractor
     private const array MAGICS = ["ustar\0", 'ustar '];
 
     /**
+     * Creates a tarball extractor using Composer's filesystem abstraction.
+     *
      * @param Filesystem $fs Filesystem used to create directories.
      */
     public function __construct(private Filesystem $fs) {}

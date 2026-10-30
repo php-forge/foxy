@@ -21,6 +21,8 @@ use function preg_match;
 final readonly class PackageMetadata
 {
     /**
+     * Describes the installable versions returned for an npm package.
+     *
      * @param string $name Package name.
      * @param array<string, string> $distTags Dist-tag names mapped to versions.
      * @param array<string, PackageVersion> $versions Versions keyed by version string, limited to the versions that

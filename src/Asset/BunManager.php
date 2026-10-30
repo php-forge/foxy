@@ -38,33 +38,54 @@ use function trim;
 
 use const DIRECTORY_SEPARATOR;
 
+/**
+ * Integrates the Bun package manager with Foxy's install, update, and audit workflows.
+ */
 final class BunManager extends AbstractAssetManager
 {
+    /**
+     * Returns the parser for Bun audit JSON output.
+     */
     public function getAuditParser(): AuditParserInterface
     {
         return new BunAuditParser();
     }
 
+    /**
+     * Returns Bun's text lock-file name.
+     */
     public function getLockPackageName(): string
     {
         return 'bun.lock';
     }
 
+    /**
+     * Returns the manager name used in Foxy configuration.
+     */
     public function getName(): string
     {
         return 'bun';
     }
 
+    /**
+     * Returns the Bun versions supported by this integration.
+     */
     public function getVersionConstraint(): string
     {
         return '^1.4.0';
     }
 
+    /**
+     * Returns whether the package manifest, dependency directory, and Bun lock file exist.
+     */
     public function isInstalled(): bool
     {
         return parent::isInstalled() && $this->hasLockFile();
     }
 
+    /**
+     * Returns the Bun audit command for all or production dependencies.
+     */
     protected function getAuditCommand(bool $noDev): string
     {
         $command = ['audit', '--json'];
@@ -84,6 +105,9 @@ final class BunManager extends AbstractAssetManager
         return Platform::isWindows() ? 'bun.exe' : 'bun';
     }
 
+    /**
+     * Rejects Bun and npm configuration that would narrow or ignore audit results.
+     */
     protected function validateAuditConfiguration(bool $noDev): void
     {
         foreach ($this->getNpmrcPaths() as $path) {

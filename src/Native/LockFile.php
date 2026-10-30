@@ -39,6 +39,8 @@ final readonly class LockFile
     ];
 
     /**
+     * Creates a native dependency lock-file store.
+     *
      * @param string $path Lock file path.
      */
     public function __construct(private string $path) {}

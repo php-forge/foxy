@@ -11,6 +11,8 @@ namespace Foxy\Native;
 final readonly class Requirement
 {
     /**
+     * Describes one dependency constraint for the native resolver.
+     *
      * @param string $name Package name, scoped names included (`@scope/name`).
      * @param string $spec npm specification as written by the declaring manifest (range, version, or dist-tag).
      * @param string $source Declaring origin: `''` for the root manifest, the local package name, or `name@version`.
