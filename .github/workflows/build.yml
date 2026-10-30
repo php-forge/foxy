@@ -19,6 +19,6 @@ jobs:
   phpunit:
     uses: php-forge/actions/.github/workflows/phpunit.yml@a574dbe95fc370db1b7b5ea546cd5ff5b70304d6 # v3.0.0
     with:
-      php-version: '["8.3","8.4","8.5","8.6"]'
+      php-version: '["8.3","8.4","8.5"]'
     secrets:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

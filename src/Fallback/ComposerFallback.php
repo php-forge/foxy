@@ -64,7 +64,9 @@ final class ComposerFallback implements FallbackInterface
     }
 
     /**
-     * Restores the captured Composer state without running project scripts.
+     * Restores the captured Composer state.
+     *
+     * The default installer suppresses project scripts; an injected installer retains its event-dispatcher behavior.
      *
      * @throws Exception
      */

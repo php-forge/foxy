@@ -12,12 +12,12 @@ use function strlen;
 use function substr;
 
 /**
- * Converts asset-manager version constraints to Composer-compatible constraints.
+ * Converts an asset-manager version to a Composer-compatible version.
  */
 final class SemverConverter implements VersionConverterInterface
 {
     /**
-     * Converts an asset-manager version constraint to Composer syntax.
+     * Converts an asset-manager version to Composer-compatible syntax.
      */
     public function convertVersion(string|null $version = null): string
     {

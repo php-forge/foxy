@@ -25,7 +25,7 @@ final class DenoManager extends AbstractAssetManager
     private const array AUDIT_ENVIRONMENT = ['NO_COLOR' => '1'];
 
     /**
-     * Returns the parser for Deno audit JSON output.
+     * Returns the parser for the human-readable text report produced by `deno audit`.
      */
     public function getAuditParser(): AuditParserInterface
     {

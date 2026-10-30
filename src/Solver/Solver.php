@@ -42,7 +42,7 @@ final readonly class Solver implements SolverInterface
     private const string MANAGED_MARKER = '.foxy-managed';
 
     /**
-     * Creates the asset dependency solver and its rollback collaborators.
+     * Creates the asset dependency solver with optional fallbacks; `null` disables each corresponding rollback path.
      *
      * @param AssetManagerInterface $assetManager The asset manager instance.
      * @param Config $config The config instance.
