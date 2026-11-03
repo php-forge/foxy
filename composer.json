@@ -39,7 +39,7 @@
         "phpstan/extension-installer": "^1.4",
         "phpstan/phpstan": "^2.2",
         "phpstan/phpstan-strict-rules": "^2.0.3",
-        "phpunit/phpunit": "^11.5",
+        "phpunit/phpunit": "^13.4",
         "xepozz/internal-mocker": "^1.4"
     },
     "suggest": {
