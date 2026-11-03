@@ -17,4 +17,4 @@ permissions:
 
 jobs:
   composer-require-checker:
-    uses: php-forge/actions/.github/workflows/composer-require-checker.yml@a574dbe95fc370db1b7b5ea546cd5ff5b70304d6 # v3.0.0
+    uses: php-forge/actions/.github/workflows/composer-require-checker.yml@7e505a901224dd878bbda274546f3a8594727dd9 # v3.0.0
