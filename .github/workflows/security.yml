@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   security:
-    uses: php-forge/actions/.github/workflows/security.yml@a574dbe95fc370db1b7b5ea546cd5ff5b70304d6 # v3.0.0
+    uses: php-forge/actions/.github/workflows/security.yml@ed2c7b46bd89123eea257136960b12d27fbb5d9e # v3.0.0
     permissions:
       contents: read
     with:
